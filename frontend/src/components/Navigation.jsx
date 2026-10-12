@@ -15,6 +15,12 @@ import {
   IconNetwork,
 } from './CyberIcons';
 
+// Сайт открыт по адресу локальной сети (192.168.x.x, 10.x.x.x, 172.16–31.x.x,
+// localhost на деве), а не по внешнему домену. Только для показа пунктов меню,
+// которые работают лишь изнутри сети; на остальную работу платформы не влияет.
+const IS_LOCAL_NETWORK = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/
+  .test(window.location.hostname);
+
 function Navigation({ user, isOpen, onClose }) {
   const academyName = useAcademyName();
   const { pathname } = useLocation();
@@ -103,8 +109,9 @@ function Navigation({ user, isOpen, onClose }) {
           </li>
         )}
         {/* Отчёт NetDiag — отдельный сервис на том же сервере (nginx: /netdiag/,
-            только из локальной сети). Не маршрут React — обычная ссылка в новой вкладке. */}
-        {user?.role === 'admin' && (
+            только из локальной сети). Не маршрут React — обычная ссылка в новой вкладке.
+            Показывается, только если сайт открыт по адресу локальной сети. */}
+        {user?.role === 'admin' && IS_LOCAL_NETWORK && (
           <li className="nav__item">
             <a href="/netdiag/" target="_blank" rel="noopener noreferrer" className="nav__link" onClick={handleLinkClick}>
               <IconNetwork className="nav__icon" />
