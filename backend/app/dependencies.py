@@ -7,6 +7,7 @@ from .models import User
 from .core.security import decode_token
 
 security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)
 
 async def get_current_user(
     request: Request,
@@ -39,6 +40,22 @@ async def get_current_user(
 
     request.state.current_user = user
     return user
+
+async def get_optional_user(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(optional_security),
+    db: AsyncSession = Depends(get_db),
+):
+    """Пользователь, если запрос пришёл с действующим токеном, иначе None —
+    для публичных роутов, которые ведут себя иначе для своих (регистрация
+    по QR: ученик, которого заводит педагог, не ждёт подтверждения)."""
+    if credentials is None:
+        return None
+    try:
+        return await get_current_user(request, credentials, db)
+    except HTTPException:
+        return None
+
 
 # Dependency для роутов только для admin
 async def require_admin(current_user: User = Depends(get_current_user)):

@@ -31,9 +31,7 @@ function PhoneGate() {
       const status = err?.response?.status;
       setError(status === 409
         ? 'Этот телефон уже зарегистрирован. Обратитесь к педагогу или администратору'
-        : status === 422
-          ? 'Введите номер с кодом страны, например +994 50 123 45 67'
-          : (err?.response?.data?.detail || 'Не удалось сохранить'));
+        : (typeof err?.response?.data?.detail === 'string' ? err.response.data.detail : 'Не удалось сохранить'));
     } finally {
       setSaving(false);
     }

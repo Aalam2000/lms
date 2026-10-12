@@ -83,7 +83,7 @@ async def build_student_report(
     joined = {
         gid: (joined_at, expelled_at) for gid, joined_at, expelled_at in (await db.execute(
             select(GroupMember.group_id, GroupMember.joined_at, GroupMember.expelled_at)
-            .where(GroupMember.student_id == student.id, GroupMember.group_id.in_(gids))
+            .where(GroupMember.student_id == student.id, GroupMember.group_id.in_(gids), GroupMember.status != "pending")
         )).all()
     }
     group_names = {g["id"]: g["name"] for g in groups}

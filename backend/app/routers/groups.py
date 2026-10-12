@@ -94,6 +94,21 @@ async def get_student_groups(
     return result.scalars().unique().all()
 
 
+# Группы, куда ученик записался по QR и ждёт подтверждения педагога (Главная ученика)
+@router.get("/student/pending")
+async def get_student_pending_groups(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    rows = (await db.execute(
+        select(Group.id, Group.name)
+        .join(GroupMember, GroupMember.group_id == Group.id)
+        .where(GroupMember.student_id == current_user.id, GroupMember.status == "pending", Group.status == "active")
+        .order_by(Group.name)
+    )).all()
+    return [{"id": gid, "name": name} for gid, name in rows]
+
+
 # Настройки группы, которые может менять сам педагог (своей группы; admin —
 # любой): название, контакты, ссылка на видеоконференцию, длительность
 # урока по умолчанию (на уже созданные уроки не влияет). Курс, педагог и
@@ -198,6 +213,11 @@ async def get_my_groups(
     teachers = {uid: (full_name or username) for uid, full_name, username in teachers_result.all()}
     to_review = await to_review_by_group(db, group_ids)
     work_to_review = await work_to_review_by_group(db, group_ids)
+    pending = dict((await db.execute(
+        select(GroupMember.group_id, func.count(GroupMember.id))
+        .where(GroupMember.group_id.in_(group_ids), GroupMember.status == "pending")
+        .group_by(GroupMember.group_id)
+    )).all())
 
     out = []
     for g in groups:
@@ -206,6 +226,7 @@ async def get_my_groups(
         item.teacher_name = teachers.get(g.teacher_id)
         item.homework_to_review = to_review.get(g.id, 0)
         item.work_to_review = work_to_review.get(g.id, 0)
+        item.pending_count = pending.get(g.id, 0)
         out.append(item)
     out += [_guest_group_out(g, teachers.get(g.teacher_id)) for g in guest_groups]
     return out
@@ -273,6 +294,10 @@ async def get_group_detail(
     item = GroupOut.model_validate(group)
     item.student_count = student_count
     item.teacher_name = teacher_name
+    item.pending_count = (await db.execute(
+        select(func.count(GroupMember.id))
+        .where(GroupMember.group_id == group.id, GroupMember.status == "pending")
+    )).scalar() or 0
     return item
 
 class GroupMemberOut(BaseModel):
@@ -298,7 +323,8 @@ class ExpelMemberIn(BaseModel):
 
 
 # Участники группы — по умолчанию активные, ?status=expelled — архив
-# (отчисленные, с причиной и датой).
+# (отчисленные, с причиной и датой), ?status=pending — новые: записались по
+# QR и ждут подтверждения.
 @router.get("/{group_id}/students", response_model=list[GroupMemberOut])
 async def get_group_students(
     group_id: int,
@@ -306,8 +332,8 @@ async def get_group_students(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_teacher)
 ):
-    if status not in ("active", "expelled"):
-        raise HTTPException(status_code=400, detail="status должен быть active или expelled")
+    if status not in ("active", "expelled", "pending"):
+        raise HTTPException(status_code=400, detail="status должен быть active, expelled или pending")
     await _get_owned_group(db, group_id, current_user)
 
     result = await db.execute(
@@ -494,6 +520,60 @@ async def restore_group_member(
         created_at=student.created_at, membership_id=member.id, status=member.status,
     )
 
+async def _pending_member(db: AsyncSession, group_id: int, student_id: int) -> tuple[GroupMember, User]:
+    row = (await db.execute(
+        select(GroupMember, User).join(User, User.id == GroupMember.student_id).where(
+            GroupMember.group_id == group_id, GroupMember.student_id == student_id,
+            GroupMember.status == "pending",
+        )
+    )).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Заявка не найдена — ученик уже принят или отклонён")
+    return row[0], row[1]
+
+
+# Принять нового ученика (записался по QR): с этого момента он в группе —
+# дата вступления = сегодня, более ранние уроки ему не в счёт (attendance.py).
+@router.post("/{group_id}/members/{student_id}/accept", response_model=GroupMemberOut)
+async def accept_group_member(
+    group_id: int,
+    student_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_teacher)
+):
+    await _get_owned_group(db, group_id, current_user)
+    member, student = await _pending_member(db, group_id, student_id)
+    member.status = "active"
+    member.joined_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(member)
+    return GroupMemberOut(
+        id=student.id, full_name=student.full_name, username=student.username, phone=student.phone,
+        created_at=student.created_at, membership_id=member.id, status=member.status,
+    )
+
+
+# Отклонить заявку. Ученик больше нигде не состоит — аккаунт удаляется целиком
+# (телефон освобождается); есть другие группы — убирается только эта запись.
+@router.post("/{group_id}/members/{student_id}/decline")
+async def decline_group_member(
+    group_id: int,
+    student_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_teacher)
+):
+    await _get_owned_group(db, group_id, current_user)
+    member, student = await _pending_member(db, group_id, student_id)
+    other = (await db.execute(select(GroupMember.id).where(
+        GroupMember.student_id == student_id, GroupMember.id != member.id,
+    ).limit(1))).first()
+    await db.delete(member)
+    if other is None and student.role == "student":
+        await db.delete(student)
+    await db.commit()
+    return {"ok": True, "account_deleted": other is None}
+
+
 # Публичный: данные группы по invite-коду (для страницы регистрации)
 @router.get("/invite/{invite_code}", response_model=GroupInviteOut)
 async def get_group_by_invite(
@@ -502,7 +582,7 @@ async def get_group_by_invite(
 ):
     result = await db.execute(select(Group).where(Group.invite_code == invite_code))
     group = result.scalar_one_or_none()
-    if not group:
+    if not group or group.status != "active":  # архивная группа учеников не принимает
         raise HTTPException(status_code=404, detail="Приглашение недействительно")
 
     course_result = await db.execute(select(Course).where(Course.id == group.course_id))

@@ -79,7 +79,7 @@ async def attendance_slots(
 
     members_q = select(
         GroupMember.group_id, GroupMember.student_id, GroupMember.joined_at, GroupMember.expelled_at,
-    ).where(GroupMember.group_id.in_(group_ids))
+    ).where(GroupMember.group_id.in_(group_ids), GroupMember.status != "pending")  # не принятые педагогом — не в счёт
     if student_ids is not None:
         members_q = members_q.where(GroupMember.student_id.in_(list(student_ids)))
     members = (await db.execute(members_q)).all()

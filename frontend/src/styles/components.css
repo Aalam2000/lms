@@ -1703,6 +1703,20 @@ a.row-icon:hover {
   border-radius: 3px;
 }
 
+/* Новые ученики (записались по QR): кнопки «Принять / Отклонить» в окне учеников группы */
+.pending-actions {
+  display: inline-flex;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+/* Главная ученика: записался в группу, ждёт подтверждения педагога */
+.pending-note {
+  margin-bottom: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-left: 4px solid var(--color-warning);
+  background: var(--color-warning-bg);
+}
+
 /* Вкладка ученика «Работа на уроке» (LessonWorkStudent.jsx) */
 .lesson-work {
   display: flex;

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api/auth';
 import Calendar from '../components/Calendar';
 import StudentGroupsBar from '../components/StudentGroupsBar';
-import { getStudentGroups } from '../api/groups';
+import { getStudentGroups, getMyPendingGroups } from '../api/groups';
 
 // Главная студента: «Мои уроки» — Таблица | Календарь (как в группе у педагога).
 // Урок, где что-то не закрыто, подсвечивается и там и там:
@@ -36,12 +36,14 @@ function StudentHome() {
   const navigate = useNavigate();
   const [lessons, setLessons] = useState([]);
   const [groups, setGroups] = useState([]);
+  const [pendingGroups, setPendingGroups] = useState([]); // записался по QR, педагог ещё не принял
   const [viewMode, setViewMode] = useState(readViewMode); // table | calendar
 
   useEffect(() => {
     // Все уроки (и закрытые) — для календаря; таблица показывает только открытые
     api.get('/lessons/student', { params: { include_closed: 1 } }).then(r => setLessons(r.data));
     getStudentGroups().then(setGroups).catch(() => setGroups([]));
+    getMyPendingGroups().then(setPendingGroups).catch(() => setPendingGroups([]));
   }, []);
 
   useEffect(() => {
@@ -58,6 +60,12 @@ function StudentHome() {
         <h2>{'Мои уроки'}</h2>
         <StudentGroupsBar groups={groups} />
       </div>
+
+      {pendingGroups.map(g => (
+        <div key={g.id} className="pending-note">
+          {'Вы записались в группу'} <b>{g.name}</b>{'. Ждём, когда педагог подтвердит, — после этого здесь появятся уроки.'}
+        </div>
+      ))}
 
       <div className="toolbar__filters">
         <button type="button" className={`tab${viewMode === 'table' ? ' tab--active' : ''}`} onClick={() => setViewMode('table')}>

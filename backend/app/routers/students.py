@@ -14,7 +14,7 @@ from ..database import get_db
 from ..homework_status import last_homework_debts
 from ..schemas import NewPasswordIn
 from ..dependencies import require_admin, require_teacher
-from ..phones import checked_student_phone, normalize_phone, PHONE_FORMAT_ERROR, PHONE_REQUIRED_ERROR
+from ..phones import checked_student_phone, normalize_phone, phone_key, PHONE_FORMAT_ERROR, PHONE_REQUIRED_ERROR
 from ..report_common import resolve_period
 from ..student_report import build_student_report
 from ..models import (
@@ -382,11 +382,14 @@ def _clean(value: Optional[str]) -> Optional[str]:
     return (value or "").strip() or None
 
 
-def _parent_phone(raw: Optional[str]) -> Optional[str]:
-    # Телефон родителя: тот же формат, что у ученика, но повторяться может (братья и сёстры)
+def _parent_phone(raw: Optional[str], current: Optional[str] = None) -> Optional[str]:
+    # Телефон родителя: тот же формат, что у ученика, но повторяться может (братья и сёстры).
+    # Уже записанный номер, если его не меняли, не перепроверяем (app/phones.py).
     raw = (raw or "").strip()
     if not raw:
         return None
+    if current and phone_key(raw) == phone_key(current):
+        return current
     normalized = normalize_phone(raw)
     if not normalized:
         raise HTTPException(status_code=422, detail=PHONE_FORMAT_ERROR)
@@ -473,7 +476,7 @@ async def update_student_profile(
     # (ученик сам заполнит при входе).
     phone = (data.phone or "").strip()
     if phone:
-        student.phone = await checked_student_phone(db, phone, exclude_user_id=student.id)
+        student.phone = await checked_student_phone(db, phone, exclude_user_id=student.id, current=student.phone)
     elif (student.phone or "").strip():
         raise HTTPException(status_code=422, detail=PHONE_REQUIRED_ERROR)
 
@@ -481,7 +484,7 @@ async def update_student_profile(
     student.telegram_username = _clean(data.telegram_username)
     student.whatsapp = _clean(data.whatsapp)
     student.parent_name = _clean(data.parent_name)
-    student.parent_phone = _parent_phone(data.parent_phone)
+    student.parent_phone = _parent_phone(data.parent_phone, current=student.parent_phone)
 
     await db.commit()
     await db.refresh(student)

@@ -61,7 +61,9 @@ class GroupMember(Base):
     id = Column(Integer, primary_key=True, index=True)
     group_id = Column(Integer, ForeignKey("groups.id"), nullable=False)
     student_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    status = Column(String, nullable=False, default="active")  # active | expelled
+    # active | expelled | pending — сам зарегистрировался по QR и ждёт, когда педагог
+    # примет (routers/groups.py); pending нигде не учитывается, как и expelled
+    status = Column(String, nullable=False, default="active")
     joined_at = Column(DateTime(timezone=True), server_default=func.now())
     # Заполняются только при status="expelled" (отчислен из ЭТОЙ группы —
     # ученик может состоять в нескольких группах одновременно и быть

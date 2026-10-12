@@ -1,14 +1,21 @@
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from ..database import get_db
 from ..models import User, Group, GroupMember
 from ..schemas import UserLogin, Token, UserOut, UserCreate, StudentRegister, UserUpdate
 from ..core.security import verify_password, get_password_hash, create_access_token, decode_token
-from ..dependencies import get_current_user
+from ..dependencies import get_current_user, get_optional_user
 from ..phones import checked_student_phone, ensure_phone_free, normalize_phone, PHONE_REQUIRED_ERROR
 
 router = APIRouter()
+
+# Самостоятельная регистрация по QR: не больше стольких новых учеников в одну
+# группу за час — защита от массового заведения аккаунтов
+REGISTRATIONS_PER_HOUR = 30
 
 # Регистрация педагога админом
 @router.post("/register", response_model=UserOut)
@@ -61,13 +68,33 @@ async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
+# Регистрация ученика по коду группы (QR). Сам ученик попадает в группу со
+# статусом pending — «ждёт подтверждения»: пока педагог не примет, его нет в
+# журнале, уроках и отчётах (везде учитываются только active). Если ученика
+# заводит педагог этой группы или админ (окно «Добавить студента» у QR),
+# он сразу активный и ограничение частоты на него не действует.
 @router.post("/register/student", response_model=UserOut)
-async def register_student(data: StudentRegister, db: AsyncSession = Depends(get_db)):
-    # Проверяем invite_code
+async def register_student(
+    data: StudentRegister,
+    db: AsyncSession = Depends(get_db),
+    actor: Optional[User] = Depends(get_optional_user),
+):
+    # Проверяем invite_code; в архивную группу не регистрируем
     result = await db.execute(select(Group).where(Group.invite_code == data.invite_code))
     group = result.scalar_one_or_none()
-    if not group:
-        raise HTTPException(status_code=404, detail="Группа не найдена")
+    if not group or group.status != "active":
+        raise HTTPException(status_code=404, detail="Приглашение недействительно")
+
+    by_staff = actor is not None and (actor.role == "admin" or (actor.role == "teacher" and group.teacher_id == actor.id))
+    if not by_staff:
+        since = datetime.now(timezone.utc) - timedelta(hours=1)
+        recent = (await db.execute(
+            select(func.count(GroupMember.id))
+            .join(User, User.id == GroupMember.student_id)
+            .where(GroupMember.group_id == group.id, User.created_at >= since)
+        )).scalar() or 0
+        if recent >= REGISTRATIONS_PER_HOUR:
+            raise HTTPException(status_code=429, detail="Слишком много регистраций в эту группу — попробуйте позже")
 
     # Проверяем уникальность username
     result = await db.execute(select(User).where(User.username == data.username))
@@ -89,8 +116,8 @@ async def register_student(data: StudentRegister, db: AsyncSession = Depends(get
     db.add(student)
     await db.flush()  # получаем id до commit
 
-    # Привязываем к группе
-    member = GroupMember(group_id=group.id, student_id=student.id)
+    # Привязываем к группе: сам — ждёт подтверждения педагога, завёл педагог — сразу в группе
+    member = GroupMember(group_id=group.id, student_id=student.id, status="active" if by_staff else "pending")
     db.add(member)
     await db.commit()
     await db.refresh(student)
@@ -110,7 +137,9 @@ async def update_me(
             raise HTTPException(status_code=422, detail=PHONE_REQUIRED_ERROR)
         # У ученика телефон проверяется так же, как при регистрации
         if current_user.role == "student":
-            current_user.phone = await checked_student_phone(db, data.phone, exclude_user_id=current_user.id)
+            current_user.phone = await checked_student_phone(
+                db, data.phone, exclude_user_id=current_user.id, current=current_user.phone,
+            )
         else:
             await ensure_phone_free(db, data.phone, exclude_user_id=current_user.id)
             current_user.phone = normalize_phone(data.phone) or data.phone.strip()

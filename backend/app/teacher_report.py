@@ -120,7 +120,7 @@ async def build_teacher_report(db: AsyncSession, teacher: User, period: Period) 
     members = (await db.execute(
         select(GroupMember, User.full_name, User.username)
         .join(User, User.id == GroupMember.student_id)
-        .where(GroupMember.group_id.in_(gids))
+        .where(GroupMember.group_id.in_(gids), GroupMember.status != "pending")  # не принятые педагогом — не в счёт
     )).all()
     base_members, left = [], []
     for m, full_name, username in members:

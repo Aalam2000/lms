@@ -454,6 +454,17 @@ function GroupPage() {
             <IconButton icon="settings" tip={'Настройки группы'} onClick={() => setIsSettingsOpen(true)} />
             <IconButton icon="qr" tip={'QR для регистрации'} onClick={() => setIsQRModalOpen(true)} />
             <IconButton icon="students" tip={'Ученики'} label={group.student_count ?? 0} onClick={() => setIsStudentsModalOpen(true)} />
+            {/* Записались по QR и ждут подтверждения — пока не примете, их нет в журнале */}
+            {group.pending_count > 0 && (
+              <button
+                type="button"
+                className="btn btn--attention"
+                data-tip={'Новые ученики ждут подтверждения'}
+                onClick={() => setIsStudentsModalOpen('pending')}
+              >
+                {'Новые'}<span className="btn__count">{group.pending_count}</span>
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -923,7 +934,13 @@ function GroupPage() {
         <StudentsModal
           groupId={gid}
           groupName={group.name}
-          onClose={() => setIsStudentsModalOpen(false)}
+          initialTab={isStudentsModalOpen === 'pending' ? 'pending' : 'active'}
+          pendingCount={group.pending_count || 0}
+          onClose={() => {
+            setIsStudentsModalOpen(false);
+            // приняли или отклонили новых — обновить число учеников и метку «Новые»
+            getMyGroups({ with_guest: true }).then(setGroups).catch(() => {});
+          }}
         />
       )}
     </div>

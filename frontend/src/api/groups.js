@@ -46,6 +46,21 @@ export function restoreGroupMember(groupId, studentId) {
   return api.post(`/groups/${groupId}/members/${studentId}/restore`).then(res => res.data);
 }
 
+// Новые ученики (записались по QR и ждут подтверждения): принять / отклонить.
+// Отклонить: ученик больше нигде не состоит — аккаунт удаляется ({account_deleted: true}).
+export function acceptGroupMember(groupId, studentId) {
+  return api.post(`/groups/${groupId}/members/${studentId}/accept`).then(res => res.data);
+}
+
+export function declineGroupMember(groupId, studentId) {
+  return api.post(`/groups/${groupId}/members/${studentId}/decline`).then(res => res.data);
+}
+
+// Ученик: группы, где он ждёт подтверждения педагога
+export function getMyPendingGroups() {
+  return api.get('/groups/student/pending').then(res => res.data);
+}
+
 // Настройки группы, которые меняет сам педагог: name, telegram_chat_id,
 // whatsapp, video_url. Возвращает обновлённую группу (GroupOut).
 export function updateGroupSettings(groupId, data) {

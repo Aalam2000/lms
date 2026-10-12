@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api/auth';
-import { getGroupStudents, searchAvailableStudents, addGroupMember, expelGroupMember, restoreGroupMember } from '../api/groups';
+import {
+  getGroupStudents, searchAvailableStudents, addGroupMember, expelGroupMember, restoreGroupMember,
+  acceptGroupMember, declineGroupMember,
+} from '../api/groups';
 import StudentCardModal from './StudentCardModal';
 
-function StudentsModal({ groupId, groupName, onClose }) {
-  const [tab, setTab] = useState('active'); // active | archived
+// initialTab — 'pending', если окно открыли меткой «Новые» на странице группы
+function StudentsModal({ groupId, groupName, onClose, initialTab = 'active', pendingCount = 0 }) {
+  const [tab, setTab] = useState(initialTab); // active | pending (новые, ждут подтверждения) | archived
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -25,7 +29,7 @@ function StudentsModal({ groupId, groupName, onClose }) {
     setLoading(true);
     setError('');
     try {
-      const res = await getGroupStudents(groupId, tab === 'active' ? 'active' : 'expelled');
+      const res = await getGroupStudents(groupId, tab === 'archived' ? 'expelled' : tab);
       setStudents(res);
     } catch (err) {
       setError(err?.response?.data?.detail || 'Не удалось загрузить учеников');
@@ -87,6 +91,34 @@ function StudentsModal({ groupId, groupName, onClose }) {
   const openEdit = (studentId) => { setExpellingId(null); setEditingId(studentId); };
   const closeEdit = () => setEditingId(null);
 
+  // Новые ученики: принять — сразу в группе; отклонить — аккаунт удаляется, если других групп нет
+  const handleAccept = async (studentId) => {
+    setBusyId(studentId);
+    setError('');
+    try {
+      await acceptGroupMember(groupId, studentId);
+      await load();
+    } catch (err) {
+      setError(err?.response?.data?.detail || 'Не удалось принять');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleDecline = async (st) => {
+    if (!window.confirm(`Отклонить «${st.full_name || st.username}»? Если ученик больше нигде не учится, его аккаунт будет удалён.`)) return;
+    setBusyId(st.id);
+    setError('');
+    try {
+      await declineGroupMember(groupId, st.id);
+      await load();
+    } catch (err) {
+      setError(err?.response?.data?.detail || 'Не удалось отклонить');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const handleRestore = async (studentId) => {
     setBusyId(studentId);
     setError('');
@@ -113,6 +145,15 @@ function StudentsModal({ groupId, groupName, onClose }) {
             onClick={() => setTab('active')}
           >
             {'Активные'}
+          </button>
+          <button
+            className={`tab${tab === 'pending' ? ' tab--active' : ''}`}
+            onClick={() => setTab('pending')}
+          >
+            {'Новые'}
+            {(tab === 'pending' && !loading ? students.length : pendingCount) > 0 && (
+              <span className="btn__count">{tab === 'pending' && !loading ? students.length : pendingCount}</span>
+            )}
           </button>
           <button
             className={`tab${tab === 'archived' ? ' tab--active' : ''}`}
@@ -166,7 +207,7 @@ function StudentsModal({ groupId, groupName, onClose }) {
                 <th>{'Имя'}</th>
                 <th>{'Логин'}</th>
                 <th>{'Телефон'}</th>
-                {tab === 'active' && <th>{'Дата регистрации'}</th>}
+                {tab !== 'archived' && <th>{'Дата регистрации'}</th>}
                 {tab === 'archived' && <th>{'Причина'}</th>}
                 {tab === 'archived' && <th>{'Дата отчисления'}</th>}
                 <th></th>
@@ -176,7 +217,7 @@ function StudentsModal({ groupId, groupName, onClose }) {
               {students.length === 0 && (
                 <tr>
                   <td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: '#6B7280' }}>
-                    {tab === 'active' ? 'Учеников пока нет' : 'Архив пуст'}
+                    {tab === 'active' ? 'Учеников пока нет' : tab === 'pending' ? 'Новых заявок нет' : 'Архив пуст'}
                   </td>
                 </tr>
               )}
@@ -187,7 +228,7 @@ function StudentsModal({ groupId, groupName, onClose }) {
                     <td>{st.username}</td>
                     {/* нет телефона — красный прочерк, чтобы пропуск было видно сразу */}
                     <td className="nowrap" style={{ color: st.phone ? undefined : '#B91C1C' }}>{st.phone || '—'}</td>
-                    {tab === 'active' && (
+                    {tab !== 'archived' && (
                       <td>{st.created_at ? new Date(st.created_at).toLocaleDateString('ru-RU') : '—'}</td>
                     )}
                     {tab === 'archived' && <td>{st.expel_reason || '—'}</td>}
@@ -216,6 +257,24 @@ function StudentsModal({ groupId, groupName, onClose }) {
                         >
                           {busyId === st.id ? '...' : 'Вернуть'}
                         </button>
+                      )}
+                      {tab === 'pending' && (
+                        <span className="pending-actions">
+                          <button
+                            className="btn btn--compact"
+                            disabled={busyId === st.id}
+                            onClick={() => handleAccept(st.id)}
+                          >
+                            {'Принять'}
+                          </button>
+                          <button
+                            className="btn btn--danger btn--compact"
+                            disabled={busyId === st.id}
+                            onClick={() => handleDecline(st)}
+                          >
+                            {'Отклонить'}
+                          </button>
+                        </span>
                       )}
                     </td>
                   </tr>

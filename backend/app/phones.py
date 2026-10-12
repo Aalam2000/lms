@@ -7,29 +7,47 @@
 Местная запись без «+» понимается только для Азербайджана и России: для
 остальных стран страну по ней не угадать. Номер в базе не повторяется ни у
 кого (ученики, педагоги, админы) — сравниваем полный номер в едином виде.
+
+Номер должен существовать: проверка по телефонным планам стран (библиотека
+phonenumbers — база Google libphonenumber): код страны, код оператора или
+города и длина. Номер из одних одинаковых цифр (+994 50 000 00 00) не
+принимаем. Уже записанный в базе номер при повторном сохранении карточки
+не перепроверяем (checked_student_phone, current=...), чтобы старые записи
+не мешали править остальные поля.
 """
 import re
 from typing import Optional
+import phonenumbers
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from .models import User
 
-PHONE_FORMAT_ERROR = "Введите номер с кодом страны, например +994 50 123 45 67"
+PHONE_FORMAT_ERROR = "Такого номера не существует — проверьте код страны, код оператора и количество цифр, например +994 50 123 45 67"
 PHONE_REQUIRED_ERROR = "Телефон обязателен"
 PHONE_TAKEN_ERROR = "Этот телефон уже зарегистрирован. Войдите под своим логином или обратитесь к педагогу"
 
 
 def normalize_phone(raw: Optional[str]) -> Optional[str]:
-    """Номер в едином виде "+<код страны><номер>" или None, если запись не распознана."""
+    """Номер в едином виде "+<код страны><номер>" или None, если запись не
+    распознана или такого номера не бывает."""
     s = re.sub(r"[\s\-()]", "", raw or "")
-    if re.fullmatch(r"\+\d{8,15}", s):   # международная запись (E.164: до 15 цифр)
-        return s
     if re.fullmatch(r"0\d{9}", s):        # Азербайджан: 050 123 45 67
-        return "+994" + s[1:]
-    if re.fullmatch(r"8\d{10}", s):       # Россия: 8 916 037 15 37
-        return "+7" + s[1:]
-    return None
+        s = "+994" + s[1:]
+    elif re.fullmatch(r"8\d{10}", s):     # Россия: 8 916 037 15 37
+        s = "+7" + s[1:]
+    if not re.fullmatch(r"\+\d{8,15}", s):   # международная запись (E.164: до 15 цифр)
+        return None
+    try:
+        number = phonenumbers.parse(s, None)
+    except phonenumbers.NumberParseException:
+        return None
+    if not phonenumbers.is_valid_number(number):
+        return None
+    national = str(number.national_number)
+    if len(set(national[-7:])) == 1:       # +994 50 000 00 00, +994 99 999 99 99
+        return None
+    return phonenumbers.format_number(number, phonenumbers.PhoneNumberFormat.E164)
 
 
 def phone_key(raw: Optional[str]) -> Optional[str]:
@@ -50,9 +68,15 @@ async def ensure_phone_free(db: AsyncSession, raw: Optional[str], exclude_user_i
             raise HTTPException(status_code=409, detail=PHONE_TAKEN_ERROR)
 
 
-async def checked_student_phone(db: AsyncSession, raw: Optional[str], exclude_user_id: Optional[int] = None) -> str:
+async def checked_student_phone(
+    db: AsyncSession, raw: Optional[str], exclude_user_id: Optional[int] = None, current: Optional[str] = None,
+) -> str:
     """Телефон ученика: нормализует и проверяет, что номера нет в базе.
-    422 — неверный формат, 409 — телефон уже зарегистрирован."""
+    422 — такого номера не бывает, 409 — телефон уже зарегистрирован.
+    current — номер, уже записанный у этого пользователя: если его не
+    меняли, оставляем как есть, без перепроверки."""
+    if current and phone_key(raw) == phone_key(current):
+        return current
     phone = normalize_phone(raw)
     if not phone:
         raise HTTPException(status_code=422, detail=PHONE_FORMAT_ERROR)

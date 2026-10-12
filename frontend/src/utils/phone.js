@@ -15,6 +15,9 @@ export function registerErrorText(err, fallback) {
   if (status === 400) return 'Пользователь с таким логином уже существует';
   if (status === 404) return 'Приглашение недействительно';
   if (status === 409) return 'Этот телефон уже зарегистрирован. Войдите под своим логином или обратитесь к педагогу';
-  if (status === 422) return 'Введите номер с кодом страны, например +994 50 123 45 67';
-  return err?.response?.data?.detail || fallback;
+  // 422 — такого номера не бывает, 429 — слишком много регистраций: текст приходит с сервера
+  const detail = err?.response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (status === 422) return 'Такого номера не существует — проверьте код страны, код оператора и количество цифр';
+  return fallback;
 }
