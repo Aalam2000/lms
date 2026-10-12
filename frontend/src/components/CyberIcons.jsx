@@ -137,3 +137,16 @@ export function IconActivity(props) {
     </svg>
   );
 }
+
+// Сеть: три узла, соединённые линиями (пункт «Отчёт о сети»)
+export function IconNetwork(props) {
+  return (
+    <svg {...baseProps} {...props}>
+      <rect x="9" y="3" width="6" height="5" />
+      <rect x="3" y="16" width="6" height="5" />
+      <rect x="15" y="16" width="6" height="5" />
+      <polyline points="12,8 12,12 6,12 6,16" />
+      <polyline points="12,12 18,12 18,16" />
+    </svg>
+  );
+}

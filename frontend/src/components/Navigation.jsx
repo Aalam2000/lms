@@ -12,6 +12,7 @@ import {
   IconHelp,
   IconActivity,
   IconBook,
+  IconNetwork,
 } from './CyberIcons';
 
 function Navigation({ user, isOpen, onClose }) {
@@ -99,6 +100,16 @@ function Navigation({ user, isOpen, onClose }) {
               <IconAdmin className="nav__icon" />
               <span>{'Админ'}</span>
             </NavLink>
+          </li>
+        )}
+        {/* Отчёт NetDiag — отдельный сервис на том же сервере (nginx: /netdiag/,
+            только из локальной сети). Не маршрут React — обычная ссылка в новой вкладке. */}
+        {user?.role === 'admin' && (
+          <li className="nav__item">
+            <a href="/netdiag/" target="_blank" rel="noopener noreferrer" className="nav__link" onClick={handleLinkClick}>
+              <IconNetwork className="nav__icon" />
+              <span>{'Отчёт о сети'}</span>
+            </a>
           </li>
         )}
       </ul>
