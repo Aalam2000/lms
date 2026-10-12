@@ -11,9 +11,12 @@ import { TYPE_META, formatSize, subtypeLabel, resourceKey, needsPdfPreview, isPr
 import { extractErrorMessage } from '../utils/errors';
 import { useAuth } from '../context/AuthContext';
 import StudentHomework from '../components/HomeworkStudent';
+import LessonWorkStudent from '../components/LessonWorkStudent';
 import StudentGroupsBar from '../components/StudentGroupsBar';
 import { DialogThread } from '../components/LessonDialog';
 import { getMyHomework, getMessages } from '../api/homework';
+import { getMyWork } from '../api/lessonWork';
+import { useHomeworkRefresh } from '../hooks/useHomeworkRefresh';
 
 function StudentLessonPage() {
   const { lessonId } = useParams();
@@ -24,17 +27,19 @@ function StudentLessonPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Вкладки: Материалы | ДЗ | Диалог (набросок «В»). Отметки за урок
+  // Вкладки: Материалы | Работа на уроке | ДЗ | Диалог. Отметки за урок
   // (посещаемость, оценки, звёзды) ученик смотрит в разделе «Успеваемость».
   const [tab, setTab] = useState('materials');
   // Ссылка «Открыть урок» из полосы несданных ДЗ ведёт сразу на вкладку ДЗ (?tab=homework).
   // location.key меняется при каждом переходе — срабатывает и когда урок уже открыт.
   const location = useLocation();
   useEffect(() => {
-    if (new URLSearchParams(location.search).get('tab') === 'homework') setTab('homework');
+    const want = new URLSearchParams(location.search).get('tab');
+    if (want === 'homework' || want === 'work') setTab(want);
   }, [location.key, location.search]);
   const [items, setItems] = useState([]);
   const [homework, setHomework] = useState({ tasks: [], answer: { status: 'none', files: [] } });
+  const [work, setWork] = useState({ status: 'none', files: [], is_locked: false });
   const [newMessages, setNewMessages] = useState(0);
   const [itemsError, setItemsError] = useState('');
   const [openingKey, setOpeningKey] = useState(null);
@@ -45,14 +50,16 @@ function StudentLessonPage() {
       setError('');
       setItemsError('');
       try {
-        const [lessonRes, itemsRes, hwRes] = await Promise.all([
+        const [lessonRes, itemsRes, hwRes, workRes] = await Promise.all([
           api.get(`/lessons/${lessonId}`),
           api.get(`/lessons/${lessonId}/items`),
           getMyHomework(lessonId),
+          getMyWork(lessonId),
         ]);
         setLesson(lessonRes.data);
         setItems(itemsRes.data);
         setHomework(hwRes);
+        setWork(workRes);
       } catch (err) {
         setError(extractErrorMessage(err, 'Не удалось загрузить урок'));
       } finally {
@@ -62,6 +69,9 @@ function StudentLessonPage() {
 
     load();
   }, [lessonId]);
+
+  // Работа на уроке: статус и оценка подтягиваются сами, когда педагог проверит
+  useHomeworkRefresh(() => { getMyWork(lessonId).then(setWork).catch(() => {}); });
 
   // Счётчик на вкладке «Диалог»: сообщения педагога после моего последнего
   const refreshMessagesCount = async () => {
@@ -139,6 +149,7 @@ function StudentLessonPage() {
 
   const TABS = [
     { key: 'materials', label: 'Материалы', count: 0 },
+    { key: 'work', label: 'Работа на уроке', count: work.files.length },
     { key: 'homework', label: 'ДЗ', count: pendingHw },
     { key: 'dialog', label: 'Диалог', count: newMessages },
   ];
@@ -219,6 +230,10 @@ function StudentLessonPage() {
               </div>
             )}
           </>
+        )}
+
+        {tab === 'work' && (
+          <LessonWorkStudent lessonId={lessonId} work={work} onUpdated={setWork} />
         )}
 
         {tab === 'homework' && (

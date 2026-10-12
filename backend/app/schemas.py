@@ -109,6 +109,7 @@ class GroupOut(BaseModel):
     student_count: int = 0
     teacher_name: Optional[str] = None
     homework_to_review: int = 0   # ответов на ДЗ ждут проверки (подсветка группы у педагога)
+    work_to_review: int = 0       # учеников с непроверенной работой на уроке (app/lesson_work.py)
     # False — педагог в группе не основной: он лишь ведёт или вёл в ней отдельные
     # уроки и видит только их (app/lesson_teacher.py); контакты и ученики не отдаются
     is_main: bool = True

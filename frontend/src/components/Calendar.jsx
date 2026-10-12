@@ -72,7 +72,7 @@ export const GROUP_COLORS = ['#EC3013', '#2E5FA3', '#3B6D11', '#C026D3', '#0891B
 // getEventColor(lesson) => css-цвет; не задан — все события фирменным красным.
 // highlight(lesson) => значок-префикс ('' — не подсвечивать). По умолчанию —
 // урок педагога с непроверенными ДЗ; у студента своё (StudentHome.jsx).
-const TEACHER_HIGHLIGHT = (l) => (l.has_unreviewed_homework ? '📥 ' : '');
+const TEACHER_HIGHLIGHT = (l) => (l.has_unreviewed_homework || l.has_unreviewed_work ? '📥 ' : '');
 
 // isLight(lesson) — урок рисуется светлым вариантом цвета группы. По
 // умолчанию (педагог) — урок открыт ученикам. У студента передаётся null:

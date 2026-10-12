@@ -88,7 +88,7 @@ export function editMessage(lessonId, studentId, messageId, text) {
 
 // --- Скачивание ---
 
-async function saveBlob(url, filename, contentType) {
+export async function saveBlob(url, filename, contentType) {
   const res = await api.get(url, { responseType: 'blob' });
   const blobUrl = window.URL.createObjectURL(new Blob([res.data], { type: contentType || 'application/octet-stream' }));
   const a = document.createElement('a');

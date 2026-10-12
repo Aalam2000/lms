@@ -10,6 +10,7 @@ from ..models import Group, GroupMember, Lesson, User, Course
 from ..schemas import GroupOut, CourseOut, GroupInviteOut, clean_video_url, DURATION_MIN, DURATION_MAX
 from ..dependencies import require_teacher, get_current_user
 from ..homework_status import oldest_lesson_to_review, to_review_by_group
+from ..lesson_work import work_to_review_by_group, work_to_review_for_teacher
 
 router = APIRouter(prefix="/groups", tags=["groups"])
 
@@ -196,6 +197,7 @@ async def get_my_groups(
     )
     teachers = {uid: (full_name or username) for uid, full_name, username in teachers_result.all()}
     to_review = await to_review_by_group(db, group_ids)
+    work_to_review = await work_to_review_by_group(db, group_ids)
 
     out = []
     for g in groups:
@@ -203,6 +205,7 @@ async def get_my_groups(
         item.student_count = counts.get(g.id, 0)
         item.teacher_name = teachers.get(g.teacher_id)
         item.homework_to_review = to_review.get(g.id, 0)
+        item.work_to_review = work_to_review.get(g.id, 0)
         out.append(item)
     out += [_guest_group_out(g, teachers.get(g.teacher_id)) for g in guest_groups]
     return out
@@ -224,6 +227,20 @@ async def get_homework_to_review(
         "count": sum(counts.values()),
         "lesson_id": await oldest_lesson_to_review(db, list(counts)),
     }
+
+
+# Флаг «Проверь работы» в шапке педагога: ученики, сдавшие работу на уроке,
+# который ведёт этот педагог (в его активных группах, в т.ч. замена), и урок,
+# с которого начать (самый давний непроверенный файл).
+@router.get("/work-to-review")
+async def get_work_to_review(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_teacher),
+):
+    group_ids = [row[0] for row in (await db.execute(
+        select(Group.id).where(Group.status == "active")
+    )).all()]
+    return await work_to_review_for_teacher(db, current_user.id, group_ids)
 
 # Данные одной группы (teacher — только свою, admin — любую)
 @router.get("/{group_id}", response_model=GroupOut)

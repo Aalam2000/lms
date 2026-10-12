@@ -84,7 +84,8 @@ class Lesson(Base):
     duration_min = Column(Integer, nullable=False, default=120, server_default="120")  # длительность, мин; конец = date + duration
     is_open = Column(Boolean, nullable=False, default=False)  # педагог открывает доступ
     source = Column(String, nullable=True)  # academy | teacher
-    comment = Column(Text, nullable=True)  # заметки педагога по уроку в целом (не по студенту)
+    comment = Column(Text, nullable=True)  # заметки педагога по уроку в целом — видит и ученик
+    private_note = Column(Text, nullable=True)  # «Заметки для себя» — только педагог и админ, ученику не отдаются
     # Персональный урок: виден и учитывается только у участников (lesson_students) — app/personal.py
     is_personal = Column(Boolean, nullable=False, default=False, server_default="false")
     # Кто ведёт урок: по умолчанию основной педагог группы, админ может назначить
@@ -131,6 +132,10 @@ class LessonMark(Base):
     comment = Column(Text, nullable=True)
     marked_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     marked_at = Column(DateTime(timezone=True), nullable=True)
+    # Проверка работы на уроке (LessonWorkFile): педагог принял или оценил
+    # (оценка — та же score за урок). После проверки файлы ученика заморожены.
+    work_reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    work_reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -256,6 +261,23 @@ class HomeworkAnswerFile(Base):
     __tablename__ = "homework_answer_files"
     id = Column(Integer, primary_key=True, index=True)
     answer_id = Column(Integer, ForeignKey("homework_answers.id"), nullable=False, index=True)
+    object_key = Column(String, nullable=False, unique=True)
+    original_filename = Column(String, nullable=False)
+    content_type = Column(String, nullable=True)
+    size_bytes = Column(Integer, nullable=False)
+    uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+# Работа на уроке: файлы, которые ученик сдаёт во время урока (lesson-work/ в
+# MinIO), в «Базу знаний» не попадают. Оценка за них — оценка за урок
+# (LessonMark.score), отметка проверки — LessonMark.work_reviewed_at.
+# Правила — app/lesson_work.py и routers/lesson_work.py.
+class LessonWorkFile(Base):
+    __tablename__ = "lesson_work_files"
+    __table_args__ = (Index("ix_lesson_work_files_lesson_student", "lesson_id", "student_id"),)
+    id = Column(Integer, primary_key=True)
+    lesson_id = Column(Integer, ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False)
+    student_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     object_key = Column(String, nullable=False, unique=True)
     original_filename = Column(String, nullable=False)
     content_type = Column(String, nullable=True)

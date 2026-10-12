@@ -196,6 +196,11 @@ function GroupsPage() {
                     {'ДЗ: проверить'}<span className="badge__count">{g.homework_to_review}</span>
                   </span>
                 )}
+                {g.work_to_review > 0 && (
+                  <span className="badge badge--homework-pending badge--inline" data-tip={'Есть непроверенные работы на уроке'}>
+                    {'Работы: проверить'}<span className="badge__count">{g.work_to_review}</span>
+                  </span>
+                )}
               </button>
             ))}
             <span className="la-calendar__legend-item">
@@ -227,7 +232,7 @@ function GroupsPage() {
               {mainGroups.map(g => (
                 <tr
                   key={g.id}
-                  className={`table__row--clickable${g.homework_to_review > 0 ? ' table__row--homework-pending table__row--attention' : ''}`}
+                  className={`table__row--clickable${g.homework_to_review > 0 || g.work_to_review > 0 ? ' table__row--homework-pending table__row--attention' : ''}`}
                   onClick={() => navigate(`/dashboard/groups/${g.id}`)}
                 >
                   <td>
@@ -235,6 +240,11 @@ function GroupsPage() {
                     {g.homework_to_review > 0 && (
                       <span className="badge badge--homework-pending badge--inline" data-tip={'Есть непроверенные решения ДЗ'}>
                         {'ДЗ: проверить'}<span className="badge__count">{g.homework_to_review}</span>
+                      </span>
+                    )}
+                    {g.work_to_review > 0 && (
+                      <span className="badge badge--homework-pending badge--inline" data-tip={'Есть непроверенные работы на уроке'}>
+                        {'Работы: проверить'}<span className="badge__count">{g.work_to_review}</span>
                       </span>
                     )}
                   </td>

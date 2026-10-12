@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import api from '../api/auth';
 import DateTimePicker, { formatDateTime } from '../components/DateTimePicker';
 import { formatDuration, DEFAULT_DURATION_MIN } from '../utils/lessonTime';
@@ -12,9 +12,10 @@ import { TYPE_META, formatSize, subtypeLabel, resourceKey, needsPdfPreview, isPr
 import { extractErrorMessage } from '../utils/errors';
 import { StudentContactIcons, GroupContactIcons } from '../components/ContactIcons';
 import { subscribeLessonMarksUpdated } from '../utils/lessonMarksChannel';
-import { HomeworkAddModal, HomeworkFlags, HomeworkCheckView, personalOrCommonDeadline } from '../components/HomeworkTeacher';
+import { HomeworkAddModal, HomeworkFlags, HomeworkCheckView, ReviewPanel, personalOrCommonDeadline } from '../components/HomeworkTeacher';
 import { DialogCell } from '../components/LessonDialog';
 import { getHomeworkBoard } from '../api/homework';
+import { getWorkBoard } from '../api/lessonWork';
 import { useHomeworkRefresh } from '../hooks/useHomeworkRefresh';
 import { uploadMaterial } from '../api/materials';
 
@@ -37,8 +38,13 @@ const LATE_STATUSES = new Set(['in_person', 'online']);
 function LessonPage() {
   const { lessonId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const [view, setView] = useState('lesson'); // 'lesson' | 'students'
+  // ?view=students — сразу журнал (ссылка «Проверь работы» из шапки)
+  const [view, setView] = useState(() => (new URLSearchParams(location.search).get('view') === 'students' ? 'students' : 'lesson'));
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('view') === 'students') setView('students');
+  }, [location.key, location.search]);
 
   const [lesson, setLesson] = useState(null);
   const [participantsOpen, setParticipantsOpen] = useState(false); // смена участников персонального урока
@@ -52,6 +58,9 @@ function LessonPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [lessonComment, setLessonComment] = useState('');
   const [isSavingComment, setIsSavingComment] = useState(false);
+  // «Заметки для себя» — видят только педагог и админ (lessons.private_note)
+  const [privateNote, setPrivateNote] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
 
   const [marksLoading, setMarksLoading] = useState(false);
   const [marksLoaded, setMarksLoaded] = useState(false);
@@ -87,6 +96,9 @@ function LessonPage() {
   // «Проверить ДЗ»: таблица перестраивается под приём и оценку ДЗ
   const [hwCheckMode, setHwCheckMode] = useState(false);
   const [itemsNotice, setItemsNotice] = useState('');
+  // Работа на уроке (api/lessonWork.js): файлы учеников и их проверка — колонка «Файлы с урока»
+  const [workBoard, setWorkBoard] = useState({ students: [], to_review: 0 });
+  const [workPanel, setWorkPanel] = useState(null); // { studentId, fileId } — окно проверки
 
   useEffect(() => {
     marksRowsRef.current = marksRows;
@@ -112,6 +124,7 @@ function LessonPage() {
         setDateValue(lessonRes.data?.date ? new Date(lessonRes.data.date) : null);
         setDurationValue(lessonRes.data?.duration_min || DEFAULT_DURATION_MIN);
         setLessonComment(lessonRes.data?.comment || '');
+        setPrivateNote(lessonRes.data?.teacher_notes || '');
       } catch (err) {
         setError(extractErrorMessage(err, 'Не удалось загрузить урок'));
       } finally {
@@ -120,6 +133,8 @@ function LessonPage() {
     };
 
     load();
+    loadWork();
+    // eslint-disable-next-line
   }, [lessonId]);
 
   useEffect(() => {
@@ -184,6 +199,27 @@ function LessonPage() {
   };
   // Новые решения учеников появляются в журнале сами
   useHomeworkRefresh(() => { getHomeworkBoard(lessonId).then(setHwBoard).catch(() => {}); });
+
+  // Работа на уроке — тихо, без «Загрузка...»; новые файлы учеников появляются сами
+  const loadWork = () => getWorkBoard(lessonId).then(setWorkBoard).catch(() => {});
+  useHomeworkRefresh(loadWork);
+
+  // После проверки работы оценка за урок могла измениться — подтягиваем оценки
+  // в таблицу тихо, не трогая остальные поля, которые педагог может сейчас править
+  const reloadScores = async () => {
+    try {
+      const res = await api.get(`/lessons/${lessonId}/marks`);
+      const scores = Object.fromEntries(res.data.students.map(s => [s.student_id, s.score]));
+      setMarksRows(prev => prev.map(r => (r.student_id in scores
+        ? { ...r, score: scores[r.student_id] === null || scores[r.student_id] === undefined ? '' : scores[r.student_id] }
+        : r)));
+    } catch {
+      // оценки обновятся при следующем открытии журнала
+    }
+  };
+  const onWorkReviewed = async () => {
+    await Promise.all([loadWork(), reloadScores()]);
+  };
 
   const loadItems = async () => {
     setItemsLoading(true);
@@ -376,6 +412,7 @@ function LessonPage() {
     try {
       const res = await api.put(`/lessons/${lessonId}/marks/${studentId}`, buildPayload(row));
       syncLessonOpen(res.data.is_open);
+      loadWork(); // оценка за урок при сданной работе — это и есть её проверка
     } catch (err) {
       setRowErrors(prev => ({ ...prev, [studentId]: extractErrorMessage(err, 'Не удалось сохранить') }));
       if (err?.response?.status === 403) {
@@ -518,6 +555,23 @@ function LessonPage() {
     }
   };
 
+  const handleCommitPrivateNote = async () => {
+    if (!lesson) return;
+    if ((lesson.teacher_notes || '') === privateNote) return;
+
+    setIsSavingNote(true);
+    setError('');
+    try {
+      const res = await api.patch(`/lessons/${lesson.id}`, { private_note: privateNote });
+      setLesson(res.data);
+      setPrivateNote(res.data?.teacher_notes || '');
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Не удалось сохранить заметки'));
+    } finally {
+      setIsSavingNote(false);
+    }
+  };
+
   const handleToggleOpen = async () => {
     if (!lesson) return;
 
@@ -646,8 +700,10 @@ function LessonPage() {
             type="button"
             className={`tab${view === 'students' ? ' tab--active' : ''}`}
             onClick={() => setView('students')}
+            data-tip={workBoard.to_review > 0 ? 'Работы на уроке ждут проверки' : undefined}
           >
             {'Студенты'}
+            {workBoard.to_review > 0 && <span className="btn__count">{workBoard.to_review}</span>}
           </button>
         </div>
       </div>
@@ -900,6 +956,7 @@ function LessonPage() {
                     <tr>
                       <th>{'Имя'}</th>
                       <th className="table__col--attendance">{'Посещаемость'}</th>
+                      <th className="table__col--work-files">{'Файлы с урока'}</th>
                       <th className="table__col--score">{'Оценка'}</th>
                       <th className="table__col--score">{'Экзамен'}</th>
                       <th className="table__col--stars">{'Звёзды'}</th>
@@ -911,10 +968,11 @@ function LessonPage() {
                   </thead>
                   <tbody>
                     {marksRows.length === 0 ? (
-                      <tr><td colSpan="9" className="table__empty">{'В группе нет студентов'}</td></tr>
+                      <tr><td colSpan="10" className="table__empty">{'В группе нет студентов'}</td></tr>
                     ) : (
                       marksRows.map(row => {
                         const hwRow = hwBoard.students.find(h => h.student_id === row.student_id);
+                        const work = workBoard.students.find(w => w.student_id === row.student_id)?.work;
                         return (
                           <tr key={row.student_id} className={hwRow?.answer.status === 'submitted' ? 'table__row--homework-pending' : undefined}>
                             <td>
@@ -942,6 +1000,23 @@ function LessonPage() {
                                   disabled={marksLocked || !LATE_STATUSES.has(row.attendance_status)}
                                   onClick={() => handleLateToggle(row.student_id)}
                                 />
+                              </div>
+                            </td>
+                            <td>
+                              {/* Работа на уроке: клик — окно проверки; оранжевые ждут проверки */}
+                              <div className="work-files">
+                                {(work?.files || []).map(f => (
+                                  <button
+                                    key={f.id}
+                                    type="button"
+                                    className={`link work-files__item${work.status === 'submitted' ? ' work-files__item--todo' : ''}`}
+                                    data-tip={work.status === 'submitted' ? 'Ждёт проверки — посмотреть' : 'Посмотреть'}
+                                    onClick={() => setWorkPanel({ studentId: row.student_id, fileId: f.id })}
+                                  >
+                                    {f.original_filename}
+                                  </button>
+                                ))}
+                                {!work?.files?.length && <span className="text-muted">{'—'}</span>}
                               </div>
                             </td>
                             <td>
@@ -1008,13 +1083,30 @@ function LessonPage() {
               </div>
               )}
 
+              {workPanel && (
+                <ReviewPanel
+                  key={workPanel.studentId}
+                  mode="work"
+                  lessonId={lessonId}
+                  rows={workBoard.students}
+                  queue={workBoard.students}
+                  toReviewCount={workBoard.to_review}
+                  studentId={workPanel.studentId}
+                  fileId={workPanel.fileId}
+                  locked={marksLocked}
+                  onNavigate={(studentId) => setWorkPanel({ studentId, fileId: null })}
+                  onChanged={onWorkReviewed}
+                  onClose={() => setWorkPanel(null)}
+                />
+              )}
+
             </>
           )}
         </fieldset>
       )}
 
       <label className="field-label field-label--top-gap">
-        {'Комментарий к уроку'}
+        {'Комментарий к уроку — видят ученики'}
         <textarea
           className="input input--textarea"
           value={lessonComment}
@@ -1024,6 +1116,19 @@ function LessonPage() {
           placeholder={'Заметки педагога по уроку в целом — что обсудили, на что обратить внимание в следующий раз...'}
         />
         {isSavingComment && <span className="hint-text">{'Сохранение…'}</span>}
+      </label>
+
+      <label className="field-label field-label--top-gap">
+        {'Заметки для себя — видят только педагог и админ'}
+        <textarea
+          className="input input--textarea"
+          value={privateNote}
+          onChange={e => setPrivateNote(e.target.value)}
+          onBlur={handleCommitPrivateNote}
+          disabled={isSavingNote || readOnly}
+          placeholder={'Что учесть на следующем уроке, кому уделить внимание...'}
+        />
+        {isSavingNote && <span className="hint-text">{'Сохранение…'}</span>}
       </label>
     </div>
   );

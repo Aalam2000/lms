@@ -559,7 +559,7 @@ function GroupPage() {
                 return (
                   <tr
                     key={l.id}
-                    className={`table__row--clickable${today ? ' table__row--today' : ''}${l.has_unreviewed_homework ? ' table__row--homework-pending' : ''}`}
+                    className={`table__row--clickable${today ? ' table__row--today' : ''}${l.has_unreviewed_homework || l.has_unreviewed_work ? ' table__row--homework-pending' : ''}`}
                     onClick={() => navigate(`/dashboard/lessons/${l.id}`)}
                   >
                     <td>
@@ -576,6 +576,11 @@ function GroupPage() {
                       {l.has_unreviewed_homework && (
                         <span className="badge badge--homework-pending badge--inline" data-tip={'Есть непроверенные решения ДЗ'}>
                           {'ДЗ: проверить'}
+                        </span>
+                      )}
+                      {l.has_unreviewed_work && (
+                        <span className="badge badge--homework-pending badge--inline" data-tip={'Есть непроверенные работы на уроке'}>
+                          {'Работы: проверить'}
                         </span>
                       )}
                     </td>

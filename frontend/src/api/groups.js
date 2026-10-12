@@ -11,6 +11,11 @@ export function getHomeworkToReview() {
   return api.get('/groups/homework-to-review').then(res => res.data);
 }
 
+// Флаг «Проверь работы» у педагога: {count — учеников с непроверенной работой на уроке, lesson_id — с какого урока начать}
+export function getWorkToReview() {
+  return api.get('/groups/work-to-review').then(res => res.data);
+}
+
 // Список курсов для регистрации/создания группы — отдельный эндпоинт
 // /groups/courses, не путать с admin.getCourses() (/admin/courses).
 export function getCourses() {

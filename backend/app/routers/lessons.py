@@ -12,6 +12,7 @@ from ..lesson_lock import BAKU_TZ, is_date_locked
 from ..attendance import PRESENT, attendance_slots
 from ..lesson_lock import aware
 from ..homework_status import awaiting_review, student_homework_debts
+from ..lesson_work import has_work_files, lessons_with_work_to_review
 from ..lesson_teacher import can_edit_lesson, can_view_lesson, is_group_teacher
 from ..personal import (
     is_participant, lesson_student_ids, lesson_students_condition, participant_names,
@@ -22,6 +23,7 @@ from .. import storage
 from ..models import (
     Lesson, Group, GroupMember, User, LessonMark, LessonResource, Material, Link, Quiz,
     HomeworkTask, HomeworkAnswer, HomeworkAnswerFile, LessonMessage, LessonStudent, LessonFeedback,
+    LessonWorkFile,
 )
 from ..dependencies import require_teacher, get_current_user
 from ..resources import RESOURCE_MODELS, RESOURCE_NOT_FOUND, fetch_resource_details, resource_exists
@@ -56,6 +58,7 @@ class LessonUpdate(BaseModel):
     date: Optional[datetime] = None
     duration_min: Optional[int] = Field(default=None, ge=DURATION_MIN, le=DURATION_MAX)
     comment: Optional[str] = None
+    private_note: Optional[str] = None  # «Заметки для себя» — пишет педагог урока или админ
 
 class LessonOut(BaseModel):
     id: int
@@ -67,12 +70,18 @@ class LessonOut(BaseModel):
     is_open: bool
     source: Optional[str]
     comment: Optional[str] = None
+    # «Заметки для себя» (lessons.private_note) — только педагогу/админу и только
+    # из GET /lessons/{id} и PATCH; имя поля другое, чтобы from_attributes не
+    # подхватил заметки в списки уроков ученика.
+    teacher_notes: Optional[str] = None
     created_at: datetime
     # Персональный урок и его участники (участников отдаём только педагогу/админу)
     is_personal: bool = False
     participants: list[LessonParticipantOut] = []
     # Есть ответы на ДЗ без оценки — подсветка урока в списке и календаре
     has_unreviewed_homework: bool = False
+    # Есть непроверенная работа на уроке (app/lesson_work.py) — только тому, кто ведёт урок
+    has_unreviewed_work: bool = False
     # Прошла полночь по Баку — нельзя удалить/перенести, менять присутствие и оценку за урок
     # (для админа всегда False)
     is_locked: bool = False
@@ -129,7 +138,6 @@ class MyPerformanceRowOut(BaseModel):
     is_late: bool
     score: Optional[int]
     exam_score: Optional[int]
-    comment: Optional[str]
     hw_grades: list[int] = []      # оценки за ДЗ этого урока (заданий может быть несколько)
     status_label: str = "—"        # посещаемость текстом: «Пришёл», «Онлайн», «Пропуск»…
 
@@ -451,6 +459,12 @@ async def delete_lessons_homework(db: AsyncSession, lesson_ids: list[int]) -> No
     )).all()]
     await delete_homework_tasks(db, task_ids)
     await db.execute(delete(LessonMessage).where(LessonMessage.lesson_id.in_(lesson_ids)))
+    # Работа на уроке: файлы в MinIO и записи
+    for (key,) in (await db.execute(
+        select(LessonWorkFile.object_key).where(LessonWorkFile.lesson_id.in_(lesson_ids))
+    )).all():
+        _safe_delete_object(key)
+    await db.execute(delete(LessonWorkFile).where(LessonWorkFile.lesson_id.in_(lesson_ids)))
 
 
 async def with_unreviewed_flag(db: AsyncSession, lessons: list[Lesson], user: Optional[User] = None) -> list[LessonOut]:
@@ -465,9 +479,11 @@ async def with_unreviewed_flag(db: AsyncSession, lessons: list[Lesson], user: Op
         .distinct()
     )
     flagged = {row[0] for row in rows.all()}
+    work_flagged = await lessons_with_work_to_review(db, [item.id for item in out]) if user and user.role != "student" else set()
     names = await participant_names(db, [item.id for item in out if item.is_personal])
     for item in out:
         item.has_unreviewed_homework = item.id in flagged
+        item.has_unreviewed_work = item.id in work_flagged
         item.participants = names.get(item.id, [])
     if user and user.role != "student":
         await _fill_teacher_info(db, out, lessons, user)
@@ -495,6 +511,8 @@ async def _fill_teacher_info(db: AsyncSession, out: list[LessonOut], lessons: li
         item.can_manage = is_group_teacher(group_teacher_id, user)
         if not is_group_teacher(group_teacher_id, user):
             item.has_unreviewed_homework = False
+        if not item.can_edit:
+            item.has_unreviewed_work = False  # работу на уроке проверяет тот, кто ведёт урок
 
 
 # Уроки группы
@@ -896,7 +914,6 @@ async def get_student_marks(
             is_late=mark.is_late if mark else False,
             score=mark.score if mark else None,
             exam_score=mark.exam_score if mark else None,
-            comment=mark.comment if mark else None,
             hw_grades=hw_by_lesson.get(lesson.id, []),
             status_label=_STATUS_LABELS.get(status_of(lesson, mark), "—"),
         )
@@ -1111,6 +1128,12 @@ async def _upsert_mark(
         mark = LessonMark(lesson_id=lesson_id, student_id=student_id)
         db.add(mark)
     arrived = data.attendance_status in PRESENT and mark.attendance_status not in PRESENT
+    # Оценка за урок, поставленная в журнале, когда ученик уже сдал работу на
+    # уроке, — это и есть проверка работы (app/lesson_work.py)
+    if (data.score is not None and data.score != mark.score and mark.work_reviewed_at is None
+            and await has_work_files(db, lesson_id, student_id)):
+        mark.work_reviewed_at = datetime.now(dt_timezone.utc)
+        mark.work_reviewed_by = current_user.id
 
     mark.attendance_status = data.attendance_status
     mark.is_late = data.is_late
@@ -1502,6 +1525,7 @@ async def get_lesson(
         if lesson.is_personal:
             out.participants = (await participant_names(db, [lesson.id])).get(lesson.id, [])
         await _fill_teacher_info(db, [out], [lesson], current_user)
+        out.teacher_notes = lesson.private_note
         if not out.can_edit:
             # только просмотр — без входа в конференцию и чатов группы
             out.group_video_url = out.group_telegram = out.group_whatsapp = None
@@ -1536,7 +1560,7 @@ async def update_lesson(
     update_data = data.model_dump(exclude_unset=True)
     # Заметки по уроку пишет тот, кто его ведёт; название, дата и длительность — расписание группы
     lesson = await get_lesson_for_teacher_or_admin(
-        lesson_id, db, current_user, manage=bool(set(update_data) - {"comment"}),
+        lesson_id, db, current_user, manage=bool(set(update_data) - {"comment", "private_note"}),
     )
     if update_data.get("duration_min", 0) is None:
         del update_data["duration_min"]  # колонка NOT NULL — null не пишем
@@ -1549,6 +1573,7 @@ async def update_lesson(
     await db.refresh(lesson)
     out = LessonOut.model_validate(lesson)
     out.is_locked = lesson_locked_for(lesson, current_user)
+    out.teacher_notes = lesson.private_note
     await _fill_teacher_info(db, [out], [lesson], current_user)
     return out
 

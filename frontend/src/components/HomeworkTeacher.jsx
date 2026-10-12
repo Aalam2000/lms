@@ -5,8 +5,11 @@
 //  - HomeworkCheckView — режим «Проверить ДЗ»: таблица перестроена под приём ДЗ
 //    (Имя, Задание, Срок, Ответ, Итог ДЗ, Комментарий).
 //  - ReviewPanel       — панель справа: файл студента прямо в ней, оценка,
-//    «Принять», «Вернуть», диалог, «← Предыдущий / Следующий →».
+//    «Принять», «Вернуть», «Скачать», диалог, «← Предыдущий / Следующий →».
+//    Та же панель проверяет и работу на уроке (mode="work", api/lessonWork.js):
+//    там оценка — это оценка за урок, «Вернуть» нет.
 // Оценка одна на всё ДЗ студента; «принято» или оценка = проверено.
+// Файлов в ДЗ сколько угодно — ограничение только размер файла (бэкенд).
 import React, { useEffect, useRef, useState } from 'react';
 import Modal from './Modal';
 import DateTimePicker from './DateTimePicker';
@@ -15,11 +18,10 @@ import { DialogCell, DialogThread } from './LessonDialog';
 import { formatDeadline } from './DeadlinePicker';
 import {
   createHomeworkTask, setScopeDeadline, reviewHomework,
-  openTaskFile, openAnswerFile, answerFileViewUrl,
+  openTaskFile, openAnswerFile, answerFileViewUrl, downloadAnswerFile,
 } from '../api/homework';
+import { reviewWork, workFileViewUrl, openWorkFile, downloadWorkFile } from '../api/lessonWork';
 import { extractErrorMessage } from '../utils/errors';
-
-const MAX_TASKS = 2;
 
 // ---------- Окно «+ ДЗ» ----------
 
@@ -38,13 +40,14 @@ export function HomeworkAddModal({ lessonId, student, deadline, onChanged, onClo
     await onChanged();
   };
 
+  // Можно выбрать сразу несколько файлов — каждый становится заданием
   const handleFile = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
     setBusy(true);
     setError('');
     try {
-      await create({ file });
+      for (const file of files) await create({ file });
     } catch (err) {
       setError(extractErrorMessage(err, 'Не удалось загрузить файл'));
     } finally {
@@ -80,7 +83,7 @@ export function HomeworkAddModal({ lessonId, student, deadline, onChanged, onClo
       footer={<span />}
     >
       <div className="form-toolbar">
-        <input type="file" ref={fileRef} onChange={handleFile} hidden />
+        <input type="file" multiple ref={fileRef} onChange={handleFile} hidden />
         <button type="button" className="btn btn--outline" onClick={() => fileRef.current?.click()} disabled={busy}>
           {busy ? 'Загрузка...' : '+ Файл'}
         </button>
@@ -123,10 +126,10 @@ const ANSWER_FLAG = {
   returned: { cls: 'hw-flag--red', sign: '↺', tip: 'Вернули на доработку — ждём исправление' },
 };
 
-// Клик по «ДЗ» — положить студенту персональный файл (onAdd), пока файлов < 2
+// Клик по «ДЗ» — положить студенту персональный файл (onAdd)
 export function HomeworkFlags({ row, onAdd }) {
   const given = row && row.task_ids.length > 0;
-  const canAdd = !!row && !!onAdd && row.task_ids.length < MAX_TASKS;
+  const canAdd = !!row && !!onAdd;
   const givenTip = given ? 'ДЗ выдано' : 'ДЗ не выдано';
   const a = row ? ANSWER_FLAG[row.answer.status] : ANSWER_FLAG.none;
   const answerTip = row && row.answer.status === 'graded' ? `Оценка ${row.answer.grade}` : a.tip;
@@ -143,7 +146,7 @@ export function HomeworkFlags({ row, onAdd }) {
             {given ? '✓' : '+'}
           </button>
         ) : (
-          <span className={`hw-flag ${given ? 'hw-flag--green' : 'hw-flag--grey'}`} data-tip={given ? `ДЗ выдано (${MAX_TASKS} файла — максимум)` : givenTip}>
+          <span className={`hw-flag ${given ? 'hw-flag--green' : 'hw-flag--grey'}`} data-tip={givenTip}>
             {given ? '✓' : '·'}
           </span>
         )}
@@ -198,11 +201,9 @@ export function HomeworkCheckView({ lessonId, board, onChanged, onError }) {
                         {tasksById[id].title}
                       </button>
                     ))}
-                    {row.task_ids.length < MAX_TASKS && (
-                      <button type="button" className="btn btn--sm" onClick={() => setAddFor(row)} data-tip="Добавить домашнее задание этому студенту">
-                        {'+ ДЗ'}
-                      </button>
-                    )}
+                    <button type="button" className="btn btn--sm" onClick={() => setAddFor(row)} data-tip="Добавить домашнее задание этому студенту">
+                      {'+ ДЗ'}
+                    </button>
                   </div>
                 </td>
                 <td className="nowrap">
@@ -381,12 +382,94 @@ function ReviewControls({ lessonId, row, onChanged, onError }) {
   );
 }
 
+// Работа на уроке в панели проверки: оценка (= оценка за урок) и ✓ принять без оценки.
+// locked — прошла полночь: оценку за урок менять нельзя (кроме админа), принять можно.
+function WorkReviewControls({ lessonId, row, locked, onChanged, onError }) {
+  const { work } = row;
+  const [grade, setGrade] = useState(work.score ?? '');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => { setGrade(work.score ?? ''); }, [work.score]);
+
+  const send = async (payload) => {
+    setBusy(true);
+    try {
+      await reviewWork(lessonId, row.student_id, payload);
+      await onChanged();
+    } catch (err) {
+      onError(extractErrorMessage(err, 'Не удалось сохранить'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const num = grade === '' ? null : Number(grade);
+  const valid = num !== null && Number.isInteger(num) && num >= 0 && num <= 100;
+  const saveGrade = () => {
+    if (busy) return;
+    if (grade === '') { setGrade(work.score ?? ''); return; }
+    if (!valid) { onError('Оценка — целое число от 0 до 100'); setGrade(work.score ?? ''); return; }
+    if (num !== work.score || work.status === 'submitted') send({ grade: num });
+  };
+  const reviewed = work.status === 'accepted' || work.status === 'graded';
+
+  return (
+    <div className="hw-review">
+      <span className="text-muted">{'Оценка за урок'}</span>
+      <input
+        type="number"
+        min="0"
+        max="100"
+        className={`input input--sm-num hw-review__grade${work.status === 'submitted' ? ' hw-review__grade--todo' : ''}`}
+        value={grade}
+        disabled={busy || locked}
+        data-tip={locked ? 'Прошла полночь — оценку за урок менять нельзя' : 'Оценка за урок (0–100) — сохраняется сразу'}
+        onChange={e => setGrade(e.target.value)}
+        onBlur={saveGrade}
+        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      />
+      <button
+        type="button"
+        className={`hw-review__btn${reviewed ? ' hw-review__btn--on' : ''}`}
+        data-tip={reviewed ? 'Проверено' : 'Принять без оценки'}
+        disabled={busy || reviewed}
+        onClick={() => send({ accepted: true })}
+      >
+        {'✓'}
+      </button>
+    </div>
+  );
+}
+
 // ---------- Панель проверки справа ----------
 
+// mode: homework — ответ на ДЗ (row.answer); work — работа на уроке (row.work, оценка за урок).
+const PANEL_MODES = {
+  homework: {
+    files: row => row.answer.files,
+    viewUrl: answerFileViewUrl,
+    open: openAnswerFile,
+    download: downloadAnswerFile,
+    submittedAt: row => row.answer.submitted_at,
+    deadline: row => row.answer.deadline,
+    empty: 'ответа нет',
+  },
+  work: {
+    files: row => row.work.files,
+    viewUrl: workFileViewUrl,
+    open: openWorkFile,
+    download: downloadWorkFile,
+    submittedAt: row => row.work.submitted_at,
+    deadline: () => null,
+    empty: 'работу не сдал',
+  },
+};
+
 // queue — все студенты группы по порядку таблицы (листаем по кругу, ради диалога тоже); toReviewCount — сколько ждут проверки
-function ReviewPanel({ lessonId, rows, queue, toReviewCount, studentId, fileId, onNavigate, onChanged, onClose }) {
+export function ReviewPanel({ lessonId, rows, queue, toReviewCount, studentId, fileId, onNavigate, onChanged, onClose, mode = 'homework', locked = false }) {
+  const M = PANEL_MODES[mode];
   const row = rows.find(r => r.student_id === studentId);
-  const files = row ? row.answer.files : [];
+  const files = row ? M.files(row) : [];
   const [activeId, setActiveId] = useState(fileId || files[0]?.id || null);
   const [view, setView] = useState(null); // { url, type, text }
   const [error, setError] = useState('');
@@ -398,7 +481,7 @@ function ReviewPanel({ lessonId, rows, queue, toReviewCount, studentId, fileId, 
     setView(null);
     const f = files.find(x => x.id === activeId);
     if (!f) return undefined;
-    answerFileViewUrl(lessonId, f)
+    M.viewUrl(lessonId, f)
       .then(async ({ url, type }) => {
         revoked = url;
         const text = type.startsWith('text/') ? await (await fetch(url)).text() : null;
@@ -426,8 +509,8 @@ function ReviewPanel({ lessonId, rows, queue, toReviewCount, studentId, fileId, 
           <button type="button" className="btn btn--sm" onClick={onClose} data-tip="Закрыть">{'✕'}</button>
         </div>
         <div className="text-muted review-panel__meta">
-          {row.answer.submitted_at ? `сдано ${new Date(row.answer.submitted_at).toLocaleString('ru-RU')}` : 'ответа нет'}
-          {row.answer.deadline ? ` · срок до ${formatDeadline(row.answer.deadline)}` : ''}
+          {M.submittedAt(row) ? `сдано ${new Date(M.submittedAt(row)).toLocaleString('ru-RU')}` : M.empty}
+          {M.deadline(row) ? ` · срок до ${formatDeadline(M.deadline(row))}` : ''}
         </div>
 
         <div className="review-panel__tabs">
@@ -445,9 +528,18 @@ function ReviewPanel({ lessonId, rows, queue, toReviewCount, studentId, fileId, 
             <button
               type="button"
               className="review-panel__tab"
-              onClick={() => openAnswerFile(lessonId, active).catch(err => setError(extractErrorMessage(err, 'Не удалось открыть')))}
+              onClick={() => M.open(lessonId, active).catch(err => setError(extractErrorMessage(err, 'Не удалось открыть')))}
             >
               {'↗ в новой вкладке'}
+            </button>
+          )}
+          {active && (
+            <button
+              type="button"
+              className="review-panel__tab"
+              onClick={() => M.download(lessonId, active).catch(err => setError(extractErrorMessage(err, 'Не удалось скачать')))}
+            >
+              {'⬇ Скачать'}
             </button>
           )}
         </div>
@@ -460,11 +552,13 @@ function ReviewPanel({ lessonId, rows, queue, toReviewCount, studentId, fileId, 
           {active && view && view.type === 'application/pdf' && <iframe src={view.url} title={active.original_filename} />}
           {active && view && view.text !== null && <pre>{view.text}</pre>}
           {active && view && !view.type.startsWith('image/') && view.type !== 'application/pdf' && view.text === null && (
-            <p className="text-muted">{'Этот формат не показывается в панели — «↗ в новой вкладке».'}</p>
+            <p className="text-muted">{'Этот формат не показывается в панели — «↗ в новой вкладке» или «⬇ Скачать».'}</p>
           )}
         </div>
 
-        <ReviewControls lessonId={lessonId} row={row} onChanged={onChanged} onError={setError} />
+        {mode === 'work'
+          ? <WorkReviewControls lessonId={lessonId} row={row} locked={locked} onChanged={onChanged} onError={setError} />
+          : <ReviewControls lessonId={lessonId} row={row} onChanged={onChanged} onError={setError} />}
 
         <div className="review-panel__dialog">
           <DialogThread lessonId={lessonId} studentId={row.student_id} onChanged={onChanged} />

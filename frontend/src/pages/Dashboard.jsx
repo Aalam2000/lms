@@ -7,7 +7,7 @@ import StudentStars from '../components/StudentStars';
 import StudentHomeworkStrip from '../components/StudentHomeworkStrip';
 import { usePresencePing } from '../hooks/usePresencePing';
 import { useHomeworkRefresh } from '../hooks/useHomeworkRefresh';
-import { getHomeworkToReview } from '../api/groups';
+import { getHomeworkToReview, getWorkToReview } from '../api/groups';
 
 function Dashboard() {
   const { user, logout } = useAuth();
@@ -20,13 +20,19 @@ function Dashboard() {
   const { pathname } = useLocation();
   const isTeaching = user?.role === 'teacher' || user?.role === 'admin';
   const [homework, setHomework] = useState({ count: 0, lesson_id: null });
+  // «Проверь работы»: работы, сданные на уроках, которые ведёт педагог (api/lessonWork.js)
+  const [work, setWork] = useState({ count: 0, lesson_id: null });
   useEffect(() => {
     if (!isTeaching) return undefined;
     let alive = true;
     getHomeworkToReview().then(data => { if (alive) setHomework(data); }).catch(() => {});
+    getWorkToReview().then(data => { if (alive) setWork(data); }).catch(() => {});
     return () => { alive = false; };
   }, [isTeaching, pathname]);
-  useHomeworkRefresh(() => { getHomeworkToReview().then(setHomework).catch(() => {}); }, isTeaching);
+  useHomeworkRefresh(() => {
+    getHomeworkToReview().then(setHomework).catch(() => {});
+    getWorkToReview().then(setWork).catch(() => {});
+  }, isTeaching);
 
   const roleBadgeClass = user?.role
     ? `badge badge--role badge--inline badge--${user.role}`
@@ -83,6 +89,18 @@ function Dashboard() {
                 <span className="only-desktop">{'Проверь ДЗ'}</span>
                 <span className="only-mobile">{'ДЗ'}</span>
                 <span className="btn__count">{homework.count}</span>
+              </button>
+            )}
+            {isTeaching && work.count > 0 && work.lesson_id && (
+              <button
+                type="button"
+                className="btn btn--attention"
+                data-tip="Есть непроверенные работы на уроке"
+                onClick={() => navigate(`/dashboard/lessons/${work.lesson_id}?view=students`)}
+              >
+                <span className="only-desktop">{'Проверь работы'}</span>
+                <span className="only-mobile">{'Работы'}</span>
+                <span className="btn__count">{work.count}</span>
               </button>
             )}
             <LanguageSwitcher />

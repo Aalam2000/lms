@@ -1675,7 +1675,85 @@ a.row-icon:hover {
   width: 260px;
 }
 .table--marks {
-  min-width: 1140px;
+  min-width: 1300px;
+}
+/* Колонка «Файлы с урока» в журнале: работа на уроке (LessonPage.jsx) */
+.table__col--work-files {
+  width: 160px;
+}
+.work-files {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+.work-files__item {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+/* Ждёт проверки — оранжевым, как непроверенное ДЗ */
+.link.work-files__item--todo {
+  color: #8a5a00;
+  background: var(--color-warning-bg);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
+/* Вкладка ученика «Работа на уроке» (LessonWorkStudent.jsx) */
+.lesson-work {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 560px;
+}
+.lesson-work__drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: var(--space-5) var(--space-3);
+  border: 2px dashed var(--color-primary);
+  border-radius: 10px;
+  background: var(--color-white);
+  color: var(--color-primary);
+  cursor: pointer;
+}
+.lesson-work__drop:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.lesson-work__drop--over {
+  background: var(--color-bg-soft);
+}
+.lesson-work__drop-title {
+  font-size: var(--font-lg);
+  font-weight: var(--weight-bold);
+}
+.lesson-work__drop-hint {
+  font-size: var(--font-xs);
+  color: var(--color-muted);
+}
+.lesson-work__file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-light);
+  border-radius: 8px;
+  background: var(--color-white);
+}
+.lesson-work__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
 }
 .hw-bar {
   border: 1px solid var(--color-border-light);

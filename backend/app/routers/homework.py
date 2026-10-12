@@ -4,7 +4,7 @@
   - «+ ДЗ всем» — задание со student_id = NULL (одна запись; видят все
     активные студенты группы, в т.ч. пришедшие позже);
   - «+ ДЗ» студенту — персональное задание.
-  В ДЗ студента (общие + его персональные) — не больше MAX_TASKS файлов.
+  Файлов в ДЗ сколько угодно; ограничение — размер файла (MAX_FILE_SIZE).
 Файл задания: из «Базы знаний» или новый. Новый общий → materials/ (в БЗ,
 с контролем дублей); новый персональный → homework-tasks/урок/студент/
 (Material.is_personal, в БЗ не попадает).
@@ -47,8 +47,6 @@ from .lessons import (
 from .materials import MAX_FILE_SIZE, _content_disposition, _stored_hash
 
 router = APIRouter(prefix="/lessons", tags=["homework"])
-
-MAX_TASKS = 2  # не больше 2 файлов в ДЗ студента (общие + персональные)
 
 
 # ---------- Схемы ----------
@@ -224,20 +222,6 @@ async def _ensure_active_student(db: AsyncSession, lesson: Lesson, student_id: i
         raise HTTPException(status_code=422, detail="Студент не состоит в группе этого урока")
 
 
-async def _ensure_task_limit(db: AsyncSession, lesson: Lesson, student_id: Optional[int]) -> None:
-    """В ДЗ студента (общие + его персональные) — не больше MAX_TASKS файлов."""
-    tasks = await _lesson_tasks(db, lesson.id)
-    if student_id is not None:
-        if sum(1 for t in tasks if _task_is_for(t, student_id)) >= MAX_TASKS:
-            raise HTTPException(status_code=422, detail=f"В ДЗ этого студента уже {MAX_TASKS} файла — больше нельзя")
-        return
-    for sid, name in await _active_students(db, lesson):
-        if sum(1 for t in tasks if _task_is_for(t, sid)) >= MAX_TASKS:
-            raise HTTPException(status_code=422, detail=f"В ДЗ уже {MAX_TASKS} файла (у студента {name}) — больше нельзя")
-    if sum(1 for t in tasks if t.student_id is None) >= MAX_TASKS:
-        raise HTTPException(status_code=422, detail=f"В ДЗ уже {MAX_TASKS} файла — больше нельзя")
-
-
 async def _get_task(db: AsyncSession, lesson_id: int, task_id: int) -> HomeworkTask:
     task = (await db.execute(select(HomeworkTask).where(
         HomeworkTask.id == task_id, HomeworkTask.lesson_id == lesson_id,
@@ -334,7 +318,6 @@ async def create_task(
         await _ensure_active_student(db, lesson, student_id)
     if (material_id is None) == (file is None):
         raise HTTPException(status_code=422, detail="Выберите файл из Базы знаний или загрузите новый")
-    await _ensure_task_limit(db, lesson, student_id)
 
     old_key = None  # объект, заменённый новым содержимым, — удалить после коммита
     if material_id is not None:
@@ -628,10 +611,27 @@ _TEXT_EXT = {".py", ".txt", ".md", ".csv", ".json", ".js", ".ts", ".css", ".html
              ".java", ".c", ".cpp", ".h", ".cs", ".php", ".rb", ".go", ".sql", ".sh", ".yml", ".yaml", ".ini", ".log"}
 
 
-# Файл ответа: студент — свой, педагог/admin — в своём уроке.
-# inline=1 — для просмотра в браузере (панель проверки, новая вкладка):
-# картинки и PDF отдаются как есть, код/текст — как text/plain (чтобы
-# чужой HTML/JS никогда не исполнялся), остальное — обычным скачиванием.
+def file_response(object_key: str, filename: str, content_type: Optional[str], inline: bool) -> StreamingResponse:
+    """Файл ученика (ответ на ДЗ, работа на уроке). inline=True — для просмотра
+    в браузере (панель проверки, новая вкладка): картинки и PDF отдаются как
+    есть, код/текст — как text/plain (чтобы чужой HTML/JS никогда не
+    исполнялся), остальное — обычным скачиванием. inline=False — скачать."""
+    media_type = content_type or "application/octet-stream"
+    disposition = "attachment"
+    if inline:
+        ext = Path(filename).suffix.lower()
+        if media_type.startswith("image/") and media_type != "image/svg+xml" or media_type == "application/pdf":
+            disposition = "inline"
+        elif ext in _TEXT_EXT or media_type.startswith("text/"):
+            media_type, disposition = "text/plain; charset=utf-8", "inline"
+    return StreamingResponse(
+        storage.stream_object(object_key),
+        media_type=media_type,
+        headers={"Content-Disposition": _content_disposition(filename, disposition)},
+    )
+
+
+# Файл ответа: студент — свой, педагог/admin — в своём уроке (просмотр или скачать — file_response).
 @router.get("/{lesson_id}/homework/answer-files/{file_id}/download")
 async def download_answer_file(
     lesson_id: int,
@@ -654,20 +654,7 @@ async def download_answer_file(
         await get_lesson_for_student(lesson_id, db, current_user)
     else:
         await get_lesson_for_teacher_or_admin(lesson_id, db, current_user, write=False)
-
-    media_type = f.content_type or "application/octet-stream"
-    disposition = "attachment"
-    if inline:
-        ext = Path(f.original_filename).suffix.lower()
-        if media_type.startswith("image/") and media_type != "image/svg+xml" or media_type == "application/pdf":
-            disposition = "inline"
-        elif ext in _TEXT_EXT or media_type.startswith("text/"):
-            media_type, disposition = "text/plain; charset=utf-8", "inline"
-    return StreamingResponse(
-        storage.stream_object(f.object_key),
-        media_type=media_type,
-        headers={"Content-Disposition": _content_disposition(f.original_filename, disposition)},
-    )
+    return file_response(f.object_key, f.original_filename, f.content_type, inline)
 
 
 # ---------- Диалог педагог ↔ студент в строке студента ----------

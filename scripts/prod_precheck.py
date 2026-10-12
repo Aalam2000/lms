@@ -11,10 +11,10 @@ import asyncio
 from sqlalchemy import text
 from app.database import engine
 
-EXPECTED_REVISION = "0022_lesson_teacher"   # последняя уже выкаченная
-NEW_TABLES = ["parent_links"]
-NEW_COLUMNS = []
-NEW_INDEXES = []
+EXPECTED_REVISION = "0023_parent_links"   # последняя уже выкаченная
+NEW_TABLES = ["lesson_work_files"]
+NEW_COLUMNS = [("lesson_marks", "work_reviewed_at"), ("lesson_marks", "work_reviewed_by"), ("lessons", "private_note")]
+NEW_INDEXES = ["ix_lesson_work_files_lesson_student"]
 
 
 async def main():

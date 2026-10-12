@@ -18,7 +18,7 @@ from fastapi import HTTPException
 from sqlalchemy import delete, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import GroupMember, HomeworkAnswer, Lesson, LessonMark, LessonStudent, User
+from .models import GroupMember, HomeworkAnswer, Lesson, LessonMark, LessonStudent, LessonWorkFile, User
 
 
 def visible_to_student(student_id: int):
@@ -95,7 +95,7 @@ async def set_participants(db: AsyncSession, lesson: Lesson, student_ids: Iterab
     """Задать состав участников персонального урока (без commit).
 
     Участники — только активные ученики группы урока, хотя бы один. Убрать
-    ученика, у которого в этом уроке уже есть отметка или решение ДЗ, нельзя.
+    ученика, у которого в этом уроке уже есть отметка, решение ДЗ или работа на уроке, нельзя.
     """
     wanted = set(student_ids)
     if not wanted:
@@ -118,10 +118,13 @@ async def set_participants(db: AsyncSession, lesson: Lesson, student_ids: Iterab
         has_answers = (await db.execute(select(HomeworkAnswer.student_id).where(
             HomeworkAnswer.lesson_id == lesson.id, HomeworkAnswer.student_id.in_(removed),
         ))).first()
-        if has_marks or has_answers:
+        has_work = (await db.execute(select(LessonWorkFile.student_id).where(
+            LessonWorkFile.lesson_id == lesson.id, LessonWorkFile.student_id.in_(removed),
+        ))).first()
+        if has_marks or has_answers or has_work:
             raise HTTPException(
                 status_code=409,
-                detail="Нельзя убрать ученика: у него в этом уроке уже есть отметка или решение ДЗ",
+                detail="Нельзя убрать ученика: у него в этом уроке уже есть отметка, решение ДЗ или работа на уроке",
             )
         await db.execute(delete(LessonStudent).where(
             LessonStudent.lesson_id == lesson.id, LessonStudent.student_id.in_(removed),
