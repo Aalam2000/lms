@@ -5,6 +5,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import Modal from '../components/Modal';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import {
   getParentHome, getChildMarks, getChildGrades, getChildHomework, getChildMessages,
   taskFileUrl, answerFileUrl,
@@ -198,7 +199,8 @@ function ParentPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    getParentHome(token).then(setHome).catch(err => setError(extractErrorMessage(err, 'Ссылка недействительна')));
+    // свой текст, а не с сервера — его переводит autoi18n
+    getParentHome(token).then(setHome).catch(() => setError('Ссылка недействительна'));
   }, [token]);
 
   return (
@@ -206,6 +208,7 @@ function ParentPage() {
       <header className="parent-header">
         <span className="parent-header__brand">{'Log Academy'}</span>
         <span className="parent-header__title">{'Успеваемость'}</span>
+        <span className="parent-header__lang"><LanguageSwitcher /></span>
       </header>
       <main className="parent-main">
         {error && <div className="parent-empty">{error}</div>}

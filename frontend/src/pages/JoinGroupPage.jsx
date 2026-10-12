@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import api from '../api/auth';
 import { useAcademyName } from '../utils/academyName';
-import { isValidPhone, registerErrorText, PHONE_PLACEHOLDER } from '../utils/phone';
+import { isValidPhone, registerErrorText, PHONE_PLACEHOLDER, PHONE_FORMAT_TEXT } from '../utils/phone';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 function JoinGroupPage() {
   const academyName = useAcademyName();
@@ -28,7 +29,7 @@ function JoinGroupPage() {
         const res = await api.get(`/groups/invite/${inviteCode}`);
         setGroup(res.data);
       } catch (err) {
-        setGroupError(err?.response?.data?.detail || 'Приглашение недействительно');
+        setGroupError('Приглашение недействительно'); // свой текст, а не с сервера — его переводит autoi18n
       } finally {
         setLoadingGroup(false);
       }
@@ -40,7 +41,7 @@ function JoinGroupPage() {
     e.preventDefault();
     setSubmitError('');
     if (!isValidPhone(phone)) {
-      setSubmitError('Введите номер с кодом страны, например +994 50 123 45 67');
+      setSubmitError(PHONE_FORMAT_TEXT);
       return;
     }
     setIsSubmitting(true);
@@ -67,6 +68,7 @@ function JoinGroupPage() {
   if (groupError) {
     return (
       <div className="centered-page">
+        <div className="auth-lang"><LanguageSwitcher /></div>
         <div className="card">
           <h2 className="card__title">{'Регистрация ученика'}</h2>
           <p className="error-text error-text--sm">{groupError}</p>
@@ -78,6 +80,8 @@ function JoinGroupPage() {
 
   return (
     <div className="centered-page">
+      {/* Язык — до входа: новый ученик сразу выбирает свой, выбор запоминается */}
+      <div className="auth-lang"><LanguageSwitcher /></div>
       <div className="card">
         <img src="/assets/logo.svg" alt={academyName} width="180" height="60" />
         <h2 className="card__title">{'Регистрация ученика'}</h2>

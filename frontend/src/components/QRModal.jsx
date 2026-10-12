@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import Modal from './Modal';
 import { registerStudent } from '../api/auth';
-import { isValidPhone, registerErrorText, PHONE_PLACEHOLDER } from '../utils/phone';
+import { isValidPhone, registerErrorText, PHONE_PLACEHOLDER, PHONE_FORMAT_TEXT } from '../utils/phone';
 
 // QR для регистрации + «Добавить студента»: педагог сам вносит студентов
 // (имя, логин, пароль). После «Сохранить» — снова QR, и так сколько нужно.
@@ -42,7 +42,7 @@ function QRModal({ group, onClose, onAdded }) {
     e.preventDefault();
     setError('');
     if (!isValidPhone(phone)) {
-      setError('Введите номер с кодом страны, например +994 50 123 45 67');
+      setError(PHONE_FORMAT_TEXT);
       return;
     }
     setSaving(true);

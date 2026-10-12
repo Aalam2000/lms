@@ -1167,6 +1167,19 @@
   cursor: pointer;
 }
 
+/* Выбор языка на страницах до входа: «Вход» и «Регистрация» (Login.jsx, JoinGroupPage.jsx) */
+.auth-lang {
+  position: fixed;
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: 10;
+}
+/* … и в шапке страницы родителя (ParentPage.jsx) */
+.parent-header__lang {
+  margin-left: auto;
+  align-self: center;
+}
+
 /* ===== Значки контактов в строке таблицы (GroupsPage) ===== */
 .table__icons {
   display: flex;

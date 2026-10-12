@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { login as loginRequest } from '../api/auth';
-import { getErrorMessage } from '../api/errors';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import { useAcademyName } from '../utils/academyName';
@@ -25,12 +25,19 @@ function Login() {
       login(data.access_token);
       navigate('/dashboard');
     } catch (err) {
-      setError(getErrorMessage(err, 'Ошибка соединения с сервером'));
+      // Свои тексты, а не с сервера: их переводит autoi18n. Что именно неверно —
+      // логин или пароль — не подсказываем.
+      const status = err?.response?.status;
+      setError(status === 401 ? 'Неверный логин или пароль'
+        : status === 429 ? 'Слишком много попыток входа — попробуйте позже'
+          : 'Ошибка соединения с сервером');
     }
   };
 
   return (
     <div className="centered-page">
+      {/* Язык — до входа; выбор запоминается и остаётся после входа */}
+      <div className="auth-lang"><LanguageSwitcher /></div>
       <div className="card">
         <img src="/assets/logo.svg" alt={academyName} width="200" height="66" />
         <form className="login-form" onSubmit={handleSubmit}>

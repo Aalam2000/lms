@@ -6,7 +6,7 @@ import Modal from './Modal';
 import FormField from './FormField';
 import api from '../api/auth';
 import { useAuth } from '../context/AuthContext';
-import { isValidPhone, PHONE_PLACEHOLDER } from '../utils/phone';
+import { isValidPhone, PHONE_PLACEHOLDER, PHONE_FORMAT_TEXT, PHONE_INVALID_TEXT } from '../utils/phone';
 
 function PhoneGate() {
   const { user, refreshUser, logout } = useAuth();
@@ -19,7 +19,7 @@ function PhoneGate() {
   const submit = async (e) => {
     e.preventDefault();
     if (!isValidPhone(phone)) {
-      setError('Введите номер с кодом страны, например +994 50 123 45 67');
+      setError(PHONE_FORMAT_TEXT);
       return;
     }
     setSaving(true);
@@ -31,7 +31,7 @@ function PhoneGate() {
       const status = err?.response?.status;
       setError(status === 409
         ? 'Этот телефон уже зарегистрирован. Обратитесь к педагогу или администратору'
-        : (typeof err?.response?.data?.detail === 'string' ? err.response.data.detail : 'Не удалось сохранить'));
+        : status === 422 ? PHONE_INVALID_TEXT : 'Не удалось сохранить');
     } finally {
       setSaving(false);
     }
