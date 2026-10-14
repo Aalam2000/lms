@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..usages import ensure_not_used
 from ..attendance import attendance_slots, missed_last_lesson, summarize_by_student
-from ..core.security import get_password_hash
+from ..security import get_password_hash
 from ..database import get_db
 from ..homework_status import last_homework_debts
 from ..schemas import NewPasswordIn
@@ -228,7 +228,7 @@ async def list_students(
     missed_last = await missed_last_lesson(db, group_ids, student_ids)
     homework_debts = await last_homework_debts(db, group_ids, student_ids)
 
-    # Последний вход — начало самой свежей сессии ученика (app/presence.py)
+    # Последний вход — начало самой свежей сессии ученика (app/routers/presence.py)
     logins_result = await db.execute(
         select(UserSession.user_id, func.max(UserSession.started_at))
         .where(UserSession.user_id.in_(student_ids))

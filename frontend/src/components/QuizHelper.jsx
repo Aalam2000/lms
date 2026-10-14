@@ -2,7 +2,8 @@
 // педагог сам отдаёт его любому ИИ, вставляет ответ (JSON) обратно, и
 // квиз заполняется целиком (всегда «Заменить» — квиз делается заново).
 import React, { useEffect, useState } from 'react';
-import api from '../api/auth';
+import { getLessonItems } from '../api/lessons';
+import { getMaterialText } from '../api/materials';
 
 const LANG_NAMES = { ru: 'русский', az: 'азербайджанский', en: 'английский' };
 
@@ -139,9 +140,9 @@ function QuizHelper({ templateType, lang, lessonId, onFill }) {
 
   useEffect(() => {
     if (!lessonId) return;
-    api.get(`/lessons/${lessonId}/items`)
-      .then(res => {
-        const files = res.data.filter(i => i.resource_type === 'material' && TEXT_EXT.test(i.title || ''));
+    getLessonItems(lessonId)
+      .then(items => {
+        const files = items.filter(i => i.resource_type === 'material' && TEXT_EXT.test(i.title || ''));
         setLessonFiles(files);
         setPicked(Object.fromEntries(files.map(f => [f.resource_id, true])));
       })
@@ -159,8 +160,8 @@ function QuizHelper({ templateType, lang, lessonId, onFill }) {
       const problems = [];
       for (const f of chosen) {
         try {
-          const res = await api.get(`/materials/${f.resource_id}/text`, { params: { limit: perFile } });
-          if (res.data.text.trim()) materials.push(res.data);
+          const material = await getMaterialText(f.resource_id, perFile);
+          if (material.text.trim()) materials.push(material);
           else problems.push(`«${f.title}»: текста нет (картинки/скан)`);
         } catch (err) {
           const detail = err?.response?.data?.detail;

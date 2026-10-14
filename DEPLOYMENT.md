@@ -4,7 +4,7 @@
 > Build output is still `frontend/build/`, build arg is still `REACT_APP_API_URL` —
 > `docker-compose.prod.yml` and nginx are unchanged. Details: README.md → «Сборка фронтенда: Vite».
 
-## 1) Server-side Postgres and MinIO (outside app compose)
+## 1) Server-side Postgres, platform files and MinIO (outside app compose)
 
 ### 1.1 Postgres service
 - Install Postgres on prod host using OS packages.
@@ -46,7 +46,15 @@
   - `MINIO_CONSOLE_ADDRESS="127.0.0.1:9001"`
 - Open only port `9000` for app host/private network, keep `9001` local/admin-only.
 
-### 1.3 Pre-deploy health checks
+### 1.3 Platform files folder (required before deploy)
+Uploaded files are stored on the host as `<type>/<uuid>` (names only in the DB, see `backend/app/storage.py`).
+The folder is mounted into the backend container at the same path. Create it once, owned by the deploy user:
+- `sudo install -d -o quizadm -g quizadm -m 700 /var/lib/logacademy/data`
+
+`scripts/deploy-prod.sh` refuses to deploy if the folder is missing or not writable; `scripts/backup.sh` archives it as `files.tar.gz`.
+MinIO (1.2) is only needed until the existing files are moved to this folder: the backend moves them automatically at startup.
+
+### 1.4 Pre-deploy health checks
 - Postgres service is active:
   - `systemctl is-active postgresql`
 - Postgres accepts auth:

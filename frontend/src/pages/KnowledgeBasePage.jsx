@@ -1,12 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import SortTh, { sortRows } from '../components/SortTh';
 import { useNavigate } from 'react-router-dom';
-import api from '../api/auth';
 import DeleteButton from '../components/DeleteButton';
 import IconButton from '../components/IconButton';
 import { getCourses } from '../api/admin';
 import { getSectors } from '../api/academy';
-import { uploadMaterial, updateMaterialTemplate, bulkUpdateMaterialTemplate } from '../api/materials';
+import {
+  uploadMaterial, updateMaterialTemplate, bulkUpdateMaterialTemplate, deleteMaterial, openPendingTab, showMaterialInTab,
+} from '../api/materials';
+import { getLibraryItems } from '../api/library';
+import { createLink, deleteLink } from '../api/links';
+import { getQuizHtml, deleteQuiz } from '../api/quizzes';
 import { useAuth } from '../context/AuthContext';
 import { TYPE_META, formatSize, subtypeLabel, resourceKey, needsPdfPreview, isPresentation, openSlides } from '../utils/libraryItems';
 import { IconBadgeFile, IconBadgeQuiz, IconBadgeLink } from '../components/TypeBadgeIcons';
@@ -91,8 +95,7 @@ function KnowledgeBasePage() {
       if (isAdmin && filterCourseId) params.course_id = filterCourseId;
       if (isAdmin && filterSector) params.sector = filterSector;
       if (showTemplates) params.include_templates = true;
-      const res = await api.get('/library/items', { params });
-      setItems(res.data);
+      setItems(await getLibraryItems(params));
     } catch (err) {
       setError(err?.response?.data?.detail || 'Не удалось загрузить базу знаний');
     } finally {
@@ -138,7 +141,7 @@ function KnowledgeBasePage() {
     setIsAddingLink(true);
     setError('');
     try {
-      await api.post('/links/', { title: linkTitle.trim(), url: linkUrl.trim() });
+      await createLink(linkTitle.trim(), linkUrl.trim());
       setLinkTitle('');
       setLinkUrl('');
       setShowLinkForm(false);
@@ -272,26 +275,14 @@ function KnowledgeBasePage() {
 
     const key = itemKey(item);
     setOpeningKey(key);
-    const win = window.open('', '_blank');
-    const isConverting = item.resource_type === 'material' && needsPdfPreview(item.content_type);
-    if (win && isConverting) {
-      win.document.write('<p style="font-family:sans-serif;color:#4B5563;padding:24px">Конвертируем файл в PDF...</p>');
-      win.document.close();
-    }
+    const win = openPendingTab(item.resource_type === 'material' && needsPdfPreview(item.content_type));
     try {
       if (item.resource_type === 'material') {
-        const endpoint = needsPdfPreview(item.content_type) ? 'preview' : 'download';
-        const res = await api.get(`/materials/${item.id}/${endpoint}`, { responseType: 'blob' });
-        const fallbackType = endpoint === 'preview' ? 'application/pdf' : (item.content_type || 'application/octet-stream');
-        const type = res.headers?.['content-type'] || fallbackType;
-        const url = window.URL.createObjectURL(new Blob([res.data], { type }));
-        const openUrl = type === 'application/pdf' ? `${url}#navpanes=0` : url;
-        if (win) win.location.href = openUrl;
-        setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+        await showMaterialInTab(win, item.id, item.content_type);
       } else {
-        const res = await api.get(`/quizzes/${item.id}/html`);
+        const quiz = await getQuizHtml(item.id);
         if (win) {
-          win.document.write(res.data.html);
+          win.document.write(quiz.html);
           win.document.close();
         }
       }
@@ -340,7 +331,7 @@ function KnowledgeBasePage() {
     return isAdmin; // файлы и ссылки — только admin
   };
 
-  const DELETE_PATH = { material: 'materials', quiz: 'quizzes', link: 'links' };
+  const DELETE_FN = { material: deleteMaterial, quiz: deleteQuiz, link: deleteLink };
   const DELETE_TIP = { material: 'Удалить файл', quiz: 'Удалить квиз', link: 'Удалить ссылку' };
 
   const columnCount = 9;
@@ -662,7 +653,7 @@ function KnowledgeBasePage() {
                           id={item.id}
                           name={item.title}
                           tip={DELETE_TIP[item.resource_type]}
-                          onDelete={() => api.delete(`/${DELETE_PATH[item.resource_type]}/${item.id}`)}
+                          onDelete={() => DELETE_FN[item.resource_type](item.id)}
                           onDeleted={() => setItems(prev => prev.filter(i => itemKey(i) !== key))}
                           onError={setError}
                         />

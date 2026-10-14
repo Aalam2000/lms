@@ -174,3 +174,9 @@ class NewPasswordIn(BaseModel):
         if not v or not v.strip():
             raise ValueError("Пароль не может быть пустым")
         return v
+
+
+# Выходные педагога: полоски дней недели и отдельные даты (app/days_off.py)
+class DaysOffSettings(BaseModel):
+    weeks: List[List[int]] = []
+    dates: Dict[str, str] = {}  # "YYYY-MM-DD": "off" | "work"

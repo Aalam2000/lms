@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../api/auth';
 import { useAuth } from '../context/AuthContext';
 import { StudentContactIcons } from '../components/ContactIcons';
 import Dropdown from '../components/Dropdown';
 import Calendar, { GROUP_COLORS } from '../components/Calendar';
 import { getMyLessons } from '../api/lessons';
+import { getCourses, getMyGroups } from '../api/groups';
+import { getGroups as getAllGroups } from '../api/admin';
 import { useDaysOff } from '../hooks/useDaysOff';
 import { useHomeworkRefresh } from '../hooks/useHomeworkRefresh';
 import IconButton from '../components/IconButton';
@@ -59,9 +60,9 @@ function GroupsPage() {
 
   // Курсы и (у admin) полный список групп — один раз, для фильтров.
   useEffect(() => {
-    api.get('/groups/courses').then(r => setCourses(r.data)).catch(() => {});
+    getCourses().then(setCourses).catch(() => {});
     if (isAdmin) {
-      api.get('/admin/groups').then(r => setAllGroups(r.data)).catch(() => {});
+      getAllGroups().then(setAllGroups).catch(() => {});
     }
     // eslint-disable-next-line
   }, [isAdmin]);
@@ -81,11 +82,11 @@ function GroupsPage() {
       const params = {};
       if (isAdmin && mine) params.mine = true;
       if (isAdmin && !mine && teacherId) params.teacher_id = teacherId;
-      const [groupsRes, lessonsRes] = await Promise.all([
-        api.get('/groups/my', { params: { ...params, with_guest: true } }),
+      const [groupsData, lessonsRes] = await Promise.all([
+        getMyGroups({ ...params, with_guest: true }),
         getMyLessons(params),
       ]);
-      setGroups(groupsRes.data);
+      setGroups(groupsData);
       setLessons(lessonsRes);
     } catch (err) {
       if (!silent) setError(err?.response?.data?.detail || 'Не удалось загрузить группы');

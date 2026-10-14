@@ -1,5 +1,6 @@
 import logging
 import os
+import threading
 
 from fastapi import APIRouter, Depends, Request, Response
 from autoi18n import Translator
@@ -14,6 +15,19 @@ router = APIRouter(prefix="/i18n", tags=["i18n"])
 # Единый экземпляр Translator для всего backend (используется также в
 # routers/quizzes.py для перевода HTML-шаблонов квизов).
 translator = Translator(env_path=".env")
+
+
+def start_translation_worker(interval: int = 1800) -> None:
+    """Фоновый поток автоперевода (запускается при старте приложения, main.py):
+    раз в interval секунд пересканировать проект и перевести накопленную очередь —
+    обе операции делает Translator.run_translation_loop() из autoi18n за один вызов.
+    """
+    threading.Thread(
+        target=translator.run_translation_loop,
+        kwargs={"interval": interval},
+        daemon=True,
+    ).start()
+    logger.info("autoi18n: фоновый воркер запущен (interval=%ss)", interval)
 
 # POST /i18n/languages дёргает библиотеку autoi18n, а она переводит СРАЗУ
 # весь реестр исходного языка через OpenAI (платно, синхронно). Библиотека

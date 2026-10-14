@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&url';
-import api from '../api/auth';
+import { getMaterialPreviewBytes } from '../api/materials';
 import { extractErrorMessage } from '../utils/errors';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
@@ -31,8 +31,8 @@ function SlideViewerPage() {
   useEffect(() => {
     if (title) document.title = title;
     let cancelled = false;
-    api.get(`/materials/${materialId}/preview`, { responseType: 'arraybuffer' })
-      .then(res => pdfjsLib.getDocument({ data: res.data }).promise)
+    getMaterialPreviewBytes(materialId)
+      .then(data => pdfjsLib.getDocument({ data }).promise)
       .then(doc => { if (!cancelled) setPdf(doc); })
       .catch(err => { if (!cancelled) setError(extractErrorMessage(err, 'Не удалось открыть презентацию')); });
     return () => { cancelled = true; };

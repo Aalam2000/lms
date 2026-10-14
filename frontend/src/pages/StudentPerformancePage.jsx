@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '../api/auth';
+import { getMyMarks, getMyGrades } from '../api/lessons';
 import Modal from '../components/Modal';
 
 // Три вида оценок — у каждой своя средняя (claude/homework-plan.md, «Оценки»).
@@ -27,8 +27,8 @@ function StudentPerformancePage() {
   const [openKind, setOpenKind] = useState(null);
 
   useEffect(() => {
-    api.get('/lessons/student/marks').then(r => setMarks(r.data));
-    api.get('/lessons/student/grades').then(r => setGrades(r.data));
+    getMyMarks().then(setMarks);
+    getMyGrades().then(setGrades);
   }, []);
 
   const absenceRows = marks.filter(m => ABSENCE_LABELS[m.attendance_status]);

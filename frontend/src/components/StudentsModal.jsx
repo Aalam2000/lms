@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import api from '../api/auth';
 import {
   getGroupStudents, searchAvailableStudents, addGroupMember, expelGroupMember, restoreGroupMember,
   acceptGroupMember, declineGroupMember,

@@ -2,11 +2,14 @@
 // (несколько полосок чередуются по неделям) и маленький календарь отдельных
 // дней. Админ правит и сохраняет (вкладка «Админ» → педагоги), педагог видит
 // то же самое у себя в профиле только для просмотра (readOnly).
-// Какие дни выходные, считает бэкенд (предпросмотр) — правило не повторяется здесь.
+// Какие дни выходные, считает бэкенд: у админа — предпросмотр несохранённых
+// настроек, у педагога — сохранённые даты. Правило здесь не повторяется.
 import React, { useEffect, useState } from 'react';
 import IconButton from './IconButton';
 import MonthGrid from './MonthGrid';
-import { getDaysOffSettings, previewDaysOff, saveDaysOffSettings } from '../api/daysOff';
+import { getTeacherDaysOffSettings, previewTeacherDaysOff, saveTeacherDaysOffSettings } from '../api/admin';
+import { getMyDaysOffSettings } from '../api/auth';
+import { getTeacherDaysOff } from '../api/lessons';
 import { addDays, isoDate } from '../utils/dates';
 import { WEEKDAY_LABELS } from '../utils/weekdays';
 
@@ -21,20 +24,25 @@ function DaysOffEditor({ teacherId, readOnly, onSaved }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    getDaysOffSettings(teacherId)
+    (readOnly ? getMyDaysOffSettings() : getTeacherDaysOffSettings(teacherId))
       .then(data => setSettings({ weeks: data.weeks.length ? data.weeks : [[]], dates: data.dates }))
       .catch(err => setError(err?.response?.data?.detail || 'Не удалось загрузить выходные'));
-  }, [teacherId]);
+  }, [teacherId, readOnly]);
 
   useEffect(() => {
     if (!settings || !calendarOpen) return undefined;
     const monthStart = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
     let alive = true;
-    previewDaysOff(teacherId, settings, isoDate(addDays(monthStart, -7)), isoDate(addDays(monthStart, 44)))
+    const from = isoDate(addDays(monthStart, -7));
+    const to = isoDate(addDays(monthStart, 44));
+    const request = readOnly
+      ? getTeacherDaysOff(teacherId, from, to).then(dates => ({ dates, pattern: [] }))
+      : previewTeacherDaysOff(teacherId, settings, from, to);
+    request
       .then(data => { if (alive) setPreview({ dates: new Set(data.dates), pattern: new Set(data.pattern) }); })
       .catch(err => { if (alive) setError(err?.response?.data?.detail || 'Не удалось показать календарь'); });
     return () => { alive = false; };
-  }, [teacherId, settings, calendarOpen, viewDate]);
+  }, [teacherId, readOnly, settings, calendarOpen, viewDate]);
 
   if (!settings) return error ? <div className="banner banner--error">{error}</div> : <p className="text-muted">{'Загрузка...'}</p>;
 
@@ -62,7 +70,7 @@ function DaysOffEditor({ teacherId, readOnly, onSaved }) {
     setSaving(true);
     setError('');
     try {
-      const saved = await saveDaysOffSettings(teacherId, settings);
+      const saved = await saveTeacherDaysOffSettings(teacherId, settings);
       setSettings({ weeks: saved.weeks.length ? saved.weeks : [[]], dates: saved.dates });
       if (onSaved) onSaved();
     } catch (err) {

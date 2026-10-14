@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import api from '../api/auth';
+import { getMe } from '../api/auth';
 
 const AuthContext = createContext();
 
@@ -10,8 +10,8 @@ export function AuthProvider({ children }) {
   // Загружаем пользователя при наличии токена
   useEffect(() => {
     if (token) {
-      api.get('/auth/me')
-        .then(r => setUser(r.data))
+      getMe()
+        .then(setUser)
         .catch(() => { logout(); });
     } else {
       setUser(null);
@@ -31,7 +31,7 @@ export function AuthProvider({ children }) {
 
   // Обновить данные пользователя (после сохранения профиля)
   const refreshUser = () => {
-    if (token) api.get('/auth/me').then(r => setUser(r.data));
+    if (token) getMe().then(setUser);
   };
 
   // Универсальная проверка роли — вместо user.role === 'admin' по всему

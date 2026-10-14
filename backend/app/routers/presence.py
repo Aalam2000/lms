@@ -1,20 +1,72 @@
-"""Присутствие в системе: пульс, «сейчас в системе», отчёт о посещениях.
-Правила — в app/presence.py, здесь только выдача (claude/presence-plan.md)."""
-from datetime import date, datetime, time, timedelta
+"""Присутствие в системе: пульс, «сейчас в системе», отчёт о посещениях
+(claude/presence-plan.md). Правила — здесь же, в начале файла, и больше нигде:
+
+- Открытая и видимая вкладка шлёт пульс раз в PING_INTERVAL (фронт:
+  hooks/usePresencePing.js). Свёрнутая / скрытая вкладка пульс не шлёт.
+- Пульс продлевает последнюю сессию, если с прошлого прошло не больше
+  SESSION_GAP; иначе начинается новая сессия.
+- «Сегодня в системе» — все, у кого сегодня (по Баку) была сессия; зелёный
+  флажок «сейчас здесь» — последний пульс не старше ONLINE_WINDOW.
+- Время сессии = last_seen - started + PING_INTERVAL (последняя минута
+  после последнего пульса тоже была проведена в системе).
+"""
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..dependencies import get_current_user, require_admin
 from ..lesson_lock import BAKU_TZ, aware, baku_day
 from ..models import Group, GroupMember, User, UserSession
-from ..presence import ONLINE_WINDOW, now_utc, purge_old, record_ping, session_minutes
 
 router = APIRouter(prefix="/presence", tags=["presence"])
+
+PING_INTERVAL = timedelta(seconds=60)
+SESSION_GAP = timedelta(minutes=5)
+ONLINE_WINDOW = timedelta(minutes=10)  # решение Андрея: «сейчас здесь» = активен за 10 мин
+# Несколько вкладок одного пользователя шлют пульсы независимо — чаще раза
+# в THROTTLE базу не трогаем.
+THROTTLE = timedelta(seconds=20)
+RETENTION_DAYS = 365
+
+
+def now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def session_minutes(started_at: datetime, last_seen_at: datetime) -> float:
+    return ((last_seen_at - started_at) + PING_INTERVAL).total_seconds() / 60
+
+
+async def record_ping(db: AsyncSession, user_id: int) -> None:
+    now = now_utc()
+    last = (await db.execute(
+        select(UserSession)
+        .where(UserSession.user_id == user_id)
+        .order_by(UserSession.last_seen_at.desc())
+        .limit(1)
+    )).scalar_one_or_none()
+    last_seen = aware(last.last_seen_at) if last else None
+    if last_seen and last_seen >= now - THROTTLE:
+        return
+    if last_seen and last_seen >= now - SESSION_GAP:
+        last.last_seen_at = now
+    else:
+        db.add(UserSession(user_id=user_id, started_at=now, last_seen_at=now))
+    await db.commit()
+
+
+async def purge_old(db: AsyncSession) -> None:
+    """Срок хранения: сессии старше RETENTION_DAYS удаляются (вызывается из отчёта)."""
+    await db.execute(delete(UserSession).where(
+        UserSession.last_seen_at < now_utc() - timedelta(days=RETENTION_DAYS)
+    ))
+    await db.commit()
+
 
 ROLES = ("admin", "teacher", "student")
 MAX_REPORT_DAYS = 366

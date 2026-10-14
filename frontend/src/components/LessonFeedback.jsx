@@ -3,7 +3,7 @@
 // Оценить можно начавшийся урок, оценку можно поменять. Педагог отдельных
 // оценок не видит — сводка идёт в отчёт по педагогу у админа.
 import React, { useEffect, useState } from 'react';
-import api from '../api/auth';
+import { getMyLessonFeedback, rateLesson } from '../api/lessons';
 
 const FACES = [
   { rating: 3, cls: 'good', tip: 'Понравилось', mouth: 'M8 14c1.2 1.6 2.5 2.4 4 2.4s2.8-.8 4-2.4' },
@@ -17,8 +17,8 @@ function LessonFeedback({ lessonId }) {
 
   useEffect(() => {
     let alive = true;
-    api.get(`/lessons/${lessonId}/feedback/me`)
-      .then(r => { if (alive) setState(r.data); })
+    getMyLessonFeedback(lessonId)
+      .then(data => { if (alive) setState(data); })
       .catch(() => {});
     return () => { alive = false; };
   }, [lessonId]);
@@ -29,8 +29,7 @@ function LessonFeedback({ lessonId }) {
     if (saving || rating === state.rating) return;
     setSaving(true);
     try {
-      const r = await api.put(`/lessons/${lessonId}/feedback/me`, { rating });
-      setState(r.data);
+      setState(await rateLesson(lessonId, rating));
     } catch {
       // не сохранилось — оставляем как было, ученик нажмёт ещё раз
     } finally {

@@ -51,8 +51,9 @@ backend/            API и бизнес-логика
   app/models.py       модель данных
   app/attendance.py   правило посещаемости
   app/lesson_lock.py  правило фиксации урока
+  app/days_off.py     правило выходных педагога
+  app/security.py     пароли и токены входа
   app/usages.py       проверка использования перед удалением
-  app/presence.py     правила учёта присутствия в системе
   app/storage.py      работа с файловым хранилищем
   app/backup_minio.py выгрузка файлов хранилища в архив (для бэкапа)
   alembic/            миграции базы данных
@@ -63,7 +64,7 @@ backend/            API и бизнес-логика
 frontend/           веб-интерфейс
   src/pages/          страницы
   src/components/     общие компоненты
-  src/api/            обращения к API
+  src/api/            обращения к API: файл на каждый роутер бэкенда, страницы и компоненты ходят на сервер только через них
   src/styles/         дизайн-токены и стили
   public/fonts/       шрифты сайта и квизов (woff2 + fonts.css), без Google Fonts
 deploy/             конфигурация Nginx и системных сервисов
@@ -84,7 +85,7 @@ scripts/            служебные скрипты
 
 Backend пишет в stdout через `logging` (уровень INFO), без `print`.
 
-**Нарушения CSP.** Браузеры шлют отчёты на `/api/csp-report` (`report-uri` в заголовке CSP, `deploy/nginx/prod.conf`). Они не пишутся в лог, а складываются в таблицу `csp_reports` с дедупликацией: одна строка на вид нарушения (директива + домен источника + страница с `:id` вместо id + файл:строка), повтор только увеличивает `count` и обновляет `last_seen`. Расширения браузера отбрасываются, видов — не больше 1000. Просмотр: `docker compose -f docker-compose.prod.yml exec backend python -m app.csp_report_list` (`--clear` — очистить после разбора) или `GET /api/csp-reports` (админ).
+**Нарушения CSP.** Браузеры шлют отчёты на `/api/csp-report` (`report-uri` в заголовке CSP, `deploy/nginx/prod.conf`). Они не пишутся в лог, а складываются в таблицу `csp_reports` с дедупликацией: одна строка на вид нарушения (директива + домен источника + страница с `:id` вместо id + файл:строка), повтор только увеличивает `count` и обновляет `last_seen`. Расширения браузера отбрасываются, видов — не больше 1000. Просмотр — консольная утилита `app/csp_report_list.py` на сервере, с очисткой после разбора.
 
 **Бэкапы.** `scripts/backup.sh` (systemd-таймер `logacademy-backup.timer`, каждый день в 03:15 по Баку, от имени `quizadm`) кладёт в `/var/backups/logacademy/<дата>_<время>/`:
 - `db.dump` — база (`pg_dump -Fc`);

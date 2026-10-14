@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import api from '../api/auth';
+import { registerStudent } from '../api/auth';
+import { getGroupByInvite } from '../api/groups';
 import { useAcademyName } from '../utils/academyName';
 import { isValidPhone, registerErrorText, PHONE_PLACEHOLDER, PHONE_FORMAT_TEXT } from '../utils/phone';
 import LanguageSwitcher from '../components/LanguageSwitcher';
@@ -26,8 +27,7 @@ function JoinGroupPage() {
       setLoadingGroup(true);
       setGroupError('');
       try {
-        const res = await api.get(`/groups/invite/${inviteCode}`);
-        setGroup(res.data);
+        setGroup(await getGroupByInvite(inviteCode));
       } catch (err) {
         setGroupError('Приглашение недействительно'); // свой текст, а не с сервера — его переводит autoi18n
       } finally {
@@ -46,7 +46,7 @@ function JoinGroupPage() {
     }
     setIsSubmitting(true);
     try {
-      await api.post('/auth/register/student', {
+      await registerStudent({
         username,
         password,
         full_name: fullName || null,

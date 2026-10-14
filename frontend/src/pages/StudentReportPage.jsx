@@ -4,7 +4,7 @@
 // нормы считает бэкенд (backend/app/student_report.py), формулировки — здесь.
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import api from '../api/auth';
+import { getStudentReport } from '../api/students';
 import { extractErrorMessage } from '../utils/errors';
 import { ReportPeriod, ReportToolbar, Status, defaultPeriod, periodParams, withSign } from '../components/ReportParts';
 
@@ -118,8 +118,8 @@ function StudentReportPage() {
     let alive = true;
     setLoading(true);
     setError('');
-    api.get(`/students/${studentId}/report`, { params: periodParams(period) })
-      .then(r => { if (alive) setReport(r.data); })
+    getStudentReport(studentId, periodParams(period))
+      .then(data => { if (alive) setReport(data); })
       .catch(err => { if (alive) setError(extractErrorMessage(err, 'Не удалось построить отчёт')); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };

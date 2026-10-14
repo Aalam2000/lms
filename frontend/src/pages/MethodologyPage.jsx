@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import api from '../api/auth';
+import { getMethodologyTree, getMethodologyDoc } from '../api/methodology';
 import { useLang } from '../hooks/useLang';
 import { useInternalLinks } from '../hooks/useInternalLinks';
 
@@ -25,8 +25,8 @@ function MethodologyPage() {
 
   useEffect(() => {
     setTreeError('');
-    api.get('/methodology', { params: { lang } })
-      .then(r => setTree(r.data.sections || []))
+    getMethodologyTree(lang)
+      .then(data => setTree(data.sections || []))
       .catch(err => setTreeError(err?.response?.data?.detail || 'Не удалось загрузить разделы'));
   }, [lang]);
 
@@ -37,8 +37,8 @@ function MethodologyPage() {
     }
     setLoading(true);
     setError('');
-    api.get(`/methodology/${section}/${slug}`, { params: { lang } })
-      .then(r => setDoc(r.data))
+    getMethodologyDoc(section, slug, lang)
+      .then(setDoc)
       .catch(err => setError(err?.response?.data?.detail || 'Не удалось загрузить материал'))
       .finally(() => setLoading(false));
   }, [section, slug, lang]);

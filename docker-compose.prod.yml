@@ -32,6 +32,9 @@ services:
       - ./backend/templates/methodology:/app/templates/methodology
       - ./frontend/src:/app/frontend/src:ro
       - ./.env.prod:/app/.env
+      # файлы платформы (app/storage.py) — папка сервера, создаётся один раз
+      # при установке (DEPLOYMENT.md), deploy-prod.sh проверяет её до выкатки
+      - /var/lib/logacademy/data:/var/lib/logacademy/data
 
   frontend:
     build:

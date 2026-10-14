@@ -2,13 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
-import api from '../api/auth';
 import { ContactIcon } from '../components/ContactIcons';
 import IconButton from '../components/IconButton';
 import DeleteButton from '../components/DeleteButton';
 import PasswordModal from '../components/PasswordModal';
 import DaysOffEditor from '../components/DaysOffEditor';
-import { setUserPassword, setUserRole } from '../api/admin';
+import * as adminApi from '../api/admin';
 import { useAuth } from '../context/AuthContext';
 import AcademyTab from '../components/AcademyTab';
 import { getSectors } from '../api/academy';
@@ -103,10 +102,10 @@ function AdminPage() {
     loadSectors();
   };
 
-  const loadTeachers = async () => { const r = await api.get('/admin/teachers'); setTeachers(r.data); };
-  const loadAdmins   = async () => { const r = await api.get('/admin/admins');   setAdmins(r.data); };
-  const loadCourses  = async () => { const r = await api.get('/admin/courses');  setCourses(r.data); };
-  const loadGroups   = async () => { const r = await api.get('/admin/groups');   setGroups(r.data); };
+  const loadTeachers = async () => setTeachers(await adminApi.getTeachers());
+  const loadAdmins   = async () => setAdmins(await adminApi.getAdmins());
+  const loadCourses  = async () => setCourses(await adminApi.getCourses());
+  const loadGroups   = async () => setGroups(await adminApi.getGroups());
   const loadSectors  = async () => { setSectors(await getSectors()); };
 
   const handleError = (e) => {
@@ -136,7 +135,7 @@ function AdminPage() {
 
   const createTeacher = async () => {
     try {
-      await api.post('/admin/teachers', { ...newTeacher, role: 'teacher' });
+      await adminApi.createTeacher({ ...newTeacher, role: 'teacher' });
       closeAddModal();
       loadTeachers();
     } catch(e) { handleError(e); }
@@ -144,7 +143,7 @@ function AdminPage() {
 
   const createAdmin = async () => {
     try {
-      await api.post('/admin/admins', { ...newAdmin, role: 'admin' });
+      await adminApi.createAdmin({ ...newAdmin, role: 'admin' });
       closeAddModal();
       loadAdmins();
     } catch(e) { handleError(e); }
@@ -152,7 +151,7 @@ function AdminPage() {
 
   const createCourse = async () => {
     try {
-      await api.post('/admin/courses', newCourse);
+      await adminApi.createCourse(newCourse);
       closeAddModal();
       loadCourses();
     } catch(e) { handleError(e); }
@@ -166,7 +165,7 @@ function AdminPage() {
     }
 
     try {
-      await api.post('/admin/groups', {
+      await adminApi.createGroup({
         ...newGroup,
         course_id:  parseInt(newGroup.course_id),
         teacher_id: parseInt(newGroup.teacher_id),
@@ -181,16 +180,16 @@ function AdminPage() {
   const [showArchivedGroups, setShowArchivedGroups] = useState(false);
   const archiveGroup = async (g) => {
     if (!window.confirm(`Отправить группу «${g.name}» в архив?`)) return;
-    try { await api.post(`/admin/groups/${g.id}/archive`); loadGroups(); }
+    try { await adminApi.archiveGroup(g.id); loadGroups(); }
     catch(e) { handleError(e); }
   };
   const restoreGroup = async (g) => {
-    try { await api.post(`/admin/groups/${g.id}/restore`); loadGroups(); }
+    try { await adminApi.restoreGroup(g.id); loadGroups(); }
     catch(e) { handleError(e); }
   };
   const deleteGroup = async (g) => {
     if (!window.confirm(`Удалить группу «${g.name}» навсегда? Это действие нельзя отменить.`)) return;
-    try { await api.delete(`/admin/groups/${g.id}`); loadGroups(); }
+    try { await adminApi.deleteGroup(g.id); loadGroups(); }
     catch(e) { handleError(e); }
   };
 
@@ -211,8 +210,8 @@ function AdminPage() {
     if (editingTeacherId === null || isSavingTeacher) return;
     try {
       setIsSavingTeacher(true);
-      const res = await api.patch(`/admin/teachers/${editingTeacherId}`, editingTeacherDraft);
-      setTeachers(prev => prev.map(u => u.id === editingTeacherId ? res.data : u));
+      const saved = await adminApi.updateTeacher(editingTeacherId, editingTeacherDraft);
+      setTeachers(prev => prev.map(u => u.id === editingTeacherId ? saved : u));
       setEditingTeacherId(null);
     } catch (e) {
       handleError(e);
@@ -238,8 +237,8 @@ function AdminPage() {
     if (editingAdminId === null || isSavingAdmin) return;
     try {
       setIsSavingAdmin(true);
-      const res = await api.patch(`/admin/admins/${editingAdminId}`, editingAdminDraft);
-      setAdmins(prev => prev.map(u => u.id === editingAdminId ? res.data : u));
+      const saved = await adminApi.updateAdmin(editingAdminId, editingAdminDraft);
+      setAdmins(prev => prev.map(u => u.id === editingAdminId ? saved : u));
       setEditingAdminId(null);
     } catch (e) {
       handleError(e);
@@ -262,8 +261,8 @@ function AdminPage() {
     if (editingCourseId === null || isSavingCourse) return;
     try {
       setIsSavingCourse(true);
-      const res = await api.patch(`/admin/courses/${editingCourseId}`, editingCourseDraft);
-      setCourses(prev => prev.map(c => c.id === editingCourseId ? res.data : c));
+      const saved = await adminApi.updateCourse(editingCourseId, editingCourseDraft);
+      setCourses(prev => prev.map(c => c.id === editingCourseId ? saved : c));
       setEditingCourseId(null);
     } catch (e) {
       handleError(e);
@@ -308,8 +307,8 @@ function AdminPage() {
         video_url: editingGroupDraft.video_url.trim() || null,
         sector: editingGroupDraft.sector || null,
       };
-      const res = await api.patch(`/admin/groups/${editingGroupId}`, payload);
-      setGroups(prev => prev.map(g => g.id === editingGroupId ? res.data : g));
+      const saved = await adminApi.updateGroup(editingGroupId, payload);
+      setGroups(prev => prev.map(g => g.id === editingGroupId ? saved : g));
       setEditingGroupId(null);
     } catch (e) {
       handleError(e);
@@ -362,7 +361,7 @@ function AdminPage() {
     const name = u.full_name || u.username;
     if (!window.confirm(role === 'admin' ? `Сделать админом: ${name}?` : `Перевести в педагоги: ${name}?`)) return;
     try {
-      await setUserRole(u.id, role);
+      await adminApi.setUserRole(u.id, role);
       await Promise.all([loadTeachers(), loadAdmins()]);
     } catch (e) { handleError(e); }
   };
@@ -436,7 +435,7 @@ function AdminPage() {
                     id={u.id}
                     name={u.full_name || u.username}
                     tip={del.tip}
-                    onDelete={() => api.delete(`${del.path}/${u.id}`)}
+                    onDelete={() => del.remove(u.id)}
                     onDeleted={del.reload}
                     onError={showError}
                   />
@@ -456,7 +455,7 @@ function AdminPage() {
       {passwordUser && (
         <PasswordModal
           user={passwordUser}
-          save={(password) => setUserPassword(passwordUser.id, password)}
+          save={(password) => adminApi.setUserPassword(passwordUser.id, password)}
           onClose={() => setPasswordUser(null)}
         />
       )}
@@ -483,7 +482,7 @@ function AdminPage() {
             <h3 className="toolbar__title">{'Список педагогов'}</h3>
             <Button onClick={() => setOpenAddModal('teacher')}>{'+ Добавить педагога'}</Button>
           </div>
-          {userTable(teachers, { path: '/admin/teachers', reload: loadTeachers, tip: 'Удалить педагога', toRole: 'admin' }, editingTeacherId, editingTeacherDraft, setEditingTeacherDraft, startEditTeacher, teachersTableRef)}
+          {userTable(teachers, { remove: adminApi.deleteTeacher, reload: loadTeachers, tip: 'Удалить педагога', toRole: 'admin' }, editingTeacherId, editingTeacherDraft, setEditingTeacherDraft, startEditTeacher, teachersTableRef)}
         </div>
       )}
 
@@ -494,7 +493,7 @@ function AdminPage() {
             <h3 className="toolbar__title">{'Список администраторов'}</h3>
             <Button onClick={() => setOpenAddModal('admin')}>{'+ Добавить администратора'}</Button>
           </div>
-          {userTable(admins, { path: '/admin/admins', reload: loadAdmins, tip: 'Удалить админа', toRole: 'teacher' }, editingAdminId, editingAdminDraft, setEditingAdminDraft, startEditAdmin, adminsTableRef)}
+          {userTable(admins, { remove: adminApi.deleteAdmin, reload: loadAdmins, tip: 'Удалить админа', toRole: 'teacher' }, editingAdminId, editingAdminDraft, setEditingAdminDraft, startEditAdmin, adminsTableRef)}
         </div>
       )}
 
@@ -535,7 +534,7 @@ function AdminPage() {
                         id={c.id}
                         name={c.title}
                         tip="Удалить курс"
-                        onDelete={() => api.delete(`/admin/courses/${c.id}`)}
+                        onDelete={() => adminApi.deleteCourse(c.id)}
                         onDeleted={loadCourses}
                         onError={showError}
                       />

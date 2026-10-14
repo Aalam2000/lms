@@ -4,7 +4,7 @@
 // Период — месяц назад и год вперёд (выходные действуют с даты установки,
 // важны в основном будущие дни).
 import { useCallback, useEffect, useState } from 'react';
-import { getStudentDaysOff, getTeacherDaysOff } from '../api/daysOff';
+import { getStudentDaysOff, getTeacherDaysOff } from '../api/lessons';
 import { addDays, isoDate } from '../utils/dates';
 
 const DAYS_BACK = 31;

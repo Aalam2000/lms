@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { PersonalBadge } from '../components/PersonalLesson';
 import { useNavigate } from 'react-router-dom';
-import api from '../api/auth';
+import { getMyLessons, createLesson } from '../api/lessons';
+import { getMyGroups, getCourses } from '../api/groups';
 import Modal from '../components/Modal';
 
 function TeacherHome() {
@@ -18,9 +19,9 @@ function TeacherHome() {
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
-    api.get('/lessons/my').then(r => setLessons(r.data));
-    api.get('/groups/my').then(r => setGroups(r.data));
-    api.get('/groups/courses').then(r => setCourses(r.data));
+    getMyLessons().then(setLessons);
+    getMyGroups().then(setGroups);
+    getCourses().then(setCourses);
   }, []);
 
   // Связанные фильтры
@@ -93,8 +94,8 @@ function TeacherHome() {
         group_id: parseInt(newLessonGroup),
         date: new Date(newLessonDate).toISOString(),
       };
-      const created = await api.post('/lessons/', payload);
-      setLessons(prev => [...prev, created.data]);
+      const created = await createLesson(payload);
+      setLessons(prev => [...prev, created]);
       closeCreateModal();
     } catch (err) {
       setCreateError(err?.response?.data?.detail || 'Не удалось создать урок');

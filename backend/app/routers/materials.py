@@ -4,7 +4,6 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-from uuid import uuid4
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File as FastAPIFile, Form
@@ -265,11 +264,11 @@ async def upload_material(
                 target.id,
             )
 
-        # Новый object_key, а не перезапись старого: ключ в MinIO никогда не
+        # Новый object_key, а не перезапись старого: путь файла никогда не
         # перезаписывается (на нём держится кэш PDF-предпросмотра, см.
         # storage.preview_key). Старый объект удаляем после коммита.
         old_key = target.object_key
-        new_key = f"materials/{uuid4()}/{file.filename}"
+        new_key = storage.new_key("materials")
         storage.upload_bytes(new_key, contents, file.content_type)
         target.object_key = new_key
         target.content_type = file.content_type
@@ -293,7 +292,7 @@ async def upload_material(
         return await _upload_out(db, target, "replaced")
 
     # 4. Имя новое — обычная загрузка нового файла.
-    object_key = f"materials/{uuid4()}/{file.filename}"
+    object_key = storage.new_key("materials")
     storage.upload_bytes(object_key, contents, file.content_type)
 
     material = Material(

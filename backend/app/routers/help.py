@@ -11,14 +11,13 @@ router = APIRouter(prefix="/help", tags=["help"])
 
 HELP_DIR = Path(__file__).parent.parent.parent / "templates" / "help"
 
-# Файл инструкции на роль. Ролей в системе пока 3 (admin/teacher/student),
-# но заводим сразу под все 5 — examiner/parent появятся позже, файлы уже
-# на месте, останется только наполнить текстом.
+# Файл инструкции на роль. examiner и parent — заготовки: ролей входа с
+# такими именами в системе нет, эти инструкции сейчас никто не открывает.
 #
 # Инструкции — документы Markdown на русском. autoi18n (doc_paths в
 # backend/autoi18n.json) переводит каждый файл ЦЕЛИКОМ и кладёт перевод
-# рядом: teacher.md -> teacher.en.md, teacher.az.md (в git не попадают,
-# см. .gitignore; папка подключена томом, чтобы переводы переживали деплой).
+# рядом: teacher.md -> teacher.en.md, teacher.az.md (переводы лежат в git;
+# папка подключена томом, чтобы переводы переживали деплой).
 ROLE_FILES = {
     "admin": "admin.md",
     "teacher": "teacher.md",
@@ -28,6 +27,11 @@ ROLE_FILES = {
 }
 
 MD_EXTENSIONS = ["tables", "fenced_code", "sane_lists"]
+
+
+def render_markdown(text: str) -> str:
+    """Markdown → HTML, одни настройки для Помощи и Методики (routers/methodology.py)."""
+    return markdown.markdown(text, extensions=MD_EXTENSIONS)
 
 
 @router.get("")
@@ -40,5 +44,4 @@ async def get_help(
     lang = lang or translator.source_lang
     filename = ROLE_FILES.get(current_user.role, ROLE_FILES["student"])
     doc = translator.get_document(str(HELP_DIR / filename), lang)
-    html = markdown.markdown(doc["text"], extensions=MD_EXTENSIONS)
-    return {"html": html, "lang": doc["lang"]}
+    return {"html": render_markdown(doc["text"]), "lang": doc["lang"]}

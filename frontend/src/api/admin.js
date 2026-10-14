@@ -9,8 +9,22 @@ export function createTeacher(data) {
   return api.post('/admin/teachers', data).then(res => res.data);
 }
 
+export function updateTeacher(id, data) {
+  return api.patch(`/admin/teachers/${id}`, data).then(res => res.data);
+}
+
 export function deleteTeacher(id) {
   return api.delete(`/admin/teachers/${id}`).then(res => res.data);
+}
+
+// Справочник педагогов (контакты, курсы)
+export function getTeacherDirectory() {
+  return api.get('/admin/teachers/directory').then(res => res.data);
+}
+
+// Отчёт по педагогу за период; params — { period, ... } (см. periodParams на странице отчёта)
+export function getTeacherReport(teacherId, params) {
+  return api.get(`/admin/teachers/${teacherId}/report`, { params }).then(res => res.data);
 }
 
 export function getAdmins() {
@@ -19,6 +33,10 @@ export function getAdmins() {
 
 export function createAdmin(data) {
   return api.post('/admin/admins', data).then(res => res.data);
+}
+
+export function updateAdmin(id, data) {
+  return api.patch(`/admin/admins/${id}`, data).then(res => res.data);
 }
 
 export function deleteAdmin(id) {
@@ -33,6 +51,10 @@ export function createCourse(data) {
   return api.post('/admin/courses', data).then(res => res.data);
 }
 
+export function updateCourse(id, data) {
+  return api.patch(`/admin/courses/${id}`, data).then(res => res.data);
+}
+
 export function deleteCourse(id) {
   return api.delete(`/admin/courses/${id}`).then(res => res.data);
 }
@@ -43,6 +65,15 @@ export function getGroups() {
 
 export function createGroup(data) {
   return api.post('/admin/groups', data).then(res => res.data);
+}
+
+// Активную группу можно только отправить в архив; удалить навсегда — только из архива
+export function archiveGroup(id) {
+  return api.post(`/admin/groups/${id}/archive`).then(res => res.data);
+}
+
+export function restoreGroup(id) {
+  return api.post(`/admin/groups/${id}/restore`).then(res => res.data);
 }
 
 export function deleteGroup(id) {
@@ -65,4 +96,20 @@ export function setUserPassword(userId, newPassword) {
 // Смена роли педагог ⇄ админ — только admin; себе менять нельзя
 export function setUserRole(userId, role) {
   return api.put(`/admin/users/${userId}/role`, { role }).then(res => res.data);
+}
+
+// Выходные педагога (backend/app/days_off.py) — ставит только admin.
+// settings: { weeks: [[0..6], ...], dates: { 'YYYY-MM-DD': 'off' | 'work' } }
+export function getTeacherDaysOffSettings(teacherId) {
+  return api.get(`/admin/teachers/${teacherId}/days-off`).then(res => res.data);
+}
+
+export function saveTeacherDaysOffSettings(teacherId, settings) {
+  return api.put(`/admin/teachers/${teacherId}/days-off`, settings).then(res => res.data);
+}
+
+// Какие дни будут выходными при несохранённых настройках: { dates, pattern }
+export function previewTeacherDaysOff(teacherId, settings, dateFrom, dateTo) {
+  return api.post(`/admin/teachers/${teacherId}/days-off/preview`, { ...settings, date_from: dateFrom, date_to: dateTo })
+    .then(res => res.data);
 }

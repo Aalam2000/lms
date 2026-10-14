@@ -37,7 +37,11 @@ ARG APP_UID=1000
 ARG APP_GID=1000
 RUN groupadd -o -g "$APP_GID" appuser \
     && useradd -o -m -u "$APP_UID" -g appuser appuser \
-    && chown -R appuser:appuser /app
+    && chown -R appuser:appuser /app \
+    && mkdir -p /var/lib/logacademy/data \
+    && chown appuser:appuser /var/lib/logacademy/data
+# /var/lib/logacademy/data — файлы платформы (app/storage.py): в деве — том
+# Docker, на проде — папка сервера с тем же путём (владелец quizadm).
 USER appuser
 ENV HOME=/home/appuser
 

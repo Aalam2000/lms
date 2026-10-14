@@ -1,7 +1,7 @@
 // «Посещения» (только админ, claude/presence-plan.md): кто сегодня был в
 // системе (зелёный флажок — активен за последние 10 мин) и отчёт — кто когда заходил и сколько времени провёл. Данные —
 // из пульса открытых вкладок (hooks/usePresencePing.js), правила — на
-// бэкенде (app/presence.py).
+// бэкенде (app/routers/presence.py).
 import React, { useEffect, useMemo, useState } from 'react';
 import Dropdown from '../components/Dropdown';
 import { getTodayUsers, getPresenceReport } from '../api/presence';

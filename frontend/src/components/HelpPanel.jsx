@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import api from '../api/auth';
+import { getHelp } from '../api/help';
 import { useLang } from '../hooks/useLang';
 
 // Панель справа с инструкцией для текущей роли пользователя (см.
@@ -15,8 +15,8 @@ function HelpPanel({ onClose }) {
   useEffect(() => {
     setLoading(true);
     setError('');
-    api.get('/help', { params: { lang } })
-      .then(r => setHtml(r.data.html))
+    getHelp(lang)
+      .then(data => setHtml(data.html))
       .catch(err => setError(err?.response?.data?.detail || 'Не удалось загрузить инструкцию'))
       .finally(() => setLoading(false));
   }, [lang]);

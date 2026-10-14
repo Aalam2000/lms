@@ -8,7 +8,6 @@
 """
 from datetime import datetime, timezone as dt_timezone
 from typing import Optional
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File as FastAPIFile, Query
 from pydantic import BaseModel, ConfigDict, Field
@@ -140,7 +139,7 @@ async def upload_my_work(
     lesson = await _student_lesson_for_change(db, lesson_id, current_user)
     payloads = [(u, await _read_upload(u)) for u in files]
     for upload, data in payloads:
-        key = f"lesson-work/{lesson_id}/{current_user.id}/{uuid4()}/{upload.filename}"
+        key = storage.new_key("lesson-work")
         storage.upload_bytes(key, data, upload.content_type)
         db.add(LessonWorkFile(
             lesson_id=lesson_id, student_id=current_user.id, object_key=key,

@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import Modal from './Modal';
 import FormField from './FormField';
-import api from '../api/auth';
+import { updateMe } from '../api/auth';
 import { useAuth } from '../context/AuthContext';
 import { isValidPhone, PHONE_PLACEHOLDER, PHONE_FORMAT_TEXT, PHONE_INVALID_TEXT } from '../utils/phone';
 
@@ -25,7 +25,7 @@ function PhoneGate() {
     setSaving(true);
     setError('');
     try {
-      await api.put('/auth/me', { phone });
+      await updateMe({ phone });
       refreshUser();
     } catch (err) {
       const status = err?.response?.status;

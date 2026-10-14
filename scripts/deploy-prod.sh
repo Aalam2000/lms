@@ -64,6 +64,15 @@ echo "[deploy] backend runs as uid=$APP_UID gid=$APP_GID ($(id -un))"
 # прежней — в списке контейнеров вместо имени образа показывался sha256:….
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
+# Папка файлов платформы (app/storage.py) должна быть до замены контейнеров:
+# без неё Docker создаст пустую папку от root, и загрузки сломаются. Проверка
+# до сборки — при ошибке прод остаётся на старых контейнерах.
+FILES_DIR=/var/lib/logacademy/data
+if [ ! -d "$FILES_DIR" ] || [ ! -w "$FILES_DIR" ]; then
+  echo "[deploy] FAILED: нет папки $FILES_DIR или $(id -un) не может в неё писать (см. DEPLOYMENT.md)"
+  exit 1
+fi
+
 $COMPOSE up -d --build --remove-orphans
 
 # Ждём, пока бэкенд реально поднимется: миграции + старт uvicorn. «Up» в

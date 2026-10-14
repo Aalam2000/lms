@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import api from '../api/auth';
+import { getLibraryItems } from '../api/library';
+import { attachLessonItem } from '../api/lessons';
 import { useAuth } from '../context/AuthContext';
 import { TYPE_META, subtypeLabel, resourceKey } from '../utils/libraryItems';
 import Modal from './Modal';
@@ -32,8 +33,7 @@ function LibraryPickerModal({ lessonId, attachedKeys, onAttached, onClose, onPic
         const params = { sort };
         if (typeFilter) params.type = typeFilter;
         if (onlyMine && user) params.uploader = user.id;
-        const res = await api.get('/library/items', { params });
-        setItems(res.data);
+        setItems(await getLibraryItems(params));
       } catch (err) {
         setError(err?.response?.data?.detail || 'Не удалось загрузить базу знаний');
       } finally {
@@ -51,10 +51,7 @@ function LibraryPickerModal({ lessonId, attachedKeys, onAttached, onClose, onPic
       if (onPick) {
         await onPick(item);
       } else {
-        await api.post(`/lessons/${lessonId}/items`, {
-          resource_type: item.resource_type,
-          resource_id: item.id,
-        });
+        await attachLessonItem(lessonId, item.resource_type, item.id);
       }
       setJustAttached(prev => new Set(prev).add(key));
       if (onAttached) onAttached();

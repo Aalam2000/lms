@@ -143,9 +143,9 @@ class LessonMark(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
-# Материалы («База знаний») — файлы в MinIO. Загружает teacher/admin,
+# Материалы («База знаний») — файлы в хранилище. Загружает teacher/admin,
 # удаляет только admin (см. routers/materials.py). Хранится только
-# метаданные — сам файл лежит в MinIO под object_key.
+# метаданные — сам файл лежит в хранилище под object_key (app/storage.py).
 class Material(Base):
     __tablename__ = "materials"
     id = Column(Integer, primary_key=True, index=True)
@@ -306,7 +306,7 @@ class LessonMessage(Base):
 # Сессии присутствия в системе (claude/presence-plan.md): одна строка на
 # непрерывный отрезок работы пользователя. Открытая вкладка раз в минуту
 # шлёт «пульс» (POST /presence/ping) — продлевает last_seen_at; перерыв
-# больше SESSION_GAP (app/presence.py) начинает новую сессию. Храним только
+# больше SESSION_GAP (app/routers/presence.py) начинает новую сессию. Храним только
 # время — без IP, браузера и открытых страниц. Удаление пользователя удаляет
 # и его сессии (ON DELETE CASCADE), срок хранения — RETENTION_DAYS.
 class UserSession(Base):
@@ -325,7 +325,7 @@ class UserSession(Base):
 # Дедупликация: одна строка на «вид» нарушения — fingerprint из директивы,
 # источника (только домен), страницы (путь, id заменены на :id) и места в
 # коде (файл:строка). Повтор не создаёт строку, а делает count += 1 и
-# обновляет last_seen. Нормализация — app/csp.py.
+# обновляет last_seen. Нормализация — app/routers/csp.py.
 class CspReport(Base):
     __tablename__ = "csp_reports"
     id = Column(Integer, primary_key=True)

@@ -2,19 +2,21 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from pydantic import BaseModel, Field, field_validator
+from datetime import date
 from typing import Optional
 from ..database import get_db
 from ..models import User, Course, Group, GroupMember, Lesson, LessonMark
 from ..usages import ensure_not_used
 from ..attendance import attendance_slots, summarize, PRESENT
-from ..schemas import UserCreate, UserOut, CourseCreate, CourseOut, GroupCreate, GroupOut, clean_video_url, DURATION_MIN, DURATION_MAX, NewPasswordIn
-from ..core.security import get_password_hash
+from ..schemas import UserCreate, UserOut, CourseCreate, CourseOut, GroupCreate, GroupOut, clean_video_url, DURATION_MIN, DURATION_MAX, NewPasswordIn, DaysOffSettings
+from ..security import get_password_hash
 from ..dependencies import require_admin
 from .academy import sector_exists
 from ..phones import ensure_phone_free
 from ..teacher_report import build_teacher_report
 from ..report_common import resolve_period
 from ..lesson_teacher import assign_teacher
+from ..days_off import apply_settings, check_range, current_settings, days_off_between
 import secrets
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -95,6 +97,56 @@ async def update_teacher(
     await db.commit()
     await db.refresh(user)
     return user
+
+# Выходные педагога (правила — app/days_off.py). Ставит только админ; сам
+# педагог видит их в профиле (GET /auth/me/days-off).
+class DaysOffPreviewIn(DaysOffSettings):
+    date_from: date
+    date_to: date
+
+
+class DaysOffPreviewOut(BaseModel):
+    dates: list[date]
+    pattern: list[date]  # выходные только по полоскам, без отдельных дат
+
+
+async def _teacher_or_404(db: AsyncSession, user_id: int) -> User:
+    teacher = (await db.execute(select(User).where(User.id == user_id, User.role == "teacher"))).scalar_one_or_none()
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Педагог не найден")
+    return teacher
+
+
+@router.get("/teachers/{user_id}/days-off", response_model=DaysOffSettings)
+async def get_teacher_days_off(user_id: int, db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)):
+    return current_settings((await _teacher_or_404(db, user_id)).days_off)
+
+
+@router.put("/teachers/{user_id}/days-off", response_model=DaysOffSettings)
+async def save_teacher_days_off(
+    user_id: int, data: DaysOffSettings,
+    db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin),
+):
+    teacher = await _teacher_or_404(db, user_id)
+    teacher.days_off = apply_settings(teacher.days_off, data.weeks, data.dates)
+    await db.commit()
+    return current_settings(teacher.days_off)
+
+
+# Какие дни выйдут выходными при несохранённых настройках — для календаря в
+# редакторе: правило считается только на бэкенде, на фронте не повторяется.
+@router.post("/teachers/{user_id}/days-off/preview", response_model=DaysOffPreviewOut)
+async def preview_teacher_days_off(
+    user_id: int, data: DaysOffPreviewIn,
+    db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin),
+):
+    check_range(data.date_from, data.date_to)
+    saved = (await _teacher_or_404(db, user_id)).days_off
+    return {
+        "dates": days_off_between(apply_settings(saved, data.weeks, data.dates), data.date_from, data.date_to),
+        "pattern": days_off_between(apply_settings(saved, data.weeks, {}), data.date_from, data.date_to),
+    }
+
 
 @router.delete("/teachers/{user_id}")
 async def delete_teacher(user_id: int, db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)):

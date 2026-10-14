@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useLang } from '../hooks/useLang';
 import Button from '../components/Button';
-import api from '../api/auth';
+import { getQuizForEdit, createQuiz, updateQuiz } from '../api/quizzes';
+import { attachLessonItem } from '../api/lessons';
 import QuizHelper from '../components/QuizHelper';
 
 const blankFlashQuestion = () => ({ question: '', time: 60, answer: '' });
@@ -38,13 +39,13 @@ function AddQuizPage() {
     if (id) {
       const fetchQuiz = async () => {
         try {
-          const res = await api.get(`/quizzes/${id}/edit`);
-          setTitle(res.data.title);
-          setTopic(res.data.topic || '');
-          const loadedType = res.data.template_type || 'flash';
+          const quiz = await getQuizForEdit(id);
+          setTitle(quiz.title);
+          setTopic(quiz.topic || '');
+          const loadedType = quiz.template_type || 'flash';
           setTemplateType(loadedType);
-          if (res.data.questions && res.data.questions.length > 0) {
-            const loadedQuestions = res.data.questions.map(q => ({
+          if (quiz.questions && quiz.questions.length > 0) {
+            const loadedQuestions = quiz.questions.map(q => ({
               ...q,
               time: typeof q.time === 'number' ? q.time : parseInt(q.time, 10) || 60
             }));
@@ -127,19 +128,15 @@ function AddQuizPage() {
         questions,
         lang,  // <-- передаём текущий язык
       };
-      // console.log('📤 Отправка payload:', payload);
 
       if (id) {
-        await api.put(`/quizzes/${id}`, payload);
+        await updateQuiz(id, payload);
       } else {
-        const res = await api.post('/quizzes/', payload);
+        const created = await createQuiz(payload);
         // Привязка к уроку — отдельным шагом через lesson_resources
         // (у квиза больше нет собственного lesson_id, см. resources.py).
         if (lessonId) {
-          await api.post(`/lessons/${lessonId}/items`, {
-            resource_type: 'quiz',
-            resource_id: res.data.id,
-          });
+          await attachLessonItem(lessonId, 'quiz', created.id);
         }
       }
       navigate(returnPath);

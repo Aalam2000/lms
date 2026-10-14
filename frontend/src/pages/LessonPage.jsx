@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import api from '../api/auth';
 import DateTimePicker, { formatDateTime } from '../components/DateTimePicker';
 import { formatDuration, DEFAULT_DURATION_MIN } from '../utils/lessonTime';
 import LibraryPickerModal from '../components/LibraryPickerModal';
@@ -17,7 +16,15 @@ import { DialogCell } from '../components/LessonDialog';
 import { getHomeworkBoard } from '../api/homework';
 import { getWorkBoard } from '../api/lessonWork';
 import { useHomeworkRefresh } from '../hooks/useHomeworkRefresh';
-import { uploadMaterial } from '../api/materials';
+import { uploadMaterial, openPendingTab, showMaterialInTab } from '../api/materials';
+import {
+  getLesson, getLessonMarks, saveLessonMark, saveLessonMarksBulk, updateLesson, openLesson, deleteLesson,
+  getLessonItems, attachLessonItem, detachLessonItem,
+} from '../api/lessons';
+import { getMyGroups } from '../api/groups';
+import { getQuizHtml } from '../api/quizzes';
+import { openLiveQuiz } from '../api/quizLive';
+import { createLink } from '../api/links';
 
 // 409 от бэкенда при контроле дублей: code=duplicate — вернуть existing_id;
 // code=name_taken — имя занято чужим файлом, показать как ошибку.
@@ -115,12 +122,9 @@ function LessonPage() {
       setLoading(true);
       setError('');
       try {
-        const [lessonRes, groupsRes] = await Promise.all([
-          api.get(`/lessons/${lessonId}`),
-          api.get('/groups/my'),
-        ]);
-        setLesson(lessonRes.data);
-        setGroups(groupsRes.data);
+        const [lessonData, groupsData] = await Promise.all([getLesson(lessonId), getMyGroups()]);
+        setLesson(lessonData);
+        setGroups(groupsData);
         setDateValue(lessonRes.data?.date ? new Date(lessonRes.data.date) : null);
         setDurationValue(lessonRes.data?.duration_min || DEFAULT_DURATION_MIN);
         setLessonComment(lessonRes.data?.comment || '');
@@ -163,12 +167,9 @@ function LessonPage() {
     setMarksLoading(true);
     setMarksError('');
     try {
-      const [res] = await Promise.all([
-        api.get(`/lessons/${lessonId}/marks`),
-        loadHomework(),
-      ]);
-      setMarksLocked(res.data.locked);
-      setMarksRows(res.data.students.map(s => ({
+      const [marks] = await Promise.all([getLessonMarks(lessonId), loadHomework()]);
+      setMarksLocked(marks.locked);
+      setMarksRows(marks.students.map(s => ({
         student_id: s.student_id,
         full_name: s.full_name,
         telegram_username: s.telegram_username,
@@ -208,8 +209,8 @@ function LessonPage() {
   // в таблицу тихо, не трогая остальные поля, которые педагог может сейчас править
   const reloadScores = async () => {
     try {
-      const res = await api.get(`/lessons/${lessonId}/marks`);
-      const scores = Object.fromEntries(res.data.students.map(s => [s.student_id, s.score]));
+      const marks = await getLessonMarks(lessonId);
+      const scores = Object.fromEntries(marks.students.map(s => [s.student_id, s.score]));
       setMarksRows(prev => prev.map(r => (r.student_id in scores
         ? { ...r, score: scores[r.student_id] === null || scores[r.student_id] === undefined ? '' : scores[r.student_id] }
         : r)));
@@ -225,8 +226,7 @@ function LessonPage() {
     setItemsLoading(true);
     setItemsError('');
     try {
-      const res = await api.get(`/lessons/${lessonId}/items`);
-      setLessonItems(res.data);
+      setLessonItems(await getLessonItems(lessonId));
       setItemsLoaded(true);
     } catch (err) {
       setItemsError(extractErrorMessage(err, 'Не удалось загрузить материалы'));
@@ -253,31 +253,19 @@ function LessonPage() {
 
     const key = resourceKey(item.resource_type, item.resource_id);
     setOpeningKey(key);
-    const win = window.open('', '_blank');
-    const isConverting = item.resource_type === 'material' && needsPdfPreview(item.content_type);
-    if (win && isConverting) {
-      win.document.write('<p style="font-family:sans-serif;color:#4B5563;padding:24px">Конвертируем файл в PDF...</p>');
-      win.document.close();
-    }
+    const win = openPendingTab(item.resource_type === 'material' && needsPdfPreview(item.content_type));
     try {
       if (item.resource_type === 'material') {
-        const endpoint = needsPdfPreview(item.content_type) ? 'preview' : 'download';
-        const res = await api.get(`/materials/${item.resource_id}/${endpoint}`, { responseType: 'blob' });
-        const fallbackType = endpoint === 'preview' ? 'application/pdf' : (item.content_type || 'application/octet-stream');
-        const type = res.headers?.['content-type'] || fallbackType;
-        const url = window.URL.createObjectURL(new Blob([res.data], { type }));
-        const openUrl = type === 'application/pdf' ? `${url}#navpanes=0` : url;
-        if (win) win.location.href = openUrl;
-        setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+        await showMaterialInTab(win, item.resource_id, item.content_type);
       } else if (item.resource_type === 'quiz' && item.template_type === 'live') {
         // Живой квиз — не статичный HTML, а страница хоста: открываем игру
         // на бэкенде и переводим уже открытую вкладку на неё.
-        const res = await api.post(`/quiz-live/${item.resource_id}/open`, { lesson_id: Number(lessonId) });
-        if (win) win.location.href = `/quiz-live/${res.data.code}/host`;
+        const game = await openLiveQuiz(item.resource_id, Number(lessonId));
+        if (win) win.location.href = `/quiz-live/${game.code}/host`;
       } else {
-        const res = await api.get(`/quizzes/${item.resource_id}/html`);
+        const quiz = await getQuizHtml(item.resource_id);
         if (win) {
-          win.document.write(res.data.html);
+          win.document.write(quiz.html);
           win.document.close();
         }
       }
@@ -294,7 +282,7 @@ function LessonPage() {
     setDetachingKey(key);
     setItemsError('');
     try {
-      await api.delete(`/lessons/${lessonId}/items/${item.resource_type}/${item.resource_id}`);
+      await detachLessonItem(lessonId, item.resource_type, item.resource_id);
       setLessonItems(prev => prev.filter(i => resourceKey(i.resource_type, i.resource_id) !== key));
     } catch (err) {
       setItemsError(extractErrorMessage(err, 'Не удалось открепить'));
@@ -339,10 +327,7 @@ function LessonPage() {
           throw err;
         }
       }
-      await api.post(`/lessons/${lessonId}/items`, {
-        resource_type: 'material',
-        resource_id: materialId,
-      });
+      await attachLessonItem(lessonId, 'material', materialId);
       await loadItems();
     } catch (err) {
       setItemsError(extractErrorMessage(err, 'Не удалось загрузить файл'));
@@ -362,7 +347,7 @@ function LessonPage() {
     try {
       let linkId;
       try {
-        linkId = (await api.post('/links/', { title: linkTitle.trim(), url: linkUrl.trim() })).data.id;
+        linkId = (await createLink(linkTitle.trim(), linkUrl.trim())).id;
       } catch (err) {
         const c = conflictOf(err);
         if (c?.code !== 'duplicate') throw err;
@@ -370,10 +355,7 @@ function LessonPage() {
         linkId = c.existing_id;
         setItemsNotice(`${c.detail} — привязана существующая`);
       }
-      await api.post(`/lessons/${lessonId}/items`, {
-        resource_type: 'link',
-        resource_id: linkId,
-      });
+      await attachLessonItem(lessonId, 'link', linkId);
       setLinkTitle('');
       setLinkUrl('');
       setShowLinkForm(false);
@@ -410,8 +392,8 @@ function LessonPage() {
 
     setRowErrors(prev => ({ ...prev, [studentId]: '' }));
     try {
-      const res = await api.put(`/lessons/${lessonId}/marks/${studentId}`, buildPayload(row));
-      syncLessonOpen(res.data.is_open);
+      const saved = await saveLessonMark(lessonId, studentId, buildPayload(row));
+      syncLessonOpen(saved.is_open);
       loadWork(); // оценка за урок при сданной работе — это и есть её проверка
     } catch (err) {
       setRowErrors(prev => ({ ...prev, [studentId]: extractErrorMessage(err, 'Не удалось сохранить') }));
@@ -490,8 +472,8 @@ function LessonPage() {
     setMarksError('');
     try {
       const items = rows.map(r => ({ student_id: r.student_id, ...buildPayload(r) }));
-      const res = await api.put(`/lessons/${lessonId}/marks`, items);
-      syncLessonOpen(res.data.is_open);
+      const saved = await saveLessonMarksBulk(lessonId, items);
+      syncLessonOpen(saved.is_open);
       setRowErrors({});
     } catch (err) {
       setMarksError(extractErrorMessage(err, 'Не удалось сохранить таблицу'));
@@ -527,10 +509,10 @@ function LessonPage() {
       const payload = {};
       if (dateChanged) payload.date = dateValue ? dateValue.toISOString() : null;
       if (durationChanged) payload.duration_min = durationValue;
-      const res = await api.patch(`/lessons/${lesson.id}`, payload);
-      setLesson(res.data);
-      setDateValue(res.data?.date ? new Date(res.data.date) : null);
-      setDurationValue(res.data?.duration_min || DEFAULT_DURATION_MIN);
+      const updated = await updateLesson(lesson.id, payload);
+      setLesson(updated);
+      setDateValue(updated?.date ? new Date(updated.date) : null);
+      setDurationValue(updated?.duration_min || DEFAULT_DURATION_MIN);
     } catch (err) {
       setError(extractErrorMessage(err, 'Не удалось сохранить изменения'));
     } finally {
@@ -545,9 +527,9 @@ function LessonPage() {
     setIsSavingComment(true);
     setError('');
     try {
-      const res = await api.patch(`/lessons/${lesson.id}`, { comment: lessonComment });
-      setLesson(res.data);
-      setLessonComment(res.data?.comment || '');
+      const updated = await updateLesson(lesson.id, { comment: lessonComment });
+      setLesson(updated);
+      setLessonComment(updated?.comment || '');
     } catch (err) {
       setError(extractErrorMessage(err, 'Не удалось сохранить комментарий'));
     } finally {
@@ -562,9 +544,9 @@ function LessonPage() {
     setIsSavingNote(true);
     setError('');
     try {
-      const res = await api.patch(`/lessons/${lesson.id}`, { private_note: privateNote });
-      setLesson(res.data);
-      setPrivateNote(res.data?.teacher_notes || '');
+      const updated = await updateLesson(lesson.id, { private_note: privateNote });
+      setLesson(updated);
+      setPrivateNote(updated?.teacher_notes || '');
     } catch (err) {
       setError(extractErrorMessage(err, 'Не удалось сохранить заметки'));
     } finally {
@@ -578,8 +560,8 @@ function LessonPage() {
     setIsTogglingOpen(true);
     setError('');
     try {
-      const res = await api.patch(`/lessons/${lesson.id}/open`);
-      setLesson(prev => ({ ...prev, is_open: res.data.is_open }));
+      const opened = await openLesson(lesson.id);
+      setLesson(prev => ({ ...prev, is_open: opened.is_open }));
     } catch (err) {
       setError(extractErrorMessage(err, 'Не удалось изменить доступ к уроку'));
     } finally {
@@ -595,7 +577,7 @@ function LessonPage() {
     setIsDeleting(true);
     setError('');
     try {
-      await api.delete(`/lessons/${lesson.id}`);
+      await deleteLesson(lesson.id);
       navigate('/dashboard');
     } catch (err) {
       setError(extractErrorMessage(err, 'Не удалось удалить урок'));

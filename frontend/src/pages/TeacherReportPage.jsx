@@ -4,7 +4,7 @@
 // (backend/app/teacher_report.py), формулировки — здесь.
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import api from '../api/auth';
+import { getTeacherReport } from '../api/admin';
 import { extractErrorMessage } from '../utils/errors';
 import {
   ReportPeriod, ReportToolbar, Status, defaultPeriod, formatDate, periodParams, withSign,
@@ -92,8 +92,8 @@ function TeacherReportPage() {
     let alive = true;
     setLoading(true);
     setError('');
-    api.get(`/admin/teachers/${teacherId}/report`, { params: periodParams(period) })
-      .then(r => { if (alive) setReport(r.data); })
+    getTeacherReport(teacherId, periodParams(period))
+      .then(data => { if (alive) setReport(data); })
       .catch(err => { if (alive) setError(extractErrorMessage(err, 'Не удалось построить отчёт')); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };

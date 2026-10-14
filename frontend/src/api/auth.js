@@ -30,6 +30,11 @@ export function getMe() {
   return api.get('/auth/me').then(res => res.data);
 }
 
+// Свои выходные педагога — только просмотр: { weeks, dates }
+export function getMyDaysOffSettings() {
+  return api.get('/auth/me/days-off').then(res => res.data);
+}
+
 export function updateMe(data) {
   return api.put('/auth/me', data).then(res => res.data);
 }

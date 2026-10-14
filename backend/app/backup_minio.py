@@ -13,7 +13,7 @@ previews/ пропускаем: это кэш PDF-предпросмотров, 
 import sys
 import tarfile
 
-from .storage import MINIO_BUCKET, _client
+from .storage import MINIO_BUCKET, minio_client
 
 SKIP_PREFIXES = ("previews/",)
 
@@ -22,10 +22,11 @@ def main() -> None:
     count = 0
     total = 0
     with tarfile.open(fileobj=sys.stdout.buffer, mode="w|gz") as tar:
-        for obj in _client.list_objects(MINIO_BUCKET, recursive=True):
+        client = minio_client()
+        for obj in client.list_objects(MINIO_BUCKET, recursive=True):
             if obj.is_dir or obj.object_name.startswith(SKIP_PREFIXES):
                 continue
-            resp = _client.get_object(MINIO_BUCKET, obj.object_name)
+            resp = client.get_object(MINIO_BUCKET, obj.object_name)
             try:
                 info = tarfile.TarInfo(name=obj.object_name)
                 info.size = obj.size

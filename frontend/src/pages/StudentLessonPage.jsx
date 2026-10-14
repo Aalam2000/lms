@@ -6,7 +6,6 @@ import React, { useEffect, useState } from 'react';
 import { PersonalBadge } from '../components/PersonalLesson';
 import LessonFeedback from '../components/LessonFeedback';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import api from '../api/auth';
 import { TYPE_META, formatSize, subtypeLabel, resourceKey, needsPdfPreview, isPresentation, openSlides } from '../utils/libraryItems';
 import { extractErrorMessage } from '../utils/errors';
 import { useAuth } from '../context/AuthContext';
@@ -16,6 +15,8 @@ import StudentGroupsBar from '../components/StudentGroupsBar';
 import { DialogThread } from '../components/LessonDialog';
 import { getMyHomework, getMessages } from '../api/homework';
 import { getMyWork } from '../api/lessonWork';
+import { getLesson, getLessonItems } from '../api/lessons';
+import { openPendingTab, showMaterialInTab } from '../api/materials';
 import { useHomeworkRefresh } from '../hooks/useHomeworkRefresh';
 
 function StudentLessonPage() {
@@ -50,14 +51,14 @@ function StudentLessonPage() {
       setError('');
       setItemsError('');
       try {
-        const [lessonRes, itemsRes, hwRes, workRes] = await Promise.all([
-          api.get(`/lessons/${lessonId}`),
-          api.get(`/lessons/${lessonId}/items`),
+        const [lessonData, itemsData, hwRes, workRes] = await Promise.all([
+          getLesson(lessonId),
+          getLessonItems(lessonId),
           getMyHomework(lessonId),
           getMyWork(lessonId),
         ]);
-        setLesson(lessonRes.data);
-        setItems(itemsRes.data);
+        setLesson(lessonData);
+        setItems(itemsData);
         setHomework(hwRes);
         setWork(workRes);
       } catch (err) {
@@ -112,21 +113,9 @@ function StudentLessonPage() {
 
     const key = resourceKey(item.resource_type, item.resource_id);
     setOpeningKey(key);
-    const win = window.open('', '_blank');
-    const isConverting = needsPdfPreview(item.content_type);
-    if (win && isConverting) {
-      win.document.write('<p style="font-family:sans-serif;color:#4B5563;padding:24px">Конвертируем файл в PDF...</p>');
-      win.document.close();
-    }
+    const win = openPendingTab(needsPdfPreview(item.content_type));
     try {
-      const endpoint = isConverting ? 'preview' : 'download';
-      const res = await api.get(`/materials/${item.resource_id}/${endpoint}`, { responseType: 'blob' });
-      const fallbackType = endpoint === 'preview' ? 'application/pdf' : (item.content_type || 'application/octet-stream');
-      const type = res.headers?.['content-type'] || fallbackType;
-      const url = window.URL.createObjectURL(new Blob([res.data], { type }));
-      const openUrl = type === 'application/pdf' ? `${url}#navpanes=0` : url;
-      if (win) win.location.href = openUrl;
-      setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+      await showMaterialInTab(win, item.resource_id, item.content_type);
     } catch (err) {
       if (win) win.close();
       setItemsError(extractErrorMessage(err, 'Не удалось открыть'));

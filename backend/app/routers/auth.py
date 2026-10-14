@@ -6,9 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from ..database import get_db
 from ..models import User, Group, GroupMember
-from ..schemas import UserLogin, Token, UserOut, UserCreate, StudentRegister, UserUpdate
-from ..core.security import verify_password, get_password_hash, create_access_token, decode_token
+from ..schemas import UserLogin, Token, UserOut, UserCreate, StudentRegister, UserUpdate, DaysOffSettings
+from ..security import verify_password, get_password_hash, create_access_token, decode_token
 from ..dependencies import get_current_user, get_optional_user
+from ..days_off import current_settings
 from ..phones import checked_student_phone, ensure_phone_free, normalize_phone, PHONE_REQUIRED_ERROR
 
 router = APIRouter()
@@ -73,6 +74,12 @@ async def get_me(current_user: User = Depends(get_current_user)):
 # журнале, уроках и отчётах (везде учитываются только active). Если ученика
 # заводит педагог этой группы или админ (окно «Добавить студента» у QR),
 # он сразу активный и ограничение частоты на него не действует.
+# Свои выходные — в профиле, только просмотр (ставит админ: routers/admin.py)
+@router.get("/me/days-off", response_model=DaysOffSettings)
+async def get_my_days_off(current_user: User = Depends(get_current_user)):
+    return current_settings(current_user.days_off)
+
+
 @router.post("/register/student", response_model=UserOut)
 async def register_student(
     data: StudentRegister,

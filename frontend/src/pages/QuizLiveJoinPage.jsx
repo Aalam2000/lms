@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import api from '../api/auth';
+import { getLiveRoster, getLivePlayerState, joinLiveQuiz, answerLiveQuestion } from '../api/quizLive';
 import { QUIZ_LIVE_OPTION_STYLES } from '../utils/quizLiveColors';
 
 const POLL_MS = 1500;
@@ -28,8 +28,8 @@ function QuizLiveJoinPage() {
   useEffect(() => {
     if (token) return;
     let cancelled = false;
-    api.get(`/quiz-live/${code}/roster`)
-      .then(res => { if (!cancelled) setRoster(res.data); })
+    getLiveRoster(code)
+      .then(data => { if (!cancelled) setRoster(data); })
       .catch(err => { if (!cancelled) setError(err?.response?.data?.detail || 'Игра не найдена'); });
     return () => { cancelled = true; };
   }, [code, token]);
@@ -41,9 +41,9 @@ function QuizLiveJoinPage() {
     let cancelled = false;
     const poll = async () => {
       try {
-        const res = await api.get(`/quiz-live/${code}/state`, { params: { token } });
+        const data = await getLivePlayerState(code, token);
         if (!cancelled) {
-          setState(res.data);
+          setState(data);
           setError('');
         }
       } catch (err) {
@@ -64,9 +64,9 @@ function QuizLiveJoinPage() {
   const handleJoin = async (studentId) => {
     setError('');
     try {
-      const res = await api.post(`/quiz-live/${code}/join`, { student_id: studentId });
-      localStorage.setItem(tokenKey(code), res.data.token);
-      setToken(res.data.token);
+      const { token: newToken } = await joinLiveQuiz(code, studentId);
+      localStorage.setItem(tokenKey(code), newToken);
+      setToken(newToken);
     } catch (err) {
       setError(err?.response?.data?.detail || 'Не удалось зарегистрироваться');
     }
@@ -76,11 +76,7 @@ function QuizLiveJoinPage() {
     if (answering || !state || state.status !== 'question') return;
     setAnswering(true);
     try {
-      await api.post(`/quiz-live/${code}/answer`, {
-        token,
-        question_index: state.current_question,
-        option: optionIndex,
-      });
+      await answerLiveQuestion(code, token, state.current_question, optionIndex);
       setState({ ...state, status: 'answered' });
     } catch (err) {
       setError(err?.response?.data?.detail || 'Не удалось ответить');

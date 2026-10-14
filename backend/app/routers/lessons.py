@@ -14,7 +14,10 @@ from ..lesson_lock import aware
 from ..homework_status import awaiting_review, student_homework_debts
 from ..lesson_work import has_work_files, lessons_with_work_to_review
 from ..lesson_teacher import can_edit_lesson, can_view_lesson, is_group_teacher
-from ..days_off import conflict_detail, ensure_lessons_allowed, find_conflicts, format_dates
+from ..days_off import (
+    check_range, conflict_detail, days_off_between, ensure_lessons_allowed, find_conflicts,
+    format_dates, student_days_off,
+)
 from ..personal import (
     is_participant, lesson_student_ids, lesson_students_condition, participant_names,
     set_participants, visible_to_student,
@@ -807,6 +810,34 @@ async def delete_group_lessons(
 # У admin — тот же выбор области видимости, что и в /groups/my:
 # teacher_id=<id> — уроки групп конкретного препода, mine=true — только
 # своих (если они у админа есть), ни то ни другое — уроки вообще всех групп.
+# Выходные для заливки дней в календарях уроков (правила — app/days_off.py)
+class DaysOffDatesOut(BaseModel):
+    dates: list[date_type]
+
+
+@router.get("/days-off", response_model=DaysOffDatesOut)
+async def get_teacher_days_off_dates(
+    teacher_id: int, date_from: date_type, date_to: date_type,
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_teacher),
+):
+    check_range(date_from, date_to)
+    teacher = (await db.execute(select(User).where(User.id == teacher_id))).scalar_one_or_none()
+    if not teacher or teacher.role != "teacher":
+        return {"dates": []}  # у админа в роли педагога выходных нет
+    return {"dates": days_off_between(teacher.days_off, date_from, date_to)}
+
+
+@router.get("/student/days-off", response_model=DaysOffDatesOut)
+async def get_student_days_off_dates(
+    date_from: date_type, date_to: date_type,
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user),
+):
+    check_range(date_from, date_to)
+    if current_user.role != "student":
+        return {"dates": []}
+    return {"dates": await student_days_off(db, current_user.id, date_from, date_to)}
+
+
 @router.get("/my", response_model=list[LessonOut])
 async def get_my_lessons(
     teacher_id: Optional[int] = None,

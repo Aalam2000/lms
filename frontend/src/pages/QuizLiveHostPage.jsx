@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import api from '../api/auth';
+import { getLiveHostState, setLiveExam, startLiveQuiz, nextLiveQuestion } from '../api/quizLive';
 import { QUIZ_LIVE_OPTION_STYLES } from '../utils/quizLiveColors';
 import { notifyLessonMarksUpdated } from '../utils/lessonMarksChannel';
 
@@ -28,9 +28,9 @@ function QuizLiveHostPage() {
     let cancelled = false;
     const poll = async () => {
       try {
-        const res = await api.get(`/quiz-live/${code}/host`);
+        const data = await getLiveHostState(code);
         if (!cancelled) {
-          setState(res.data);
+          setState(data);
           setError('');
         }
       } catch (err) {
@@ -73,8 +73,7 @@ function QuizLiveHostPage() {
 
   const handleToggleExam = async (checked) => {
     try {
-      const res = await api.post(`/quiz-live/${code}/set-exam`, { is_exam: checked });
-      setState(res.data);
+      setState(await setLiveExam(code, checked));
     } catch (err) {
       setError(err?.response?.data?.detail || 'Не удалось изменить');
     }
@@ -83,8 +82,7 @@ function QuizLiveHostPage() {
   const handleStart = async () => {
     setBusy(true);
     try {
-      const res = await api.post(`/quiz-live/${code}/start`);
-      setState(res.data);
+      setState(await startLiveQuiz(code));
     } catch (err) {
       setError(err?.response?.data?.detail || 'Не удалось начать');
     } finally {
@@ -95,8 +93,7 @@ function QuizLiveHostPage() {
   const handleNext = async () => {
     setBusy(true);
     try {
-      const res = await api.post(`/quiz-live/${code}/next`);
-      setState(res.data);
+      setState(await nextLiveQuestion(code));
     } catch (err) {
       setError(err?.response?.data?.detail || 'Не удалось переключить');
     } finally {

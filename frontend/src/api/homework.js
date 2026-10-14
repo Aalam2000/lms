@@ -1,6 +1,7 @@
 // ДЗ, схема v2 (backend/app/routers/homework.py, claude/homework-plan.md).
 import api from './auth';
 import { needsPdfPreview } from '../utils/libraryItems';
+import { openPendingTab, showMaterialInTab } from './materials';
 import { notifyHomeworkChanged } from '../hooks/useHomeworkRefresh';
 
 const hw = (lessonId) => `/lessons/${lessonId}/homework`;
@@ -109,18 +110,9 @@ export function downloadTaskFile(task) {
 // docx/xlsx/pptx — через конвертацию в PDF, как в Базе знаний).
 // Окно открываем синхронно по клику, иначе браузер заблокирует всплывающее.
 export async function openTaskFile(task) {
-  const win = window.open('', '_blank');
-  const endpoint = needsPdfPreview(task.content_type) ? 'preview' : 'download';
-  if (win && endpoint === 'preview') {
-    win.document.write('<p style="font-family:sans-serif;color:#4B5563;padding:24px">Конвертируем файл в PDF...</p>');
-    win.document.close();
-  }
+  const win = openPendingTab(needsPdfPreview(task.content_type));
   try {
-    const res = await api.get(`/materials/${task.material_id}/${endpoint}`, { responseType: 'blob' });
-    const type = res.headers?.['content-type'] || (endpoint === 'preview' ? 'application/pdf' : task.content_type || 'application/octet-stream');
-    const url = window.URL.createObjectURL(new Blob([res.data], { type }));
-    if (win) win.location.href = type === 'application/pdf' ? `${url}#navpanes=0` : url;
-    setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+    await showMaterialInTab(win, task.material_id, task.content_type);
   } catch (err) {
     if (win) win.close();
     throw err;

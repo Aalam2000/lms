@@ -16,18 +16,17 @@
 import re
 from pathlib import Path
 
-import markdown
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..dependencies import require_teacher
 from ..models import User
+from .help import render_markdown
 from .i18n import translator
 
 router = APIRouter(prefix="/methodology", tags=["methodology"])
 
 ROOT = Path(__file__).parent.parent.parent / "templates" / "methodology"
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
-MD_EXTENSIONS = ["tables", "fenced_code", "sane_lists"]
 
 
 def _title(text: str, fallback: str) -> str:
@@ -79,6 +78,6 @@ async def get_material(section: str, slug: str, lang: str = Query(None),
     doc = _doc(path, lang or translator.source_lang)
     return {
         "title": _title(doc["text"], slug),
-        "html": markdown.markdown(doc["text"], extensions=MD_EXTENSIONS),
+        "html": render_markdown(doc["text"]),
         "lang": doc["lang"],
     }

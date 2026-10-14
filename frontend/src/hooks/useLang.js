@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useState} from 'react';
-import api from '../api/auth';
+import { getLanguages } from '../api/i18n';
 
 export function useLang() {
     const [languages, setLanguages] = useState([]);
@@ -10,8 +10,8 @@ export function useLang() {
     );
 
     useEffect(() => {
-        api.get('/i18n/languages')
-            .then(res => setLanguages(res.data.languages))
+        getLanguages()
+            .then(data => setLanguages(data.languages))
             .catch(() => {
             });
     }, []);

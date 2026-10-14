@@ -22,7 +22,6 @@
 from datetime import datetime, timezone as dt_timezone
 from pathlib import Path
 from typing import Optional
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File as FastAPIFile, Form, Query
 from fastapi.responses import StreamingResponse
@@ -356,13 +355,13 @@ async def create_task(
                         material.id,
                     )
                 old_key = material.object_key
-                material.object_key = f"materials/{uuid4()}/{file.filename}"
+                material.object_key = storage.new_key("materials")
                 storage.upload_bytes(material.object_key, data, file.content_type)
                 material.content_type = file.content_type
                 material.size_bytes = len(data)
                 material.content_hash = digest
             else:
-                object_key = f"materials/{uuid4()}/{file.filename}"
+                object_key = storage.new_key("materials")
                 storage.upload_bytes(object_key, data, file.content_type)
                 material = Material(
                     object_key=object_key, original_filename=file.filename, content_type=file.content_type,
@@ -372,7 +371,7 @@ async def create_task(
                 await db.flush()
         else:
             # Персональное ДЗ — личная папка студента, в «Базу знаний» не попадает
-            object_key = f"homework-tasks/{lesson_id}/{student_id}/{uuid4()}/{file.filename}"
+            object_key = storage.new_key("homework-tasks")
             storage.upload_bytes(object_key, data, file.content_type)
             material = Material(
                 object_key=object_key, original_filename=file.filename, content_type=file.content_type,
@@ -567,7 +566,7 @@ async def upload_my_files(
         db.add(answer)
         await db.flush()
     for upload, data in payloads:
-        key = f"homework-answers/{lesson_id}/{current_user.id}/{uuid4()}/{upload.filename}"
+        key = storage.new_key("homework-answers")
         storage.upload_bytes(key, data, upload.content_type)
         db.add(HomeworkAnswerFile(
             answer_id=answer.id, object_key=key, original_filename=upload.filename,

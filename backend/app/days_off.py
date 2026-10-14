@@ -26,11 +26,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .lesson_lock import BAKU_TZ, baku_day
-from .models import User
+from .models import Group, GroupMember, User
 
 OFF = "off"
 WORK = "work"
 MAX_WEEKS = 4  # полосок дней недели (чередование до 4 недель)
+MAX_RANGE_DAYS = 400  # самый длинный период, за который отдаются даты выходных
 
 
 def today() -> date:
@@ -71,6 +72,11 @@ def days_off_between(cfg: Optional[dict], start: date, end: date) -> list[date]:
             days.append(d)
         d += timedelta(days=1)
     return days
+
+
+def check_range(date_from: date, date_to: date) -> None:
+    if date_to < date_from or (date_to - date_from).days > MAX_RANGE_DAYS:
+        raise HTTPException(status_code=422, detail=f"Период — не длиннее {MAX_RANGE_DAYS} дней")
 
 
 def current_settings(cfg: Optional[dict]) -> dict:
@@ -155,3 +161,21 @@ async def ensure_lessons_allowed(
     days = await find_conflicts(db, [(t, w) for t, w in items if t != actor.id])
     if days:
         raise HTTPException(status_code=409, detail=conflict_detail(days))
+
+
+async def student_days_off(db: AsyncSession, student_id: int, date_from: date, date_to: date) -> list[date]:
+    """Календарь ученика: день выходной, когда выходной у педагогов всех его
+    активных групп (у ученика с одной группой — просто выходные его педагога).
+    Группу ведёт админ — у него выходных нет, значит и у ученика их нет."""
+    teacher_ids = (await db.execute(
+        select(Group.teacher_id).join(GroupMember, GroupMember.group_id == Group.id)
+        .where(GroupMember.student_id == student_id, GroupMember.status == "active", Group.status == "active")
+        .distinct()
+    )).scalars().all()
+    if not teacher_ids:
+        return []
+    teachers = (await db.execute(select(User).where(User.id.in_(teacher_ids)))).scalars().all()
+    if any(t.role != "teacher" for t in teachers):
+        return []
+    days = days_off_between(teachers[0].days_off, date_from, date_to)
+    return [d for d in days if all(is_day_off(t.days_off, d) for t in teachers[1:])]

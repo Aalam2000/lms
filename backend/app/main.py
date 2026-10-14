@@ -1,9 +1,10 @@
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import auth, quizzes, i18n, admin, groups, lessons, materials, links, library, students, quiz_live, help, usages, homework, lesson_work, presence, methodology, csp, academy, parent, days_off
+from . import storage
+from .routers import auth, quizzes, i18n, admin, groups, lessons, materials, links, library, students, quiz_live, help, usages, homework, lesson_work, presence, methodology, csp, academy, parent
 import logging
-from .i18n_auto import start_translation_worker
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -21,8 +22,11 @@ logging.getLogger("uvicorn.access").addFilter(_SkipCspReportAccess())
 # устаревшего @app.on_event("startup"), удалённого в новых Starlette).
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    start_translation_worker(interval=1800)
+    i18n.start_translation_worker(interval=1800)
+    # Перенос файлов из MinIO на диск — в фоне, сайт работает сразу
+    migration = asyncio.create_task(storage.migrate_from_minio())
     yield
+    migration.cancel()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -72,5 +76,4 @@ app.include_router(presence.router)
 app.include_router(csp.router)
 app.include_router(academy.router)
 app.include_router(parent.router)
-app.include_router(days_off.router)
 

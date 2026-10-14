@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../api/auth';
+import { getTeacherDirectory } from '../api/admin';
 
 function TeachersDirectoryPage() {
   const navigate = useNavigate();
@@ -11,8 +11,8 @@ function TeachersDirectoryPage() {
   useEffect(() => {
     setLoading(true);
     setError('');
-    api.get('/admin/teachers/directory')
-      .then(r => setTeachers(r.data))
+    getTeacherDirectory()
+      .then(setTeachers)
       .catch(err => setError(err?.response?.data?.detail || 'Не удалось загрузить справочник'))
       .finally(() => setLoading(false));
   }, []);

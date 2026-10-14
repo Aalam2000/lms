@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../api/auth';
+import { getCourses, getMyGroups } from '../api/groups';
+import { getGroups } from '../api/admin';
 import { useAuth } from '../context/AuthContext';
 import { StudentContactIcons } from '../components/ContactIcons';
 import Dropdown from '../components/Dropdown';
@@ -9,7 +10,7 @@ import IconButton from '../components/IconButton';
 import PasswordModal from '../components/PasswordModal';
 import SortTh, { sortRows } from '../components/SortTh';
 import StudentCardModal from '../components/StudentCardModal';
-import { setStudentPassword } from '../api/students';
+import { setStudentPassword, getStudents, deleteStudent } from '../api/students';
 
 // Последний вход: «05.10.2026 14:32», нет входов — «—»
 const formatLogin = (value) => {
@@ -55,9 +56,8 @@ function StudentsPage() {
   // и список «Группа», и список «Препод» по teacher_name), у teacher —
   // только свои (тот же смысл, что и «Моё» у admin).
   useEffect(() => {
-    api.get('/groups/courses').then(r => setCourses(r.data)).catch(() => {});
-    const groupsUrl = isAdmin ? '/admin/groups' : '/groups/my';
-    api.get(groupsUrl).then(r => setGroups(r.data)).catch(() => {});
+    getCourses().then(setCourses).catch(() => {});
+    (isAdmin ? getGroups() : getMyGroups()).then(setGroups).catch(() => {});
     // eslint-disable-next-line
   }, [isAdmin]);
 
@@ -75,8 +75,7 @@ function StudentsPage() {
       if (groupId) params.group_id = groupId;
       if (isAdmin && mine) params.mine = true;
       if (isAdmin && !mine && teacherId) params.teacher_id = teacherId;
-      const res = await api.get('/students', { params });
-      setStudents(res.data);
+      setStudents(await getStudents(params));
     } catch (err) {
       setError(err?.response?.data?.detail || 'Не удалось загрузить список студентов');
     } finally {
@@ -267,7 +266,7 @@ function StudentsPage() {
                         name={s.full_name}
                         tip="Удалить студента"
                         forceable={isAdmin}
-                        onDelete={(opts) => api.delete(`/students/${s.id}`, { params: opts?.force ? { force: true } : {} })}
+                        onDelete={(opts) => deleteStudent(s.id, { force: !!opts?.force })}
                         onDeleted={() => setStudents(prev => prev.filter(x => x.id !== s.id))}
                         onError={setError}
                       />

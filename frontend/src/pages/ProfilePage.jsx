@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import api from '../api/auth';
+import { getMe, updateMe } from '../api/auth';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
 import DaysOffEditor from '../components/DaysOffEditor';
@@ -21,23 +21,23 @@ function ProfilePage() {
   const [error, setError]       = useState('');
 
   useEffect(() => {
-    api.get('/auth/me').then(r => {
-      setUsername(r.data.username);
-      setRole(r.data.role);
+    getMe().then(me => {
+      setUsername(me.username);
+      setRole(me.role);
       setForm(f => ({
         ...f,
-        full_name:        r.data.full_name || '',
-        email:            r.data.email || '',
-        phone:            r.data.phone || '',
-        telegram_username: r.data.telegram_username || '',
-        whatsapp:         r.data.whatsapp || '',
+        full_name:        me.full_name || '',
+        email:            me.email || '',
+        phone:            me.phone || '',
+        telegram_username: me.telegram_username || '',
+        whatsapp:         me.whatsapp || '',
       }));
     });
   }, []);
 
   const save = async () => {
     try {
-      await api.put('/auth/me', form);
+      await updateMe(form);
       setMsg('Сохранено!');
       refreshUser();
       setError('');
@@ -60,7 +60,7 @@ function ProfilePage() {
     setPwdSaving(true);
     setPwdError('');
     try {
-      await api.put('/auth/me', pwd);
+      await updateMe(pwd);
       setPwdOpen(false);
       setMsg('Пароль изменён');
       setError('');

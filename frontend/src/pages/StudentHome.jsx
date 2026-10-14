@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PersonalBadge } from '../components/PersonalLesson';
 import { useNavigate } from 'react-router-dom';
-import api from '../api/auth';
+import { getStudentLessons } from '../api/lessons';
 import Calendar from '../components/Calendar';
 import { useDaysOff } from '../hooks/useDaysOff';
 import StudentGroupsBar from '../components/StudentGroupsBar';
@@ -43,7 +43,7 @@ function StudentHome() {
 
   useEffect(() => {
     // Все уроки (и закрытые) — для календаря; таблица показывает только открытые
-    api.get('/lessons/student', { params: { include_closed: 1 } }).then(r => setLessons(r.data));
+    getStudentLessons({ include_closed: 1 }).then(setLessons);
     getStudentGroups().then(setGroups).catch(() => setGroups([]));
     getMyPendingGroups().then(setPendingGroups).catch(() => setPendingGroups([]));
   }, []);

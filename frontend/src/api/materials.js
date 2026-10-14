@@ -1,5 +1,6 @@
 // Роутер /materials (backend/app/routers/materials.py)
 import api from './auth';
+import { needsPdfPreview } from '../utils/libraryItems';
 
 export function getMaterials() {
   return api.get('/materials/').then(res => res.data);
@@ -32,8 +33,18 @@ export function downloadMaterial(id) {
   return api.get(`/materials/${id}/download`, { responseType: 'blob' }).then(res => res.data);
 }
 
+// Файл, сконвертированный в PDF, — байтами (для показа слайдов через pdf.js)
+export function getMaterialPreviewBytes(id) {
+  return api.get(`/materials/${id}/preview`, { responseType: 'arraybuffer' }).then(res => res.data);
+}
+
 export function deleteMaterial(id) {
   return api.delete(`/materials/${id}`).then(res => res.data);
+}
+
+// Текст файла для помощника квизов → { text, ... }; limit — сколько символов
+export function getMaterialText(id, limit) {
+  return api.get(`/materials/${id}/text`, { params: { limit } }).then(res => res.data);
 }
 
 // Правка тегов шаблона курса / одобрение / блокировка одного файла — admin.
@@ -44,4 +55,27 @@ export function updateMaterialTemplate(id, data) {
 // Массовое одобрение/блокировка всего пакета материалов курса+сектора — admin.
 export function bulkUpdateMaterialTemplate(data) {
   return api.patch('/materials/template/bulk', data).then(res => res.data);
+}
+
+// Новая вкладка под файл. Открывать синхронно по клику — иначе браузер
+// заблокирует всплывающее окно; пока docx/xlsx/pptx конвертируется в PDF,
+// во вкладке надпись.
+export function openPendingTab(converting) {
+  const win = window.open('', '_blank');
+  if (win && converting) {
+    win.document.write('<p style="font-family:sans-serif;color:#4B5563;padding:24px">Конвертируем файл в PDF...</p>');
+    win.document.close();
+  }
+  return win;
+}
+
+// Показать файл Базы знаний в уже открытой вкладке: docx/xlsx/pptx — через
+// конвертацию в PDF, остальное как есть. Ничего не скачивается.
+export async function showMaterialInTab(win, materialId, contentType) {
+  const endpoint = needsPdfPreview(contentType) ? 'preview' : 'download';
+  const res = await api.get(`/materials/${materialId}/${endpoint}`, { responseType: 'blob' });
+  const type = res.headers?.['content-type'] || (endpoint === 'preview' ? 'application/pdf' : contentType || 'application/octet-stream');
+  const url = window.URL.createObjectURL(new Blob([res.data], { type }));
+  if (win) win.location.href = type === 'application/pdf' ? `${url}#navpanes=0` : url;
+  setTimeout(() => window.URL.revokeObjectURL(url), 60000);
 }

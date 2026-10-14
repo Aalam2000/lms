@@ -2,7 +2,7 @@
 // систему — см. backend app/usages.py).
 //
 // <DeleteButton entity="course" id={c.id} name={c.title}
-//   onDelete={() => api.delete(`/admin/courses/${c.id}`)} onDeleted={loadCourses} />
+//   onDelete={() => deleteCourse(c.id)} onDeleted={loadCourses} />
 //
 // По клику: спрашивает сервер, где используется объект.
 //  - нигде — подтверждение «Удалить навсегда?» → onDelete → onDeleted;
@@ -14,7 +14,7 @@
 // ЧТО удалится вместе с ним, и кнопку «Удалить всё равно» → onDelete({ force: true }).
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../api/auth';
+import { getUsages } from '../api/usages';
 import IconButton from './IconButton';
 import Modal from './Modal';
 import { extractErrorMessage } from '../utils/errors';
@@ -36,9 +36,9 @@ function DeleteButton({ entity, id, name, onDelete, onDeleted, onError, tip = '�
     if (busy) return;
     setBusy(true);
     try {
-      let res;
+      let found;
       try {
-        res = await api.get(`/usages/${entity}/${id}`);
+        found = await getUsages(entity, id);
       } catch (err) {
         // Сервер запретил удаление в принципе (например, «Нельзя удалить
         // самого себя») — показываем это в том же окне, а не мельком сверху.
@@ -49,8 +49,8 @@ function DeleteButton({ entity, id, name, onDelete, onDeleted, onError, tip = '�
         }
         throw err;
       }
-      if (res.data.usages.length > 0) {
-        setUsages(res.data.usages);
+      if (found.usages.length > 0) {
+        setUsages(found.usages);
         return;
       }
       if (!window.confirm(`Удалить «${name}» навсегда? Это действие нельзя отменить.`)) return;
