@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .lesson_lock import aware, is_date_locked, lock_cutoff
 from .models import Group, Lesson, User
+from .days_off import ensure_lessons_allowed
 
 _NO_DATE = datetime.max.replace(tzinfo=timezone.utc)
 
@@ -50,6 +51,7 @@ async def assign_teacher(
     db: AsyncSession,
     group: Group,
     teacher_id: int,
+    actor: User,
     from_lesson_id: Optional[int] = None,
     to_lesson_id: Optional[int] = None,
 ) -> int:
@@ -87,6 +89,10 @@ async def assign_teacher(
     if last < first and to_lesson_id is not None:
         raise HTTPException(status_code=400, detail="Последний урок отрезка раньше первого")
 
+    # Урок на выходной педагога ставит только он сам (app/days_off.py)
+    await ensure_lessons_allowed(
+        db, [(teacher_id, l.date) for l in lessons[first:last + 1] if l.teacher_id != teacher_id], actor,
+    )
     changed = 0
     for lesson in lessons[first:last + 1]:
         if lesson.teacher_id != teacher_id:

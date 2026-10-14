@@ -3,9 +3,10 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/auth';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
+import DaysOffEditor from '../components/DaysOffEditor';
 
 function ProfilePage() {
-  const { refreshUser } = useAuth();
+  const { refreshUser, user } = useAuth();
   const [form, setForm] = useState({
     full_name: '', email: '', phone: '', telegram_username: '', whatsapp: ''
   });
@@ -103,6 +104,15 @@ function ProfilePage() {
         <button className="btn" onClick={save}>{'Сохранить'}</button>
         <button type="button" className="btn btn--secondary" onClick={openPwd}>{'Сменить пароль'}</button>
       </div>
+
+      {/* Выходные педагога ставит админ — здесь только просмотр (DaysOffEditor) */}
+      {role === 'teacher' && user?.id && (
+        <>
+          <h3 className="form-section">{'Выходные'}</h3>
+          <DaysOffEditor teacherId={user.id} readOnly />
+          <p className="hint-text">{'Выходные ставит администратор.'}</p>
+        </>
+      )}
 
       {pwdOpen && (
         <Modal

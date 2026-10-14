@@ -126,7 +126,8 @@ const MOBILE_NAV = { previous: '‹', next: '›' };
 const personalNames = (l) => (l.is_personal && l.participants?.length ? `${l.participants.map(p => p.full_name).join(', ')} — ` : '');
 
 // isDisabled(lesson) — урок показан, но не открывается (у студента: закрыт педагогом)
-function Calendar({ lessons, onSelectLesson, getEventColor, defaultView = 'month', highlight = TEACHER_HIGHLIGHT, isDisabled, isLight = TEACHER_LIGHT }) {
+// isDayOff(date) — выходной педагога: день заливается (hooks/useDaysOff.js)
+function Calendar({ lessons, onSelectLesson, getEventColor, defaultView = 'month', highlight = TEACHER_HIGHLIGHT, isDisabled, isLight = TEACHER_LIGHT, isDayOff }) {
   const { lang } = useLang();
   const momentLocale = MOMENT_LOCALE_BY_LANG[lang] || 'ru';
   const isMobile = useIsMobile();
@@ -178,6 +179,7 @@ function Calendar({ lessons, onSelectLesson, getEventColor, defaultView = 'month
         scrollToTime={min}
         step={30}
         timeslots={2}
+        dayPropGetter={isDayOff ? (date) => (isDayOff(date) ? { className: 'la-calendar__day--off' } : {}) : undefined}
         eventPropGetter={(event) => ({
           className: eventClassName(event.resource),
           style: { '--la-event-color': getEventColor ? getEventColor(event.resource) : 'var(--color-primary)' },

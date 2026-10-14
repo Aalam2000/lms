@@ -3,6 +3,7 @@ import { PersonalBadge } from '../components/PersonalLesson';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/auth';
 import Calendar from '../components/Calendar';
+import { useDaysOff } from '../hooks/useDaysOff';
 import StudentGroupsBar from '../components/StudentGroupsBar';
 import { getStudentGroups, getMyPendingGroups } from '../api/groups';
 
@@ -34,6 +35,7 @@ function readViewMode() {
 
 function StudentHome() {
   const navigate = useNavigate();
+  const isDayOff = useDaysOff({ student: true }); // выходные педагога (педагогов) ученика
   const [lessons, setLessons] = useState([]);
   const [groups, setGroups] = useState([]);
   const [pendingGroups, setPendingGroups] = useState([]); // записался по QR, педагог ещё не принял
@@ -77,7 +79,7 @@ function StudentHome() {
       </div>
 
       {viewMode === 'calendar' ? (
-        <Calendar lessons={lessons} onSelectLesson={open} highlight={studentHighlight} isDisabled={l => !l.is_open} isLight={null} />
+        <Calendar lessons={lessons} onSelectLesson={open} highlight={studentHighlight} isDisabled={l => !l.is_open} isLight={null} isDayOff={isDayOff} />
       ) : (
         <div className="table-scroll">
           <table className="table">

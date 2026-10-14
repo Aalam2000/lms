@@ -7,6 +7,7 @@ import { ContactIcon } from '../components/ContactIcons';
 import IconButton from '../components/IconButton';
 import DeleteButton from '../components/DeleteButton';
 import PasswordModal from '../components/PasswordModal';
+import DaysOffEditor from '../components/DaysOffEditor';
 import { setUserPassword, setUserRole } from '../api/admin';
 import { useAuth } from '../context/AuthContext';
 import AcademyTab from '../components/AcademyTab';
@@ -62,6 +63,7 @@ function AdminPage() {
 
   const [error, setError] = useState('');
   const [passwordUser, setPasswordUser] = useState(null); // кому админ меняет пароль
+  const [daysOffUser, setDaysOffUser] = useState(null); // чьи выходные админ правит
 
   useEffect(() => {
     loadAll();
@@ -419,6 +421,9 @@ function AdminPage() {
                 {/* stopPropagation: клик по строке включает правку — кнопкам это не нужно */}
                 <div className="icon-row" onClick={e => e.stopPropagation()}>
                   <IconButton icon="key" tip="Сменить пароль" onClick={() => setPasswordUser(u)} />
+                  {del.toRole === 'admin' && (
+                    <IconButton icon="schedule" tip="Выходные" onClick={() => setDaysOffUser(u)} />
+                  )}
                   {u.id === currentUser?.id ? (
                     <IconButton icon="role" tip="Нельзя сменить роль самому себе" disabled />
                   ) : del.toRole === 'admin' ? (
@@ -454,6 +459,12 @@ function AdminPage() {
           save={(password) => setUserPassword(passwordUser.id, password)}
           onClose={() => setPasswordUser(null)}
         />
+      )}
+
+      {daysOffUser && (
+        <Modal title={<>{'Выходные'}: {daysOffUser.full_name || daysOffUser.username}</>} onClose={() => setDaysOffUser(null)} size="wide">
+          <DaysOffEditor teacherId={daysOffUser.id} onSaved={() => setDaysOffUser(null)} />
+        </Modal>
       )}
 
       <div className="tabs-row">

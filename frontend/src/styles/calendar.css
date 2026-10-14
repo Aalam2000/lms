@@ -67,6 +67,10 @@
 .la-calendar .rbc-today {
   background: var(--color-warning-bg);
 }
+/* Выходной педагога (backend/app/days_off.py) — день залит во всех видах календаря */
+.la-calendar .la-calendar__day--off {
+  background: var(--color-day-off-bg);
+}
 .la-calendar .rbc-current-time-indicator {
   background: var(--color-primary);
 }

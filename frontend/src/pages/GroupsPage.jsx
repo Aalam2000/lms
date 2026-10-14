@@ -6,12 +6,13 @@ import { StudentContactIcons } from '../components/ContactIcons';
 import Dropdown from '../components/Dropdown';
 import Calendar, { GROUP_COLORS } from '../components/Calendar';
 import { getMyLessons } from '../api/lessons';
+import { useDaysOff } from '../hooks/useDaysOff';
 import { useHomeworkRefresh } from '../hooks/useHomeworkRefresh';
 import IconButton from '../components/IconButton';
 
 function GroupsPage() {
   const navigate = useNavigate();
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   const isAdmin = hasRole('admin');
 
   const [allMyGroups, setGroups] = useState([]);
@@ -52,6 +53,9 @@ function GroupsPage() {
   useEffect(() => {
     localStorage.setItem('la_groups_mine', String(mine));
   }, [mine]);
+
+  // Выходные в календаре: у педагога — свои, у админа — выбранного учителя
+  const isDayOff = useDaysOff({ teacherId: isAdmin ? (!mine && teacherId ? Number(teacherId) : null) : user?.id });
 
   // Курсы и (у admin) полный список групп — один раз, для фильтров.
   useEffect(() => {
@@ -176,6 +180,7 @@ function GroupsPage() {
             lessons={calendarLessons}
             getEventColor={getEventColor}
             onSelectLesson={(l) => navigate(`/dashboard/lessons/${l.id}`)}
+            isDayOff={isDayOff}
           />
           {/* Список групп остаётся виден и кликабелен и в календаре — тут
               же можно открыть саму группу, а не только её урок. Со всеми

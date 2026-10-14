@@ -22,6 +22,8 @@ class User(Base):
     parent_phone = Column(String, nullable=True)
     photo_url = Column(String, nullable=True)  # путь к фото, MinIO — этап 2
     theme = Column(String, nullable=True)  # brand | playful | dark — выбор пользователя, NULL = brand по умолчанию
+    # Выходные педагога: недельные полоски по версиям и отдельные даты (app/days_off.py)
+    days_off = Column(JSON, nullable=True)
 
 
 # Курс / тема преподавания

@@ -13,6 +13,8 @@ import Calendar from '../components/Calendar';
 import DateTimePicker from '../components/DateTimePicker';
 import { PersonalBadge, ParticipantsPicker } from '../components/PersonalLesson';
 import LessonTeacherModal from '../components/LessonTeacherModal';
+import { useDaysOff } from '../hooks/useDaysOff';
+import { WEEKDAY_LABELS } from '../utils/weekdays';
 import { getMyGroups, getCourses } from '../api/groups';
 import { useHomeworkRefresh } from '../hooks/useHomeworkRefresh';
 import {
@@ -20,11 +22,9 @@ import {
   fillGroupSchedule, deleteGroupLessons, markLessonHoliday, openGroupLessonsRange,
 } from '../api/lessons';
 
-const WEEKDAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']; // 0..6, как в date.weekday() на бэке
-
 function GroupPage() {
   const navigate = useNavigate();
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   const isAdmin = hasRole('admin');
   const { groupId } = useParams();
   const gid = parseInt(groupId);
@@ -66,6 +66,9 @@ function GroupPage() {
   const [genFillSource, setGenFillSource] = useState(''); // '' | template | group
   const [genFillGroupId, setGenFillGroupId] = useState('');
   const [genError, setGenError] = useState('');
+  // Серия попадает на выходные педагога: бэкенд предупредил (428), повторное
+  // нажатие с теми же параметрами создаёт уроки (backend/app/days_off.py)
+  const [genDaysOffWarned, setGenDaysOffWarned] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Диалог решения, если в группе уже есть уроки — см. handleOpenScheduleFlow
@@ -124,6 +127,8 @@ function GroupPage() {
   const group = groups.find(g => g.id === gid);
   // Педагог в группе не основной: видит только свои уроки, без управления группой
   const isGuest = group?.is_main === false;
+  // Выходные в календаре: основного педагога группы, у педагога-замены — свои
+  const isDayOff = useDaysOff({ teacherId: isGuest ? user?.id : group?.teacher_id });
   const courseName = courses.find(c => c.id === group?.course_id)?.title || '—';
 
   // Уроки только этой группы. По умолчанию — с сегодня и далее; кнопками
@@ -242,6 +247,7 @@ function GroupPage() {
     setGenFillSource('');
     setGenFillGroupId('');
     setGenError('');
+    setGenDaysOffWarned('');
     setIsGenerateModalOpen(true);
   };
 
@@ -280,25 +286,28 @@ function GroupPage() {
       return;
     }
 
+    const payload = {
+      group_id: gid,
+      start_date: genStartDate,
+      start_time: genStartTime,
+      weekdays: genWeekdays,
+      lesson_count: parseInt(genLessonCount, 10),
+      duration_min: genDuration,
+    };
+    if (genFillSource) {
+      payload.fill_source = genFillSource;
+      if (genFillSource === 'group') payload.fill_group_id = parseInt(genFillGroupId, 10);
+    }
+    const payloadKey = JSON.stringify(payload);
+
     setIsGenerating(true);
     setGenError('');
     try {
-      const payload = {
-        group_id: gid,
-        start_date: genStartDate,
-        start_time: genStartTime,
-        weekdays: genWeekdays,
-        lesson_count: parseInt(genLessonCount, 10),
-        duration_min: genDuration,
-      };
-      if (genFillSource) {
-        payload.fill_source = genFillSource;
-        if (genFillSource === 'group') payload.fill_group_id = parseInt(genFillGroupId, 10);
-      }
-      const created = await generateSchedule(payload);
+      const created = await generateSchedule({ ...payload, confirm_days_off: genDaysOffWarned === payloadKey });
       setLessons(prev => [...prev, ...created]);
       setIsGenerateModalOpen(false);
     } catch (err) {
+      if (err?.response?.status === 428) setGenDaysOffWarned(payloadKey);
       setGenError(err?.response?.data?.detail || 'Не удалось сгенерировать расписание');
     } finally {
       setIsGenerating(false);
@@ -544,6 +553,7 @@ function GroupPage() {
         <Calendar
           lessons={groupLessons}
           onSelectLesson={(l) => navigate(`/dashboard/lessons/${l.id}`)}
+          isDayOff={isDayOff}
         />
       ) : (
         /* Таблица уроков */

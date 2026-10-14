@@ -14,6 +14,7 @@ from ..lesson_lock import aware
 from ..homework_status import awaiting_review, student_homework_debts
 from ..lesson_work import has_work_files, lessons_with_work_to_review
 from ..lesson_teacher import can_edit_lesson, can_view_lesson, is_group_teacher
+from ..days_off import conflict_detail, ensure_lessons_allowed, find_conflicts, format_dates
 from ..personal import (
     is_participant, lesson_student_ids, lesson_students_condition, participant_names,
     set_participants, visible_to_student,
@@ -176,6 +177,8 @@ class ScheduleGenerate(BaseModel):
     duration_min: Optional[int] = Field(default=None, ge=DURATION_MIN, le=DURATION_MAX)  # не задано — из группы
     fill_source: Optional[str] = None  # "template" | "group"
     fill_group_id: Optional[int] = None  # обязателен при fill_source == "group"
+    # Педагог сам ставит серию на свои выходные — подтвердил повторным нажатием (app/days_off.py)
+    confirm_days_off: bool = False
 
 
 # Дозаполнение/обновление материалов уже существующих уроков по шаблону
@@ -548,6 +551,7 @@ async def create_lesson(
     group = (await db.execute(group_query)).scalar_one_or_none()
     if not group:
         raise HTTPException(status_code=403, detail="Нет доступа к этой группе")
+    await ensure_lessons_allowed(db, [(group.teacher_id, data.date)], current_user)
 
     lesson = Lesson(
         group_id=data.group_id,
@@ -625,6 +629,19 @@ async def generate_schedule(
 
     if len(dates) < data.lesson_count:
         raise HTTPException(status_code=422, detail="Не удалось подобрать достаточно дат — проверьте дни недели и период")
+
+    # Выходные педагога (app/days_off.py): другому — отказ, самому педагогу —
+    # предупреждение (428), серия создаётся после повторного нажатия.
+    days_off = await find_conflicts(db, [(group.teacher_id, d) for d in dates])
+    if days_off:
+        if current_user.id != group.teacher_id:
+            raise HTTPException(status_code=409, detail=conflict_detail(days_off))
+        if not data.confirm_days_off:
+            raise HTTPException(
+                status_code=428,
+                detail=f"Уроки попадут на ваши выходные: {format_dates(days_off)}. "
+                       "Нажмите «Создать уроки» ещё раз, чтобы создать их всё равно",
+            )
 
     word = await lesson_word(db, group.sector)
     lessons_by_order: dict[int, Lesson] = {}
@@ -1087,10 +1104,11 @@ async def mark_lesson_as_holiday(
 
     old_dates = [l.date for l in tail]
     step = (old_dates[-1] - old_dates[-2]) if len(tail) >= 2 else timedelta(days=7)
+    new_dates = old_dates[1:] + [old_dates[-1] + step]
+    await ensure_lessons_allowed(db, [(l.teacher_id, d) for l, d in zip(tail, new_dates)], current_user)
 
-    for i in range(len(tail) - 1):
-        tail[i].date = old_dates[i + 1]
-    tail[-1].date = old_dates[-1] + step
+    for l, d in zip(tail, new_dates):
+        l.date = d
 
     await db.commit()
     for l in tail:
@@ -1566,6 +1584,8 @@ async def update_lesson(
         del update_data["duration_min"]  # колонка NOT NULL — null не пишем
     if "date" in update_data and update_data["date"] != lesson.date and lesson_locked_for(lesson, current_user):
         raise HTTPException(status_code=403, detail=LOCK_DETAIL.format(what="дату урока"))
+    if "date" in update_data and update_data["date"] != lesson.date:
+        await ensure_lessons_allowed(db, [(lesson.teacher_id, update_data["date"])], current_user)
     for field, value in update_data.items():
         setattr(lesson, field, value)
 

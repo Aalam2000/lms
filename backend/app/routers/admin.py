@@ -481,7 +481,7 @@ async def update_group(
     # Смена педагога в карточке группы — передача с сегодняшнего дня: прошедшие
     # уроки остаются за тем, кто их вёл (app/lesson_teacher.py)
     if data.teacher_id != group.teacher_id:
-        await assign_teacher(db, group, data.teacher_id)
+        await assign_teacher(db, group, data.teacher_id, admin)
     group.telegram_chat_id = data.telegram_chat_id
     group.whatsapp = data.whatsapp
     group.video_url = data.video_url
@@ -511,7 +511,7 @@ async def assign_group_teacher(
     group = (await db.execute(select(Group).where(Group.id == group_id))).scalar_one_or_none()
     if not group:
         raise HTTPException(status_code=404, detail="Группа не найдена")
-    changed = await assign_teacher(db, group, data.teacher_id, data.from_lesson_id, data.to_lesson_id)
+    changed = await assign_teacher(db, group, data.teacher_id, admin, data.from_lesson_id, data.to_lesson_id)
     await db.commit()
     return {"changed": changed, "teacher_id": group.teacher_id}
 

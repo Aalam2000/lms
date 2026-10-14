@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import DurationSelect from './DurationSelect';
-import { MONTH_NAMES } from '../utils/months';
+import MonthGrid, { sameDay } from './MonthGrid';
 
-const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const MINUTE_STEPS = [0, 10, 20, 30, 40, 50];
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -10,28 +9,6 @@ const pad = (n) => String(n).padStart(2, '0');
 function formatDisplay(date) {
   if (!date) return '';
   return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function startOfDay(date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function sameDay(a, b) {
-  return !!a && !!b && startOfDay(a).getTime() === startOfDay(b).getTime();
-}
-
-// 6x7 сетка дней месяца, неделя начинается с понедельника.
-function buildMonthGrid(year, month) {
-  const first = new Date(year, month, 1);
-  const firstWeekday = (first.getDay() + 6) % 7; // 0 = Пн
-  const gridStart = new Date(year, month, 1 - firstWeekday);
-  const cells = [];
-  for (let i = 0; i < 42; i++) {
-    cells.push(new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i));
-  }
-  return cells;
 }
 
 // Ближайшая допустимая «десятиминутка» не больше фактических минут.
@@ -128,11 +105,6 @@ function DateTimePicker({ value, onChange, onCommit, disabled, hourOnly, placeho
     setViewDate(prev => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
   };
 
-  const gridYear = viewDate.getFullYear();
-  const gridMonth = viewDate.getMonth();
-  const cells = buildMonthGrid(gridYear, gridMonth);
-  const today = new Date();
-
   return (
     <div className="datetime-picker" ref={containerRef}>
       {iconOnly ? (
@@ -160,35 +132,12 @@ function DateTimePicker({ value, onChange, onCommit, disabled, hourOnly, placeho
 
       {open && (
         <div className="datetime-picker__popover" style={floating ? floatingStyle(containerRef.current) : undefined}>
-          <div className="datetime-picker__calendar-header">
-            <button type="button" className="datetime-picker__nav" onClick={() => navMonth(-1)}>{'‹'}</button>
-            <span>{MONTH_NAMES[gridMonth]} {gridYear}</span>
-            <button type="button" className="datetime-picker__nav" onClick={() => navMonth(1)}>{'›'}</button>
-          </div>
-
-          <div className="datetime-picker__weekdays">
-            {WEEKDAYS.map(w => <span key={w}>{w}</span>)}
-          </div>
-
-          <div className="datetime-picker__grid">
-            {cells.map((day) => {
-              const inMonth = day.getMonth() === gridMonth;
-              const classes = ['datetime-picker__day'];
-              if (!inMonth) classes.push('datetime-picker__day--muted');
-              if (sameDay(day, value)) classes.push('datetime-picker__day--selected');
-              if (sameDay(day, today)) classes.push('datetime-picker__day--today');
-              return (
-                <button
-                  type="button"
-                  key={day.toISOString()}
-                  className={classes.join(' ')}
-                  onClick={() => selectDay(day)}
-                >
-                  {day.getDate()}
-                </button>
-              );
-            })}
-          </div>
+          <MonthGrid
+            viewDate={viewDate}
+            onNav={navMonth}
+            onSelectDay={selectDay}
+            dayClass={(day) => (sameDay(day, value) ? ['month-grid__day--selected'] : [])}
+          />
 
           <div className="datetime-picker__time">
             <select
