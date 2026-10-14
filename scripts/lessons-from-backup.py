@@ -223,20 +223,21 @@ def plan_restore(row):
 
 
 def pack_objects(dump, objects):
-    """tar с нужными файлами из minio.tar.gz той же копии; + каких там нет."""
+    """tar с нужными файлами из files.tar.gz той же копии; + каких там нет."""
     packed, missing = io.BytesIO(), set(objects)
-    archive = dump.parent / "minio.tar.gz"
+    archive = dump.parent / "files.tar.gz"
     with tarfile.open(fileobj=packed, mode="w", format=tarfile.PAX_FORMAT) as out:
         if archive.exists():
             with tarfile.open(archive, mode="r|gz") as source:
                 for member in source:
-                    if member.name in missing:
-                        info = tarfile.TarInfo(member.name)
+                    name = member.name.removeprefix("./")  # tar -C <папка> . даёт «./materials/<uuid>»
+                    if name in missing:
+                        info = tarfile.TarInfo(name)
                         info.size = member.size
-                        if objects[member.name]:
-                            info.pax_headers = {"comment": objects[member.name]}
+                        if objects[name]:
+                            info.pax_headers = {"comment": objects[name]}
                         out.addfile(info, source.extractfile(member))
-                        missing.discard(member.name)
+                        missing.discard(name)
     return packed.getvalue(), sorted(missing)
 
 

@@ -23,10 +23,10 @@ from ..usages import ensure_not_used
 
 router = APIRouter(prefix="/materials", tags=["materials"])
 
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 МБ — рабочий дефолт, см. claude/minio-plan.md
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 МБ — рабочий дефолт
 
 # Форматы, для которых делаем предпросмотр через конвертацию в PDF
-# (см. /materials/{id}/preview ниже). Готовый PDF кэшируется в MinIO
+# (см. /materials/{id}/preview ниже). Готовый PDF кэшируется в хранилище
 # (storage.preview_key) — решение Андрея, 2026-09-28, вместо «всегда заново»
 # (2026-09-18): иначе класс, разом открывший презентацию, запускал десятки
 # soffice и вешал сервер. Если появится редактирование этих файлов —
@@ -35,7 +35,7 @@ PREVIEW_CONVERTIBLE_EXTENSIONS = {".docx", ".xlsx", ".pptx"}
 
 
 def _fetch_and_convert_to_pdf(object_key: str, ext: str) -> bytes:
-    """Синхронная (блокирующая) часть — скачивание из MinIO и вызов
+    """Синхронная (блокирующая) часть — чтение из хранилища и вызов
     soffice — намеренно вынесена в отдельную функцию и гоняется через
     asyncio.to_thread в самом эндпоинте, чтобы не блокировать event loop."""
     data = b"".join(storage.stream_object(object_key))
@@ -393,7 +393,7 @@ def _content_disposition(filename: str, disposition: str = "attachment") -> str:
     return f"{disposition}; filename=\"{ascii_fallback}\"; filename*=UTF-8''{quoted}"
 
 
-# Скачивание — стримим через бэкенд (см. claude/minio-plan.md, п.3)
+# Скачивание — стримим через бэкенд
 @router.get("/{material_id}/download")
 async def download_material(
     material_id: int,

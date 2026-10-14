@@ -38,7 +38,7 @@
 |---|---|
 | Backend | Python 3.12, FastAPI, Pydantic 2, SQLAlchemy 2 (async), Alembic |
 | Frontend | React 18, Vite, React Router, react-big-calendar |
-| Данные | PostgreSQL — база данных; MinIO — хранилище файлов |
+| Данные | PostgreSQL — база данных; файлы — папка на диске сервера |
 | Документы | LibreOffice — просмотр офисных файлов |
 | Перевод | autoi18n + OpenAI |
 | Инфраструктура | Docker, Nginx |
@@ -54,8 +54,7 @@ backend/            API и бизнес-логика
   app/days_off.py     правило выходных педагога
   app/security.py     пароли и токены входа
   app/usages.py       проверка использования перед удалением
-  app/storage.py      работа с файловым хранилищем
-  app/backup_minio.py выгрузка файлов хранилища в архив (для бэкапа)
+  app/storage.py      файлы платформы: папка на диске, путь «тип/uuid», имена только в базе
   alembic/            миграции базы данных
   templates/          HTML-шаблоны квизов
     help/               инструкции по ролям (.md) и их переводы
@@ -81,7 +80,7 @@ scripts/            служебные скрипты
 | Попытки входа (для fail2ban) | `logs/nginx-fail2ban/login.log` | logrotate: раз в неделю или при 20 МБ, 4 архива — `deploy/logrotate/logacademy` |
 | Системный журнал | journald | `SystemMaxUse=100M` |
 | auditd | `/var/log/audit` | 5 файлов по 10 МБ, режим `ROTATE` |
-| Кэш сборки Docker | — | `deploy-prod.sh` после выкатки урезает до 2 ГБ |
+| Кэш сборки Docker | — | `deploy-prod.sh` после выкатки удаляет кэш старше 3 дней |
 
 Backend пишет в stdout через `logging` (уровень INFO), без `print`.
 
@@ -89,6 +88,6 @@ Backend пишет в stdout через `logging` (уровень INFO), без 
 
 **Бэкапы.** `scripts/backup.sh` (systemd-таймер `logacademy-backup.timer`, каждый день в 03:15 по Баку, от имени `quizadm`) кладёт в `/var/backups/logacademy/<дата>_<время>/`:
 - `db.dump` — база (`pg_dump -Fc`);
-- `minio.tar.gz` — все файлы хранилища, кроме кэша предпросмотров `previews/`.
+- `files.tar.gz` — папка файлов платформы `/var/lib/logacademy/data`, кроме кэша предпросмотров `previews/`.
 
 Каждый архив проверяется сразу после записи, хранятся 14 дней. Итог каждого запуска — одна строка `OK` / `FAIL` / `SKIP` в `/var/backups/logacademy/backup.log`. Пока бэкапы лежат на том же сервере — перенос на отдельный сервер / S3 запланирован. Установка и восстановление — `DEPLOYMENT.md`.

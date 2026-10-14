@@ -447,7 +447,7 @@ async def delete_homework_tasks(db: AsyncSession, task_ids: list[int]) -> None:
 
 async def delete_lessons_homework(db: AsyncSession, lesson_ids: list[int]) -> None:
     """Вызывать перед удалением уроков: задания, ответы студентов (+ файлы
-    в MinIO) и диалоги в строках студентов."""
+    в хранилище) и диалоги в строках студентов."""
     if not lesson_ids:
         return
     answer_ids = [r[0] for r in (await db.execute(
@@ -465,7 +465,7 @@ async def delete_lessons_homework(db: AsyncSession, lesson_ids: list[int]) -> No
     )).all()]
     await delete_homework_tasks(db, task_ids)
     await db.execute(delete(LessonMessage).where(LessonMessage.lesson_id.in_(lesson_ids)))
-    # Работа на уроке: файлы в MinIO и записи
+    # Работа на уроке: файлы в хранилище и записи
     for (key,) in (await db.execute(
         select(LessonWorkFile.object_key).where(LessonWorkFile.lesson_id.in_(lesson_ids))
     )).all():
@@ -1644,7 +1644,7 @@ async def delete_lesson(
     # урока с уже проставленными оценками или привязанными материалами
     # падало на ограничении внешнего ключа. Сами материалы/квизы/ссылки
     # в «Базе знаний» не трогаем — удаляем только привязки этого урока.
-    # ДЗ урока (задания, ответы, их файлы в MinIO) и диалоги — тоже данные
+    # ДЗ урока (задания, ответы, их файлы в хранилище) и диалоги — тоже данные
     # внутри урока, удаляются вместе с ним.
     await delete_lessons_homework(db, [lesson_id])
     await db.execute(delete(LessonMark).where(LessonMark.lesson_id == lesson_id))

@@ -7,7 +7,7 @@ WORKDIR /app
 # libreoffice-writer/calc/impress (тянут libreoffice-core с бинарём soffice) —
 # для headless-конвертации docx/xlsx/pptx в PDF при предпросмотре файла
 # (см. /materials/{id}/preview в routers/materials.py). Готовый PDF
-# кэшируется в MinIO, конвертации идут по одной (решение Андрея, 2026-09-28).
+# кэшируется в хранилище, конвертации идут по одной (решение Андрея, 2026-09-28).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl fonts-dejavu-core \
        libreoffice-writer libreoffice-calc libreoffice-impress \

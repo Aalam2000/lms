@@ -8,6 +8,5 @@ werkzeug==3.1.9
 auto-i18n-lib==2.2.6
 Markdown==3.10.3
 alembic==1.20.0
-minio==7.2.20
 pypdf==6.19.0
 phonenumbers==9.0.41

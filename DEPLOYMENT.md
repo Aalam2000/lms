@@ -4,7 +4,7 @@
 > Build output is still `frontend/build/`, build arg is still `REACT_APP_API_URL` —
 > `docker-compose.prod.yml` and nginx are unchanged. Details: README.md → «Сборка фронтенда: Vite».
 
-## 1) Server-side Postgres, platform files and MinIO (outside app compose)
+## 1) Server-side Postgres and platform files (outside app compose)
 
 ### 1.1 Postgres service
 - Install Postgres on prod host using OS packages.
@@ -26,43 +26,20 @@
   - `host all all <DOCKER_BRIDGE_CIDR> scram-sha-256`
 - Reload config: `sudo systemctl reload postgresql`
 
-### 1.2 MinIO service
-- Create service user and directories:
-  - `sudo useradd --system --home /var/lib/minio --shell /sbin/nologin minio`
-  - `sudo mkdir -p /var/lib/minio/data /etc/minio`
-  - `sudo chown -R minio:minio /var/lib/minio /etc/minio`
-- Install binary to `/usr/local/bin/minio` and make it executable.
-- Copy env template:
-  - `sudo cp deploy/systemd/minio.env.example /etc/minio/minio.env`
-  - set real values for `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD`
-- Install unit file:
-  - `sudo cp deploy/systemd/minio.service /etc/systemd/system/minio.service`
-  - `sudo systemctl daemon-reload`
-  - `sudo systemctl enable --now minio`
-
-#### Network settings (required)
-- In `/etc/minio/minio.env`:
-  - `MINIO_ADDRESS="0.0.0.0:9000"`
-  - `MINIO_CONSOLE_ADDRESS="127.0.0.1:9001"`
-- Open only port `9000` for app host/private network, keep `9001` local/admin-only.
-
-### 1.3 Platform files folder (required before deploy)
+### 1.2 Platform files folder (required before deploy)
 Uploaded files are stored on the host as `<type>/<uuid>` (names only in the DB, see `backend/app/storage.py`).
 The folder is mounted into the backend container at the same path. Create it once, owned by the deploy user:
 - `sudo install -d -o quizadm -g quizadm -m 700 /var/lib/logacademy/data`
 
 `scripts/deploy-prod.sh` refuses to deploy if the folder is missing or not writable; `scripts/backup.sh` archives it as `files.tar.gz`.
-MinIO (1.2) is only needed until the existing files are moved to this folder: the backend moves them automatically at startup.
 
-### 1.4 Pre-deploy health checks
+### 1.3 Pre-deploy health checks
 - Postgres service is active:
   - `systemctl is-active postgresql`
 - Postgres accepts auth:
   - `PGPASSWORD='<password>' psql -h 127.0.0.1 -U <user> -d <db> -c 'select 1;'`
-- MinIO service is active:
-  - `systemctl is-active minio`
-- MinIO API health:
-  - `curl -fsS http://127.0.0.1:9000/minio/health/live`
+- Platform files folder exists and is writable by the deploy user:
+  - `test -w /var/lib/logacademy/data && echo ok`
 
 > If any check fails, do not deploy app containers until fixed.
 
@@ -76,9 +53,9 @@ MinIO (1.2) is only needed until the existing files are moved to this folder: th
 
 ## 3) Compose profiles
 
-- Prod (external Postgres/MinIO on server):
+- Prod (external Postgres and files folder on server):
   - `docker compose -f docker-compose.prod.yml up -d --build`
-- Dev (local Postgres/MinIO in containers):
+- Dev (local Postgres in a container, files in the `files_dev_data` volume):
   - `docker compose -f docker-compose.dev.yml up -d --build`
 
 ## 4) Production deploy from Git
@@ -104,17 +81,17 @@ MinIO (1.2) is only needed until the existing files are moved to this folder: th
 - systemd journal: `SystemMaxUse=100M` in `/etc/systemd/journald.conf`, then `sudo systemctl restart systemd-journald`
 - auditd: `max_log_file_action = ROTATE` in `/etc/audit/auditd.conf` (with `keep_logs` it never deletes old files), then `sudo service auditd restart`
 
-### Backups (DB + MinIO files)
+### Backups (DB + platform files)
 
-- Script: `scripts/backup.sh` (runs as `quizadm`): `pg_dump` + all MinIO objects except `previews/` (via `python -m app.backup_minio` in the backend container).
-- Output: `/var/backups/logacademy/<date>_<time>/` (`db.dump`, `minio.tar.gz`); both are verified after writing; kept 14 days (`KEEP_DAYS`).
+- Script: `scripts/backup.sh` (runs as `quizadm`): `pg_dump` + the files folder `/var/lib/logacademy/data` except `previews/`.
+- Output: `/var/backups/logacademy/<date>_<time>/` (`db.dump`, `files.tar.gz`); both are verified after writing; kept 14 days (`KEEP_DAYS`).
 - One line per run in `/var/backups/logacademy/backup.log` (`OK` / `FAIL` / `SKIP`).
 - Setup:
   - `sudo mkdir -p /var/backups/logacademy && sudo chown quizadm:quizadm /var/backups/logacademy && sudo chmod 700 /var/backups/logacademy`
   - systemd timer (runs as quizadm, daily 03:15 Asia/Baku; cron is closed for quizadm by `/etc/cron.allow`):
     `sudo cp deploy/systemd/logacademy-backup.{service,timer} /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now logacademy-backup.timer`
   - check: `systemctl list-timers logacademy-backup.timer`
-- Restore DB: `pg_restore --clean --if-exists -d "$URL" db.dump`; files: unpack `minio.tar.gz` and upload with `mc mirror` (or the MinIO console).
+- Restore DB: `pg_restore --clean --if-exists -d "$URL" db.dump`; files: `tar -xzf files.tar.gz -C /var/lib/logacademy/data` (as `quizadm`).
 - TODO: copy backups off this server (separate server / S3).
 
 ## 5) Important warnings

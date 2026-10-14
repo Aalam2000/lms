@@ -20,7 +20,7 @@ class User(Base):
     # Родитель ученика — заполняет педагог/админ; телефон родителя может повторяться (братья и сёстры)
     parent_name = Column(String, nullable=True)
     parent_phone = Column(String, nullable=True)
-    photo_url = Column(String, nullable=True)  # путь к фото, MinIO — этап 2
+    photo_url = Column(String, nullable=True)  # путь к фото — этап 2
     theme = Column(String, nullable=True)  # brand | playful | dark — выбор пользователя, NULL = brand по умолчанию
     # Выходные педагога: недельные полоски по версиям и отдельные даты (app/days_off.py)
     days_off = Column(JSON, nullable=True)
@@ -158,7 +158,7 @@ class Material(Base):
     sector = Column(String, nullable=True)  # ru | az — направление, для шаблонов курсов; ставит только admin
     template_lesson_no = Column(String, nullable=True)  # "5.2" и т.п. — номер урока в шаблоне; ставит только admin
     template_status = Column(String, nullable=True)  # draft | approved — статус шаблонного материала
-    # Персональный файл ДЗ конкретному студенту (homework-tasks/ в MinIO) —
+    # Персональный файл ДЗ конкретному студенту (homework-tasks/ в хранилище) —
     # в «Базу знаний» не попадает, живёт только в своём уроке.
     is_personal = Column(Boolean, nullable=False, default=False)
     # sha256 содержимого — контроль повторной загрузки того же файла в БЗ
@@ -260,7 +260,7 @@ class HomeworkAnswer(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
-# Файлы ответа студента (homework-answers/ в MinIO), в «Базу знаний» не попадают.
+# Файлы ответа студента (homework-answers/ в хранилище), в «Базу знаний» не попадают.
 class HomeworkAnswerFile(Base):
     __tablename__ = "homework_answer_files"
     id = Column(Integer, primary_key=True, index=True)
@@ -273,7 +273,7 @@ class HomeworkAnswerFile(Base):
 
 
 # Работа на уроке: файлы, которые ученик сдаёт во время урока (lesson-work/ в
-# MinIO), в «Базу знаний» не попадают. Оценка за них — оценка за урок
+# хранилище), в «Базу знаний» не попадают. Оценка за них — оценка за урок
 # (LessonMark.score), отметка проверки — LessonMark.work_reviewed_at.
 # Правила — app/lesson_work.py и routers/lesson_work.py.
 class LessonWorkFile(Base):

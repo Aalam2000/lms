@@ -1,8 +1,6 @@
-import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from . import storage
 from .routers import auth, quizzes, i18n, admin, groups, lessons, materials, links, library, students, quiz_live, help, usages, homework, lesson_work, presence, methodology, csp, academy, parent
 import logging
 
@@ -23,10 +21,7 @@ logging.getLogger("uvicorn.access").addFilter(_SkipCspReportAccess())
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     i18n.start_translation_worker(interval=1800)
-    # Перенос файлов из MinIO на диск — в фоне, сайт работает сразу
-    migration = asyncio.create_task(storage.migrate_from_minio())
     yield
-    migration.cancel()
 
 
 app = FastAPI(lifespan=lifespan)
