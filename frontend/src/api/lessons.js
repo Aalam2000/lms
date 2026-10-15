@@ -149,3 +149,9 @@ export function attachLessonItem(lessonId, resourceType, resourceId) {
 export function detachLessonItem(lessonId, resourceType, resourceId) {
   return api.delete(`/lessons/${lessonId}/items/${resourceType}/${resourceId}`).then(res => res.data);
 }
+
+// Свой урок (создан этим пользователем) — перенести и открыть/закрыть без доступа
+// внутрь урока (право lessons.own, куратор). data: { date (ISO), is_open }
+export function updateOwnLesson(lessonId, data) {
+  return api.patch(`/lessons/${lessonId}/own`, data).then(res => res.data);
+}

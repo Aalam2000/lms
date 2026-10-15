@@ -27,6 +27,23 @@ export function getTeacherReport(teacherId, params) {
   return api.get(`/admin/teachers/${teacherId}/report`, { params }).then(res => res.data);
 }
 
+// Кураторы: логин генерирует бэкенд, пароль = логину
+export function getCurators() {
+  return api.get('/admin/curators').then(res => res.data);
+}
+
+export function createCurator(data) {
+  return api.post('/admin/curators', data).then(res => res.data);
+}
+
+export function updateCurator(id, data) {
+  return api.patch(`/admin/curators/${id}`, data).then(res => res.data);
+}
+
+export function deleteCurator(id) {
+  return api.delete(`/admin/curators/${id}`).then(res => res.data);
+}
+
 export function getAdmins() {
   return api.get('/admin/admins').then(res => res.data);
 }

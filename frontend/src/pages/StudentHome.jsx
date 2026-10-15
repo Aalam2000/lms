@@ -79,7 +79,8 @@ function StudentHome() {
       </div>
 
       {viewMode === 'calendar' ? (
-        <Calendar lessons={lessons} onSelectLesson={open} highlight={studentHighlight} isDisabled={l => !l.is_open} isLight={null} isDayOff={isDayOff} />
+        <Calendar lessons={lessons} onSelectLesson={open} highlight={studentHighlight} isDisabled={l => !l.is_open} isLight={null} isDayOff={isDayOff}
+          dayOffTeacher={[...new Set(groups.map(g => g.teacher_name).filter(Boolean))].join(', ')} />
       ) : (
         <div className="table-scroll">
           <table className="table">

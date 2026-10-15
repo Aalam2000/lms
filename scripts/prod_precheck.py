@@ -1,6 +1,6 @@
 """Проверка прод-БД перед выкаткой миграций (ничего не меняет).
 
-Текущая выкатка: 0023_parent_links (личные ссылки родителей).
+Текущая выкатка: 0026_student_course_teacher + 0027_lesson_created_by (куратор: у ученика курс, сектор и педагог; кто создал урок).
 Перед следующей выкаткой с миграциями — поправить EXPECTED_* ниже.
 
 Запуск на сервере (работает и на СТАРОМ образе бэкенда):
@@ -11,10 +11,10 @@ import asyncio
 from sqlalchemy import text
 from app.database import engine
 
-EXPECTED_REVISION = "0023_parent_links"   # последняя уже выкаченная
-NEW_TABLES = ["lesson_work_files"]
-NEW_COLUMNS = [("lesson_marks", "work_reviewed_at"), ("lesson_marks", "work_reviewed_by"), ("lessons", "private_note")]
-NEW_INDEXES = ["ix_lesson_work_files_lesson_student"]
+EXPECTED_REVISION = "0025_teacher_days_off"   # последняя уже выкаченная
+NEW_TABLES = []
+NEW_COLUMNS = [("users", "course_id"), ("users", "sector"), ("users", "teacher_id"), ("lessons", "created_by")]
+NEW_INDEXES = ["ix_users_teacher_id"]
 
 
 async def main():

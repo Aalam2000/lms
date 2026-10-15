@@ -40,6 +40,7 @@ const MESSAGES_BY_LANG = {
     next: 'Вперёд',
     noEventsInRange: 'Уроков нет',
     showMore: (count) => `ещё ${count}`,
+    dayOff: (name) => (name ? `У учителя ${name} выходной` : 'У учителя выходной'),
   },
   az: {
     month: 'Ay',
@@ -50,6 +51,7 @@ const MESSAGES_BY_LANG = {
     next: 'İrəli',
     noEventsInRange: 'Dərs yoxdur',
     showMore: (count) => `daha ${count}`,
+    dayOff: (name) => (name ? `Müəllim ${name} istirahət günündədir` : 'Müəllimin istirahət günüdür'),
   },
   en: {
     month: 'Month',
@@ -60,6 +62,7 @@ const MESSAGES_BY_LANG = {
     next: 'Next',
     noEventsInRange: 'No lessons',
     showMore: (count) => `+${count} more`,
+    dayOff: (name) => (name ? `Teacher ${name} is off` : 'Teacher is off'),
   },
 };
 
@@ -127,7 +130,8 @@ const personalNames = (l) => (l.is_personal && l.participants?.length ? `${l.par
 
 // isDisabled(lesson) — урок показан, но не открывается (у студента: закрыт педагогом)
 // isDayOff(date) — выходной педагога: день заливается (hooks/useDaysOff.js)
-function Calendar({ lessons, onSelectLesson, getEventColor, defaultView = 'month', highlight = TEACHER_HIGHLIGHT, isDisabled, isLight = TEACHER_LIGHT, isDayOff }) {
+// dayOffTeacher — имя педагога для подсказки «У учителя … выходной» над таким днём
+function Calendar({ lessons, onSelectLesson, getEventColor, defaultView = 'month', highlight = TEACHER_HIGHLIGHT, isDisabled, isLight = TEACHER_LIGHT, isDayOff, dayOffTeacher }) {
   const { lang } = useLang();
   const momentLocale = MOMENT_LOCALE_BY_LANG[lang] || 'ru';
   const isMobile = useIsMobile();
@@ -156,6 +160,17 @@ function Calendar({ lessons, onSelectLesson, getEventColor, defaultView = 'month
 
   const { min, max } = useMemo(() => visibleHours(events), [events]);
 
+  // Подсказка над выходным: фон дня (месяц) и ячейки времени (неделя, день).
+  // Слой событий пропускает мышь к фону (calendar.css, .la-calendar--days-off).
+  const dayOffTip = (MESSAGES_BY_LANG[momentLocale] || MESSAGES_BY_LANG.ru).dayOff(dayOffTeacher);
+  const components = useMemo(() => {
+    if (!isDayOff) return undefined;
+    const wrap = ({ value, children }) => (isDayOff(value)
+      ? React.cloneElement(React.Children.only(children), { 'data-tip': dayOffTip })
+      : children);
+    return { dateCellWrapper: wrap, timeSlotWrapper: wrap };
+  }, [isDayOff, dayOffTip]);
+
   const eventClassName = (lesson) => [
     'la-calendar__event',
     highlight(lesson) && 'la-calendar__event--homework',
@@ -164,7 +179,7 @@ function Calendar({ lessons, onSelectLesson, getEventColor, defaultView = 'month
   ].filter(Boolean).join(' ');
 
   return (
-    <div className="la-calendar">
+    <div className={`la-calendar${isDayOff ? ' la-calendar--days-off' : ''}`}>
       <BigCalendar
         localizer={localizer}
         events={events}
@@ -180,6 +195,7 @@ function Calendar({ lessons, onSelectLesson, getEventColor, defaultView = 'month
         step={30}
         timeslots={2}
         dayPropGetter={isDayOff ? (date) => (isDayOff(date) ? { className: 'la-calendar__day--off' } : {}) : undefined}
+        components={components}
         eventPropGetter={(event) => ({
           className: eventClassName(event.resource),
           style: { '--la-event-color': getEventColor ? getEventColor(event.resource) : 'var(--color-primary)' },

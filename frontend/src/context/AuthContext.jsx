@@ -38,9 +38,12 @@ export function AuthProvider({ children }) {
   // проекту. Работает для любой роли, включая будущие (экзаменатор,
   // консультант и т.д.) без изменений в самом контексте.
   const hasRole = (...roles) => !!user && roles.includes(user.role);
+  // Права пользователя (backend/app/dependencies.py, ROLE_PERMISSIONS): меню и
+  // кнопки показываем по праву, а не по имени роли
+  const can = (perm) => !!user && (user.permissions || []).includes(perm);
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout, refreshUser, hasRole }}>
+    <AuthContext.Provider value={{ token, user, login, logout, refreshUser, hasRole, can }}>
       {children}
     </AuthContext.Provider>
   );

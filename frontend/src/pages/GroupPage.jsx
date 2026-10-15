@@ -10,7 +10,7 @@ import { GroupContactIcons } from '../components/ContactIcons';
 import DurationSelect from '../components/DurationSelect';
 import { DEFAULT_DURATION_MIN } from '../utils/lessonTime';
 import Calendar from '../components/Calendar';
-import DateTimePicker from '../components/DateTimePicker';
+import DateTimePicker, { nextHour } from '../components/DateTimePicker';
 import { PersonalBadge, ParticipantsPicker } from '../components/PersonalLesson';
 import LessonTeacherModal from '../components/LessonTeacherModal';
 import { useDaysOff } from '../hooks/useDaysOff';
@@ -58,8 +58,8 @@ function GroupPage() {
 
   // Генератор расписания (claude/group-schedule-plan.md, задача 1)
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
-  const [genStartDate, setGenStartDate] = useState('');
-  const [genStartTime, setGenStartTime] = useState('14:00');
+  // Первый урок серии: дата и время (минуты шагом 10); по умолчанию — сегодня, следующий час
+  const [genStart, setGenStart] = useState(nextHour);
   const [genWeekdays, setGenWeekdays] = useState([]); // 0..6
   const [genLessonCount, setGenLessonCount] = useState('');
   const [genDuration, setGenDuration] = useState(DEFAULT_DURATION_MIN); // мин, одна на всю серию
@@ -180,7 +180,7 @@ function GroupPage() {
     setNewLessonTitle('');
     setNewLessonPersonal(false);
     setNewLessonStudentIds([]);
-    setNewLessonDate(null);
+    setNewLessonDate(nextHour()); // сегодня, следующий час, :00
     setNewLessonDuration(group?.lesson_duration_min || DEFAULT_DURATION_MIN);
     setIsModalOpen(true);
   };
@@ -239,8 +239,7 @@ function GroupPage() {
   };
 
   const openGenerateModal = () => {
-    setGenStartDate('');
-    setGenStartTime('14:00');
+    setGenStart(nextHour());
     setGenWeekdays([]);
     setGenLessonCount('');
     setGenDuration(group?.lesson_duration_min || DEFAULT_DURATION_MIN);
@@ -277,7 +276,7 @@ function GroupPage() {
 
   const handleGenerateSchedule = async (e) => {
     e.preventDefault();
-    if (!genStartDate || !genStartTime || genWeekdays.length === 0 || !genLessonCount) {
+    if (!genStart || genWeekdays.length === 0 || !genLessonCount) {
       setGenError('Заполните дату начала, время, дни недели и количество уроков');
       return;
     }
@@ -288,8 +287,8 @@ function GroupPage() {
 
     const payload = {
       group_id: gid,
-      start_date: genStartDate,
-      start_time: genStartTime,
+      start_date: `${genStart.getFullYear()}-${String(genStart.getMonth() + 1).padStart(2, '0')}-${String(genStart.getDate()).padStart(2, '0')}`,
+      start_time: `${String(genStart.getHours()).padStart(2, '0')}:${String(genStart.getMinutes()).padStart(2, '0')}`,
       weekdays: genWeekdays,
       lesson_count: parseInt(genLessonCount, 10),
       duration_min: genDuration,
@@ -554,6 +553,7 @@ function GroupPage() {
           lessons={groupLessons}
           onSelectLesson={(l) => navigate(`/dashboard/lessons/${l.id}`)}
           isDayOff={isDayOff}
+          dayOffTeacher={isGuest ? (user?.full_name || user?.username) : group?.teacher_name}
         />
       ) : (
         /* Таблица уроков */
@@ -730,26 +730,12 @@ function GroupPage() {
           )}
         >
           <form id="generate-schedule-form" onSubmit={handleGenerateSchedule} className="form-stack">
-            <label className="field-label">
-              {'Дата первого урока'}
-              <input
-                type="date"
-                className="input"
-                value={genStartDate}
-                onChange={e => setGenStartDate(e.target.value)}
-                required
-              />
-            </label>
-            <label className="field-label">
-              {'Время (одно на все уроки)'}
-              <input
-                type="time"
-                className="input"
-                value={genStartTime}
-                onChange={e => setGenStartTime(e.target.value)}
-                required
-              />
-            </label>
+            <div className="field-label">
+              {'Дата первого урока и время (одно на все уроки)'}
+              <div>
+                <DateTimePicker value={genStart} onChange={setGenStart} floating />
+              </div>
+            </div>
             <label className="field-label">
               {'Длительность (одна на все уроки)'}
               <DurationSelect value={genDuration} onChange={setGenDuration} />

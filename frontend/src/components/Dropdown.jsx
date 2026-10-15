@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 
 // Кастомный дропдаун — триггер в стиле подчёркнутого текста (как .tab--underline),
 // панель показывает не больше ~7 строк, дальше появляется скролл.
+// Опция с muted — мелким серым (не подходит под фильтр), перед первой такой — черта.
 function Dropdown({ value, onChange, options, placeholder, disabled }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -38,11 +39,11 @@ function Dropdown({ value, onChange, options, placeholder, disabled }) {
           <button type="button" className="dropdown__option" onClick={() => handleSelect('')}>
             {placeholder}
           </button>
-          {options.map(o => (
+          {options.map((o, i) => (
             <button
               key={o.value}
               type="button"
-              className={`dropdown__option${String(o.value) === String(value) ? ' dropdown__option--active' : ''}`}
+              className={`dropdown__option${String(o.value) === String(value) ? ' dropdown__option--active' : ''}${o.muted ? ' dropdown__option--muted' : ''}${o.muted && i > 0 && !options[i - 1].muted ? ' dropdown__option--split' : ''}`}
               onClick={() => handleSelect(o.value)}
             >
               {o.label}

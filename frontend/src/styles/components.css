@@ -191,6 +191,13 @@
 .dropdown__option:hover {
   background: var(--color-bg-soft);
 }
+.dropdown__option--muted {
+  font-size: var(--font-xs);
+  color: var(--color-muted);
+}
+.dropdown__option--split {
+  border-top: 1px solid var(--color-border-light);
+}
 .dropdown__option--active {
   color: var(--color-primary);
   font-weight: var(--weight-medium);
@@ -674,6 +681,12 @@
 }
 .badge--student {
   background: var(--color-role-student);
+}
+.badge--curator {
+  background: var(--color-role-curator);
+}
+.badge--parent {
+  background: var(--color-role-parent);
 }
 .badge--open {
   background: var(--color-role-student);
@@ -2782,4 +2795,56 @@ a.row-icon:hover {
   font-size: var(--font-xs);
   color: var(--color-muted);
   text-align: center;
+}
+
+/* ===== Главная куратора (CuratorHome.jsx): флажки секторов у заголовка ===== */
+.curator-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.sector-flags {
+  display: flex;
+  gap: var(--space-2);
+}
+.sector-flag {
+  display: inline-flex;
+  padding: 2px;
+  border: 2px solid transparent;
+  background: none;
+  cursor: pointer;
+  line-height: 0;
+  opacity: 0.55;
+}
+.sector-flag svg {
+  width: 28px;
+  height: 19px;
+  display: block;
+}
+.sector-flag:hover {
+  opacity: 1;
+}
+.sector-flag--active {
+  border-color: var(--color-primary);
+  opacity: 1;
+}
+.sector-flag__code {
+  font-size: var(--font-xs);
+  font-weight: 700;
+  line-height: 19px;
+  padding: 0 var(--space-1);
+}
+
+/* ===== Метка NEW: новые ученики (ещё ни разу не были на уроке) ===== */
+.new-badge {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-white);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  vertical-align: middle;
 }

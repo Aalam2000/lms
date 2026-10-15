@@ -10,7 +10,10 @@ import IconButton from '../components/IconButton';
 import PasswordModal from '../components/PasswordModal';
 import SortTh, { sortRows } from '../components/SortTh';
 import StudentCardModal from '../components/StudentCardModal';
-import { setStudentPassword, getStudents, deleteStudent } from '../api/students';
+import Modal from '../components/Modal';
+import DateTimePicker, { nextHour } from '../components/DateTimePicker';
+import { setStudentPassword, getStudents, deleteStudent, createStudentLesson } from '../api/students';
+import { extractErrorMessage } from '../utils/errors';
 
 // Последний вход: «05.10.2026 14:32», нет входов — «—»
 const formatLogin = (value) => {
@@ -19,9 +22,62 @@ const formatLogin = (value) => {
   return `${d.toLocaleDateString('ru-RU')} ${d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
 };
 
+// Доп. урок ученику (кнопка «Урок» в строке): нет группы — выбрать её, ученик
+// запишется в неё; несколько групп — выбрать одну. Урок — персональный урок группы.
+function StudentLessonModal({ student, groups, onClose, onDone }) {
+  const own = student.groups || [];
+  // Без группы — группы его курса (и педагога, к которому направлен, если указан)
+  const choices = own.length ? own : groups.filter(g =>
+    (!g.status || g.status === 'active')
+    && (!student.course_id || g.course_id === student.course_id)
+    && (!student.teacher_id || g.teacher_id === student.teacher_id));
+  const [groupId, setGroupId] = useState(own.length === 1 ? String(own[0].id) : '');
+  const [when, setWhen] = useState(nextHour); // сегодня, следующий час, :00
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    if (!when || (own.length !== 1 && !groupId)) { setError('Выберите группу, дату и время'); return; }
+    setBusy(true);
+    setError('');
+    try {
+      await createStudentLesson(student.id, when.toISOString(), groupId ? Number(groupId) : null);
+      onDone();
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Не удалось создать урок'));
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal
+      title={<>{'Доп. урок'}: {student.full_name}</>}
+      onClose={onClose}
+      footer={(
+        <>
+          <button type="button" className="btn btn--secondary" onClick={onClose}>{'Отмена'}</button>
+          <button type="button" className="btn" onClick={save} disabled={busy}>{'Создать урок'}</button>
+        </>
+      )}
+    >
+      <div className="form-stack">
+        {own.length !== 1 && (
+          <select className="input" value={groupId} onChange={e => setGroupId(e.target.value)}>
+            <option value="">{own.length ? 'Группа ученика' : 'Группа — ученик запишется в неё'}</option>
+            {choices.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+        )}
+        <DateTimePicker value={when} onChange={setWhen} floating />
+        {error && <div className="form-field__error">{error}</div>}
+      </div>
+    </Modal>
+  );
+}
+
 function StudentsPage() {
-  const { user, hasRole } = useAuth();
-  const isAdmin = hasRole('admin');
+  const { user, hasRole, can } = useAuth();
+  // Все ученики и фильтр по учителю — право students.all (админ, куратор)
+  const isAdmin = can('students.all');
+  const canDelete = hasRole('admin');
+  const [lessonStudent, setLessonStudent] = useState(null); // ученик в окне «Доп. урок»
 
   const [students, setStudents] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -141,8 +197,12 @@ function StudentsPage() {
     }
   };
 
+  // Новые (NEW — ещё не были на уроке) всегда в начале, дальше — выбранная сортировка
   const sortedStudents = useMemo(
-    () => sortRows(students, sortKey, sortDir, sortValue, TEXT_KEYS, s => s.full_name),
+    () => {
+      const rows = sortRows(students, sortKey, sortDir, sortValue, TEXT_KEYS, s => s.full_name);
+      return [...rows.filter(s => s.is_new), ...rows.filter(s => !s.is_new)];
+    },
     // eslint-disable-next-line
     [students, sortKey, sortDir]
   );
@@ -178,7 +238,7 @@ function StudentsPage() {
           />
         </div>
         <div className="toolbar__filters">
-          {isAdmin && (
+          {canDelete && (
             <button type="button" className={`tab tab--underline${mine ? ' tab--active' : ''}`} onClick={handleMineToggle}>
               {'Моё'}
             </button>
@@ -228,10 +288,11 @@ function StudentsPage() {
                     >
                       {s.full_name}
                     </Link>
+                    {s.is_new && <span className="new-badge" data-tip="Ещё не был на уроке — поставьте доп. урок">{'NEW'}</span>}
                   </td>
-                  <td>{s.groups.map(g => g.name).join(', ') || '—'}</td>
+                  <td>{s.groups.length ? s.groups.map(g => g.name).join(', ') : <span className="chip chip--amber">{'без группы'}</span>}</td>
                   {showTeacherColumn && (
-                    <td>{[...new Set(s.groups.map(g => g.teacher_name).filter(Boolean))].join(', ') || '—'}</td>
+                    <td>{[...new Set(s.groups.map(g => g.teacher_name).filter(Boolean))].join(', ') || s.teacher_name || '—'}</td>
                   )}
                   <td>{s.avg_score ?? '—'}</td>
                   <td>{s.avg_hw_score ?? '—'}</td>
@@ -256,16 +317,19 @@ function StudentsPage() {
                   <td>
                     <div className="icon-row">
                       {/* Ученик забыл пароль — педагог (своим ученикам) или админ задаёт новый */}
-                      <IconButton icon="edit" tip="Данные ученика и родителя" onClick={() => setCardStudentId(s.id)} />
+                      <IconButton icon="edit" tip="Данные ученика" onClick={() => setCardStudentId(s.id)} />
                       <IconButton icon="key" tip="Сменить пароль" onClick={() => setPasswordStudent(s)} />
+                      {can('lessons.personal') && (
+                        <IconButton icon="schedule" tip="Доп. урок" onClick={() => setLessonStudent(s)} />
+                      )}
                       {/* Общая кнопка удаления с контролем использования (app/usages.py) */}
-                      {isAdmin && (
+                      {canDelete && (
                       <DeleteButton
                         entity="student"
                         id={s.id}
                         name={s.full_name}
                         tip="Удалить студента"
-                        forceable={isAdmin}
+                        forceable={canDelete}
                         onDelete={(opts) => deleteStudent(s.id, { force: !!opts?.force })}
                         onDeleted={() => setStudents(prev => prev.filter(x => x.id !== s.id))}
                         onError={setError}
@@ -291,8 +355,21 @@ function StudentsPage() {
         <StudentCardModal
           groups={groups.filter(g => !g.status || g.status === 'active')}
           defaultGroupId={groupId}
+          {...(isAdmin ? {
+            courses,
+            teachers: teacherOptions.map(([id, name]) => ({ id, name })),
+            defaults: { course_id: courseId, teacher_id: teacherId },
+          } : {})}
           onClose={() => setIsAddingStudent(false)}
-          onSaved={() => { setIsAddingStudent(false); loadStudents(); }}
+          onSaved={(saved) => { setIsAddingStudent(false); loadStudents(); if (saved?.id) setCardStudentId(saved.id); }}
+        />
+      )}
+      {lessonStudent && (
+        <StudentLessonModal
+          student={lessonStudent}
+          groups={groups}
+          onClose={() => setLessonStudent(null)}
+          onDone={() => { setLessonStudent(null); loadStudents(); }}
         />
       )}
       {passwordStudent && (

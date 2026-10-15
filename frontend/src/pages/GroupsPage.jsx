@@ -182,6 +182,9 @@ function GroupsPage() {
             getEventColor={getEventColor}
             onSelectLesson={(l) => navigate(`/dashboard/lessons/${l.id}`)}
             isDayOff={isDayOff}
+            dayOffTeacher={isAdmin
+              ? teacherOptions.find(([id]) => String(id) === String(teacherId))?.[1]
+              : (user?.full_name || user?.username)}
           />
           {/* Список групп остаётся виден и кликабелен и в календаре — тут
               же можно открыть саму группу, а не только её урок. Со всеми

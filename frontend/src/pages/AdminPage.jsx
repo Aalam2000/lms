@@ -10,10 +10,13 @@ import DaysOffEditor from '../components/DaysOffEditor';
 import * as adminApi from '../api/admin';
 import { useAuth } from '../context/AuthContext';
 import AcademyTab from '../components/AcademyTab';
+import { AccessBlock } from '../components/ParentLinkBlock';
 import { getSectors } from '../api/academy';
 
 const emptyTeacher = { username: '', password: '', full_name: '', email: '', phone: '', telegram_username: '', whatsapp: '' };
 const emptyAdmin   = { username: '', password: '', full_name: '', email: '', phone: '', telegram_username: '', whatsapp: '' };
+// Куратор: логин и пароль генерирует бэкенд (пароль = логину)
+const emptyCurator = { full_name: '', phone: '', email: '', telegram_username: '', whatsapp: '' };
 const emptyCourse  = { title: '', description: '' };
 const emptyGroup   = { name: '', course_id: '', teacher_id: '', telegram_chat_id: '', whatsapp: '', video_url: '', sector: '' };
 
@@ -27,6 +30,7 @@ function AdminPage() {
 
   const [teachers, setTeachers] = useState([]);
   const [admins,   setAdmins]   = useState([]);
+  const [curators, setCurators] = useState([]);
   const [courses,  setCourses]  = useState([]);
   const [groups,   setGroups]   = useState([]);
   // Секторы — справочник с вкладки «Академия»: [{code, name, lesson_word}]
@@ -34,6 +38,7 @@ function AdminPage() {
 
   const [newTeacher, setNewTeacher] = useState(emptyTeacher);
   const [newAdmin,   setNewAdmin]   = useState(emptyAdmin);
+  const [newCurator, setNewCurator] = useState(emptyCurator);
   const [newCourse,  setNewCourse]  = useState(emptyCourse);
   const [newGroup,   setNewGroup]   = useState(emptyGroup);
 
@@ -49,6 +54,12 @@ function AdminPage() {
   const [editingAdminDraft, setEditingAdminDraft] = useState(emptyUserEdit);
   const [isSavingAdmin, setIsSavingAdmin] = useState(false);
   const adminsTableRef = useRef(null);
+
+  const [editingCuratorId, setEditingCuratorId] = useState(null);
+  const [editingCuratorDraft, setEditingCuratorDraft] = useState(emptyUserEdit);
+  const [isSavingCurator, setIsSavingCurator] = useState(false);
+  const curatorsTableRef = useRef(null);
+  const [accessUser, setAccessUser] = useState(null); // куратор: окно «Доступ» (логин и пароль)
 
   const [editingCourseId, setEditingCourseId] = useState(null);
   const [editingCourseDraft, setEditingCourseDraft] = useState(emptyCourseEdit);
@@ -77,6 +88,8 @@ function AdminPage() {
         if (!teachersTableRef.current?.contains(event.target)) saveEditingTeacher();
       } else if (tab === 'admins' && editingAdminId !== null && !isSavingAdmin) {
         if (!adminsTableRef.current?.contains(event.target)) saveEditingAdmin();
+      } else if (tab === 'curators' && editingCuratorId !== null && !isSavingCurator) {
+        if (!curatorsTableRef.current?.contains(event.target)) saveEditingCurator();
       } else if (tab === 'courses' && editingCourseId !== null && !isSavingCourse) {
         if (!coursesTableRef.current?.contains(event.target)) saveEditingCourse();
       } else if (tab === 'groups' && editingGroupId !== null && !isSavingGroup) {
@@ -90,6 +103,7 @@ function AdminPage() {
     tab,
     editingTeacherId, editingTeacherDraft, isSavingTeacher,
     editingAdminId, editingAdminDraft, isSavingAdmin,
+    editingCuratorId, editingCuratorDraft, isSavingCurator,
     editingCourseId, editingCourseDraft, isSavingCourse,
     editingGroupId, editingGroupDraft, isSavingGroup,
   ]);
@@ -97,6 +111,7 @@ function AdminPage() {
   const loadAll = () => {
     loadTeachers();
     loadAdmins();
+    loadCurators();
     loadCourses();
     loadGroups();
     loadSectors();
@@ -104,6 +119,7 @@ function AdminPage() {
 
   const loadTeachers = async () => setTeachers(await adminApi.getTeachers());
   const loadAdmins   = async () => setAdmins(await adminApi.getAdmins());
+  const loadCurators = async () => setCurators(await adminApi.getCurators());
   const loadCourses  = async () => setCourses(await adminApi.getCourses());
   const loadGroups   = async () => setGroups(await adminApi.getGroups());
   const loadSectors  = async () => { setSectors(await getSectors()); };
@@ -129,6 +145,7 @@ function AdminPage() {
     setOpenAddModal(null);
     setNewTeacher(emptyTeacher);
     setNewAdmin(emptyAdmin);
+    setNewCurator(emptyCurator);
     setNewCourse(emptyCourse);
     setNewGroup(emptyGroup);
   };
@@ -146,6 +163,21 @@ function AdminPage() {
       await adminApi.createAdmin({ ...newAdmin, role: 'admin' });
       closeAddModal();
       loadAdmins();
+    } catch(e) { handleError(e); }
+  };
+
+  // Новый куратор: после создания сразу окно «Доступ» — скопировать или отправить логин и пароль
+  const createCurator = async () => {
+    if (!newCurator.full_name.trim()) {
+      setError('Укажите имя и фамилию');
+      setTimeout(() => setError(''), 4000);
+      return;
+    }
+    try {
+      const saved = await adminApi.createCurator(newCurator);
+      closeAddModal();
+      await loadCurators();
+      setAccessUser(saved);
     } catch(e) { handleError(e); }
   };
 
@@ -247,6 +279,33 @@ function AdminPage() {
     }
   };
 
+  // ── inline-редактирование: кураторы ──
+  const startEditCurator = (u) => {
+    if (editingCuratorId === u.id) return;
+    if (isSavingCurator) return;
+    setEditingCuratorId(u.id);
+    setEditingCuratorDraft({
+      full_name: u.full_name || '',
+      email: u.email || '',
+      phone: u.phone || '',
+      telegram_username: u.telegram_username || '',
+      whatsapp: u.whatsapp || '',
+    });
+  };
+  const saveEditingCurator = async () => {
+    if (editingCuratorId === null || isSavingCurator) return;
+    try {
+      setIsSavingCurator(true);
+      const saved = await adminApi.updateCurator(editingCuratorId, editingCuratorDraft);
+      setCurators(prev => prev.map(u => u.id === editingCuratorId ? saved : u));
+      setEditingCuratorId(null);
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setIsSavingCurator(false);
+    }
+  };
+
   // ── inline-редактирование: курсы ──
   const startEditCourse = (c) => {
     if (editingCourseId === c.id) return;
@@ -320,6 +379,7 @@ function AdminPage() {
   const tabs = [
     { key: 'teachers', label: 'Педагоги' },
     { key: 'admins',   label: 'Админы' },
+    { key: 'curators', label: 'Кураторы' },
     { key: 'courses',  label: 'Курсы' },
     { key: 'groups',   label: 'Группы' },
     { key: 'academy',  label: 'Компания' },
@@ -419,11 +479,16 @@ function AdminPage() {
               <td>
                 {/* stopPropagation: клик по строке включает правку — кнопкам это не нужно */}
                 <div className="icon-row" onClick={e => e.stopPropagation()}>
-                  <IconButton icon="key" tip="Сменить пароль" onClick={() => setPasswordUser(u)} />
+                  {/* У куратора пароль по умолчанию = логину: вместо смены пароля — окно «Доступ» */}
+                  {del.toRole ? (
+                    <IconButton icon="key" tip="Сменить пароль" onClick={() => setPasswordUser(u)} />
+                  ) : (
+                    <IconButton icon="key" tip="Логин и пароль" onClick={() => setAccessUser(u)} />
+                  )}
                   {del.toRole === 'admin' && (
                     <IconButton icon="schedule" tip="Выходные" onClick={() => setDaysOffUser(u)} />
                   )}
-                  {u.id === currentUser?.id ? (
+                  {!del.toRole ? null : u.id === currentUser?.id ? (
                     <IconButton icon="role" tip="Нельзя сменить роль самому себе" disabled />
                   ) : del.toRole === 'admin' ? (
                     <IconButton icon="role" tip="Сделать админом" onClick={() => changeRole(u, 'admin')} />
@@ -460,6 +525,17 @@ function AdminPage() {
         />
       )}
 
+      {accessUser && (
+        <Modal title={<>{'Логин и пароль'}: {accessUser.full_name || accessUser.username}</>} onClose={() => { setAccessUser(null); loadCurators(); }}>
+          <AccessBlock
+            username={accessUser.username}
+            phone={accessUser.phone}
+            passwordIsLogin={!!accessUser.password_is_login}
+            onReset={() => adminApi.setUserPassword(accessUser.id, accessUser.username)}
+          />
+        </Modal>
+      )}
+
       {daysOffUser && (
         <Modal title={<>{'Выходные'}: {daysOffUser.full_name || daysOffUser.username}</>} onClose={() => setDaysOffUser(null)} size="wide">
           <DaysOffEditor teacherId={daysOffUser.id} onSaved={() => setDaysOffUser(null)} />
@@ -494,6 +570,17 @@ function AdminPage() {
             <Button onClick={() => setOpenAddModal('admin')}>{'+ Добавить администратора'}</Button>
           </div>
           {userTable(admins, { remove: adminApi.deleteAdmin, reload: loadAdmins, tip: 'Удалить админа', toRole: 'teacher' }, editingAdminId, editingAdminDraft, setEditingAdminDraft, startEditAdmin, adminsTableRef)}
+        </div>
+      )}
+
+      {/* КУРАТОРЫ */}
+      {tab === 'curators' && (
+        <div>
+          <div className="toolbar">
+            <h3 className="toolbar__title">{'Список кураторов'}</h3>
+            <Button onClick={() => setOpenAddModal('curator')}>{'+ Добавить куратора'}</Button>
+          </div>
+          {userTable(curators, { remove: adminApi.deleteCurator, reload: loadCurators, tip: 'Удалить куратора', toRole: null }, editingCuratorId, editingCuratorDraft, setEditingCuratorDraft, startEditCurator, curatorsTableRef)}
         </div>
       )}
 
@@ -707,6 +794,32 @@ function AdminPage() {
         )}>
           <div className="form-stack">
             {userFields(newAdmin, setNewAdmin)}
+          </div>
+        </Modal>
+      )}
+
+      {/* Модалка: новый куратор — логин и пароль создадутся сами */}
+      {openAddModal === 'curator' && (
+        <Modal title={'Новый куратор'} onClose={closeAddModal} footer={(
+          <>
+            <button className="btn btn--secondary" onClick={closeAddModal}>{'Отмена'}</button>
+            <Button onClick={createCurator}>{'Добавить'}</Button>
+          </>
+        )}>
+          <div className="form-stack">
+            {[
+              ['full_name',         'Имя и фамилия'],
+              ['phone',             'Телефон'],
+              ['email',             'Email'],
+              ['telegram_username', 'Telegram'],
+              ['whatsapp',          'WhatsApp'],
+            ].map(([field, label]) => (
+              <input key={field} placeholder={label} className="input input--min160" autoComplete="off"
+                value={newCurator[field]}
+                onChange={e => setNewCurator({ ...newCurator, [field]: e.target.value })}
+              />
+            ))}
+            <div className="hint-text">{'Логин и пароль создадутся сами: имя.3 буквы фамилии и цифры, пароль равен логину.'}</div>
           </div>
         </Modal>
       )}

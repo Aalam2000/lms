@@ -3,14 +3,14 @@ from sqlalchemy.sql import func
 from .database import Base
 
 
-# Все пользователи: admin | teacher | student
+# Все пользователи: admin | teacher | student | curator | parent
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     email = Column(String, nullable=True)
-    role = Column(String, nullable=False, default="teacher")  # admin | teacher | student
+    role = Column(String, nullable=False, default="teacher")  # admin | teacher | student | curator | parent
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)  # кто создал пользователя
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     full_name = Column(String, nullable=True)
@@ -24,6 +24,12 @@ class User(Base):
     theme = Column(String, nullable=True)  # brand | playful | dark — выбор пользователя, NULL = brand по умолчанию
     # Выходные педагога: недельные полоски по версиям и отдельные даты (app/days_off.py)
     days_off = Column(JSON, nullable=True)
+    # Ученик без группы (добавил куратор): курс, сектор и педагог, к которому его
+    # направили — ученик виден этому педагогу в «Студентах», пока тот не запишет
+    # его в группу. У остальных ролей пусто.
+    course_id = Column(Integer, ForeignKey("courses.id", ondelete="SET NULL"), nullable=True)
+    sector = Column(String, nullable=True)
+    teacher_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
 
 
 # Курс / тема преподавания
@@ -95,6 +101,8 @@ class Lesson(Base):
     # Кто ведёт урок: по умолчанию основной педагог группы, админ может назначить
     # другого (замена, передача группы). Правила и доступ — app/lesson_teacher.py
     teacher_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    # Кто создал урок (у старых уроков пусто): куратор переносит и открывает только свои
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

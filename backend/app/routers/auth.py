@@ -8,7 +8,7 @@ from ..database import get_db
 from ..models import User, Group, GroupMember
 from ..schemas import UserLogin, Token, UserOut, UserCreate, StudentRegister, UserUpdate, DaysOffSettings
 from ..security import verify_password, get_password_hash, create_access_token, decode_token
-from ..dependencies import get_current_user, get_optional_user
+from ..dependencies import ROLE_PERMISSIONS, get_current_user, get_optional_user
 from ..days_off import current_settings
 from ..phones import checked_student_phone, ensure_phone_free, normalize_phone, PHONE_REQUIRED_ERROR
 
@@ -64,9 +64,17 @@ async def login(user_data: UserLogin, db: AsyncSession = Depends(get_db)):
     token = create_access_token(data={"sub": user.username})
     return {"access_token": token}
 
-@router.get("/me", response_model=UserOut)
+# Пользователь и его права (dependencies.ROLE_PERMISSIONS) — по ним фронт
+# показывает меню и кнопки
+class UserMeOut(UserOut):
+    permissions: list[str] = []
+
+
+@router.get("/me", response_model=UserMeOut)
 async def get_me(current_user: User = Depends(get_current_user)):
-    return current_user
+    out = UserMeOut.model_validate(current_user)
+    out.permissions = sorted(ROLE_PERMISSIONS.get(current_user.role, ()))
+    return out
 
 
 # Регистрация ученика по коду группы (QR). Сам ученик попадает в группу со

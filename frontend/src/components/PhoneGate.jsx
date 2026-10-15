@@ -14,7 +14,8 @@ function PhoneGate() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  if (!user || (user.phone || '').trim()) return null;
+  // Родителю свой телефон не нужен: его вход привязан к телефону родителя ученика
+  if (!user || user.role === 'parent' || (user.phone || '').trim()) return null;
 
   const submit = async (e) => {
     e.preventDefault();

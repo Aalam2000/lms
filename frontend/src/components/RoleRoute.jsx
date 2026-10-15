@@ -7,9 +7,13 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import NotFoundPage from '../pages/NotFoundPage';
 
-function RoleRoute({ roles, children }) {
-  const { hasRole } = useAuth();
+// perm — право вместо списка ролей (backend/app/dependencies.py, ROLE_PERMISSIONS)
+function RoleRoute({ roles, perm, children }) {
+  const { hasRole, can } = useAuth();
   if (roles && roles.length && !hasRole(...roles)) {
+    return <NotFoundPage />;
+  }
+  if (perm && !can(perm)) {
     return <NotFoundPage />;
   }
   return children;

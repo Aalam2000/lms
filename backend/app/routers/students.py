@@ -8,12 +8,12 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..usages import ensure_not_used
-from ..attendance import attendance_slots, missed_last_lesson, summarize_by_student
-from ..security import get_password_hash
+from ..attendance import PRESENT, attendance_slots, missed_last_lesson, summarize_by_student
+from ..security import get_password_hash, make_login, verify_password
 from ..database import get_db
 from ..homework_status import last_homework_debts
 from ..schemas import NewPasswordIn
-from ..dependencies import require_admin, require_teacher
+from ..dependencies import has_perm, require, require_admin
 from ..phones import checked_student_phone, normalize_phone, phone_key, PHONE_FORMAT_ERROR, PHONE_REQUIRED_ERROR
 from ..report_common import resolve_period
 from ..student_report import build_student_report
@@ -58,6 +58,13 @@ class StudentStatsOut(BaseModel):
     parent_phone: Optional[str] = None
     last_login_at: Optional[datetime] = None  # начало последней сессии (user_sessions)
     groups: list[StudentGroupOut] = []
+    # Ученик без группы (добавил куратор): курс, сектор и педагог, к которому направлен
+    course_id: Optional[int] = None
+    sector: Optional[str] = None
+    teacher_id: Optional[int] = None
+    teacher_name: Optional[str] = None
+    # NEW — ещё ни разу не был на уроке (нет отметки «пришёл» / «онлайн»)
+    is_new: bool = False
 
 
 async def _scope_group_ids(
@@ -71,7 +78,7 @@ async def _scope_group_ids(
     """Группы в допустимой области видимости пользователя + фильтрам.
     Возвращает {group_id: {id, name, teacher_id, teacher_name, course_id, course_title}}."""
     scope_teacher_id = None
-    if current_user.role != "admin":
+    if not has_perm(current_user, "students.all"):
         scope_teacher_id = current_user.id
     elif mine:
         scope_teacher_id = current_user.id
@@ -181,6 +188,67 @@ def _stats_summary(stats_row: dict) -> dict:
 
 # Табличка «Студенты»: у teacher — только свои (через принадлежность к его
 # группам), у admin — все по умолчанию, с возможностью сузить фильтрами.
+async def _new_ids(db: AsyncSession, student_ids) -> set[int]:
+    """NEW: ученики, у которых ещё нет ни одной отметки «пришёл» / «онлайн»."""
+    student_ids = list(student_ids)
+    if not student_ids:
+        return set()
+    attended = {row[0] for row in (await db.execute(
+        select(LessonMark.student_id).where(
+            LessonMark.student_id.in_(student_ids), LessonMark.attendance_status.in_(PRESENT),
+        ).distinct()
+    )).all()}
+    return set(student_ids) - attended
+
+
+# Ученики, которых ещё ни разу не записывали в группу (добавил куратор с курсом):
+# педагог видит направленных к нему, students.all — всех. Фильтры — как у списка.
+async def _waiting_students(
+    db: AsyncSession, current_user: User, course_id: Optional[int], teacher_id: Optional[int], mine: bool,
+) -> list[StudentStatsOut]:
+    query = select(User).where(
+        User.role == "student", User.course_id.isnot(None),
+        ~User.id.in_(select(GroupMember.student_id)),
+    )
+    if not has_perm(current_user, "students.all") or mine:
+        query = query.where(User.teacher_id == current_user.id)
+    elif teacher_id is not None:
+        query = query.where(User.teacher_id == teacher_id)
+    if course_id is not None:
+        query = query.where(User.course_id == course_id)
+    students = (await db.execute(query)).scalars().all()
+    if not students:
+        return []
+    teacher_ids = {s.teacher_id for s in students if s.teacher_id}
+    names = {uid: (fn or un) for uid, fn, un in (await db.execute(
+        select(User.id, User.full_name, User.username).where(User.id.in_(teacher_ids))
+    )).all()} if teacher_ids else {}
+    empty = {"scores": [], "exam_scores": [], "hw_scores": [], "stars": 0, "unexcused": 0, "late": 0}
+    return [StudentStatsOut(
+        id=s.id, full_name=s.full_name or s.username, telegram_username=s.telegram_username,
+        whatsapp=s.whatsapp, phone=s.phone, parent_name=s.parent_name, parent_phone=s.parent_phone,
+        course_id=s.course_id, sector=s.sector, teacher_id=s.teacher_id, teacher_name=names.get(s.teacher_id),
+        **_stats_summary(empty),
+    ) for s in students]
+
+
+# Метка NEW у пункта «Студенты»: сколько новых среди учеников пользователя
+# (педагог — своих групп и направленных к нему; students.all — всех)
+@router.get("/new-count")
+async def new_students_count(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require("students.view")),
+):
+    group_ids = list((await _scope_group_ids(db, current_user)).keys())
+    ids = set()
+    if group_ids:
+        ids = {row[0] for row in (await db.execute(
+            select(GroupMember.student_id).where(GroupMember.group_id.in_(group_ids), GroupMember.status == "active")
+        )).all()}
+    ids |= {s.id for s in await _waiting_students(db, current_user, None, None, False)}
+    return {"count": len(await _new_ids(db, ids))}
+
+
 @router.get("", response_model=list[StudentStatsOut])
 async def list_students(
     course_id: Optional[int] = Query(None),
@@ -188,12 +256,16 @@ async def list_students(
     teacher_id: Optional[int] = Query(None),  # фильтр «Препод» — учитывается только для admin
     mine: bool = Query(False),                # admin: считать только свои группы (кнопка «Моё»)
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_teacher),
+    current_user: User = Depends(require("students.view")),
 ):
     groups_by_id = await _scope_group_ids(db, current_user, course_id, group_id, teacher_id, mine)
     group_ids = list(groups_by_id.keys())
+    waiting = [] if group_id is not None else await _waiting_students(db, current_user, course_id, teacher_id, mine)
     if not group_ids:
-        return []
+        new_ids = await _new_ids(db, [w.id for w in waiting])
+        for s in waiting:
+            s.is_new = s.id in new_ids
+        return waiting
 
     members_result = await db.execute(
         select(GroupMember.student_id, GroupMember.group_id)
@@ -207,7 +279,10 @@ async def list_students(
             student_ids.append(student_id)
         student_groups[student_id].append(groups_by_id[gid])
     if not student_ids:
-        return []
+        new_ids = await _new_ids(db, [w.id for w in waiting])
+        for s in waiting:
+            s.is_new = s.id in new_ids
+        return waiting
 
     users_result = await db.execute(
         select(
@@ -254,6 +329,10 @@ async def list_students(
             **_stats_summary(stats[sid]),
         ))
 
+    out.extend(waiting)
+    new_ids = await _new_ids(db, [s.id for s in out])
+    for s in out:
+        s.is_new = s.id in new_ids
     # По имени; любую другую сортировку делает таблица в браузере (клик по шапке столбца)
     out.sort(key=lambda s: s.full_name.lower())
 
@@ -280,7 +359,8 @@ async def _get_accessible_student(
     member_group_ids = {row[0] for row in member_result.all()}
     matched_group_ids = [gid for gid in member_group_ids if gid in groups_by_id]
 
-    if current_user.role != "admin" and not matched_group_ids:
+    # Свой ученик — в своей группе или направлен к этому педагогу без группы
+    if not has_perm(current_user, "students.all") and not matched_group_ids and student.teacher_id != current_user.id:
         raise HTTPException(status_code=403, detail="Этот студент не в ваших группах")
     return student, matched_group_ids, groups_by_id
 
@@ -299,9 +379,10 @@ async def get_student_report(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_teacher),
+    current_user: User = Depends(require("students.view")),
 ):
     report_period = resolve_period(period, month, date_from, date_to)
+    sees_all = has_perm(current_user, "students.all")
     student = (await db.execute(
         select(User).where(User.id == student_id, User.role == "student")
     )).scalar_one_or_none()
@@ -316,7 +397,7 @@ async def get_student_report(
     groups = [groups_by_id[gid] for gid in member_group_ids if gid in groups_by_id]
 
     own_lessons_of: dict[int, int] = {}
-    if current_user.role != "admin" and member_group_ids:
+    if not sees_all and member_group_ids:
         for gid, name, course_title in (await db.execute(
             select(Group.id, Group.name, Course.title)
             .join(Course, Course.id == Group.course_id)
@@ -331,7 +412,7 @@ async def get_student_report(
                 "teacher_name": current_user.full_name or current_user.username,
             })
             own_lessons_of[gid] = current_user.id
-    if current_user.role != "admin" and not groups:
+    if not sees_all and not groups:
         raise HTTPException(status_code=403, detail="Этот студент не в ваших группах")
     return await build_student_report(db, student, groups, report_period, own_lessons_of)
 
@@ -345,7 +426,7 @@ async def set_student_password(
     student_id: int,
     data: NewPasswordIn,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_teacher),
+    current_user: User = Depends(require("students.edit")),
 ):
     student, _, _ = await _get_accessible_student(db, student_id, current_user)
     student.hashed_password = get_password_hash(data.new_password)
@@ -370,12 +451,23 @@ class StudentProfileOut(StudentProfile):
     id: int
     username: str
     groups: list[str] = []  # названия активных групп ученика — только для показа
+    # Пароль всё ещё равен логину (пароль по умолчанию) — тогда его можно
+    # показать и отправить; сменил ученик — только «Сбросить на логин».
+    password_is_login: bool = False
 
 
+# Логин и пароль необязательны: не заданы — логин из ФИО (security.make_login),
+# пароль = логину. Группа или курс обязательны: без группы ученик ждёт, пока
+# педагог (teacher_id — к кому направлен) запишет его в группу. lesson_at —
+# сразу доп. урок в группе (группа тогда обязательна).
 class StudentCreate(StudentProfile):
-    username: str
-    password: str
-    group_id: int
+    username: Optional[str] = None
+    password: Optional[str] = None
+    group_id: Optional[int] = None
+    course_id: Optional[int] = None
+    sector: Optional[str] = None
+    teacher_id: Optional[int] = None
+    lesson_at: Optional[datetime] = None
 
 
 def _clean(value: Optional[str]) -> Optional[str]:
@@ -408,30 +500,45 @@ async def _profile_out(db: AsyncSession, student: User) -> StudentProfileOut:
         telegram_username=student.telegram_username, whatsapp=student.whatsapp,
         parent_name=student.parent_name, parent_phone=student.parent_phone,
         groups=group_names,
+        password_is_login=verify_password(student.username, student.hashed_password),
     )
 
 
-# Новый ученик сразу в группу — заводит админ (секретарь) или педагог в свою
-# группу. Те же правила, что при регистрации по QR: логин не занят, телефон
-# обязателен и в базе не повторяется (app/phones.py).
+# Новый ученик — заводит педагог (в свою группу), админ или куратор (в любую
+# группу или без группы — с курсом). Те же правила, что при регистрации по QR:
+# логин не занят, телефон обязателен и в базе не повторяется (app/phones.py).
 @router.post("", response_model=StudentProfileOut)
 async def create_student(
     data: StudentCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_teacher),
+    current_user: User = Depends(require("students.edit")),
 ):
-    groups_by_id = await _scope_group_ids(db, current_user)
-    if data.group_id not in groups_by_id:
-        raise HTTPException(status_code=403, detail="Нет доступа к этой группе")
-    username = data.username.strip()
-    if not username or not data.password:
-        raise HTTPException(status_code=422, detail="Укажите логин и пароль")
-    if (await db.execute(select(User.id).where(User.username == username))).first():
-        raise HTTPException(status_code=400, detail="Пользователь с таким логином уже существует")
+    group = None
+    if data.group_id is not None:
+        groups_by_id = await _scope_group_ids(db, current_user)
+        if data.group_id not in groups_by_id:
+            raise HTTPException(status_code=403, detail="Нет доступа к этой группе")
+        group = (await db.execute(select(Group).where(Group.id == data.group_id))).scalar_one()
+    elif data.course_id is None:
+        raise HTTPException(status_code=422, detail="Укажите курс или группу")
+    if data.lesson_at is not None and group is None:
+        raise HTTPException(status_code=422, detail="Для урока выберите группу")
+    teacher_id = None
+    if group is None:
+        teacher_id = data.teacher_id if has_perm(current_user, "students.all") else current_user.id
+    username = (data.username or "").strip()
+    if username:
+        if (await db.execute(select(User.id).where(User.username == username))).first():
+            raise HTTPException(status_code=400, detail="Пользователь с таким логином уже существует")
+    else:
+        if not _clean(data.full_name):
+            raise HTTPException(status_code=422, detail="Укажите имя и фамилию ученика")
+        username = await make_login(db, data.full_name)
+    password = data.password or username
 
     student = User(
         username=username,
-        hashed_password=get_password_hash(data.password),
+        hashed_password=get_password_hash(password),
         role="student",
         full_name=_clean(data.full_name),
         phone=await checked_student_phone(db, data.phone),
@@ -440,21 +547,78 @@ async def create_student(
         whatsapp=_clean(data.whatsapp),
         parent_name=_clean(data.parent_name),
         parent_phone=_parent_phone(data.parent_phone),
+        course_id=group.course_id if group else data.course_id,
+        sector=group.sector if group else (data.sector or None),
+        teacher_id=teacher_id,
         created_by=current_user.id,
     )
     db.add(student)
     await db.flush()
-    db.add(GroupMember(group_id=data.group_id, student_id=student.id))
+    if group is not None:
+        db.add(GroupMember(group_id=group.id, student_id=student.id))
+        await db.flush()
+        if data.lesson_at is not None:
+            from .lessons import add_lesson  # lessons.py тянет много — импорт по месту
+            await add_lesson(db, group, current_user, data.lesson_at, is_personal=True, student_ids=[student.id])
     await db.commit()
     await db.refresh(student)
     return await _profile_out(db, student)
+
+
+# Доп. урок ученику из «Студентов» (педагог — своему ученику, куратор и админ —
+# любому). Нет группы — выбрать её: ученик записывается в группу. Несколько
+# групп — выбрать одну из них. Урок — обычный персональный урок группы.
+class StudentLessonIn(BaseModel):
+    date: datetime
+    group_id: Optional[int] = None
+
+
+@router.post("/{student_id}/lesson")
+async def create_student_lesson(
+    student_id: int,
+    data: StudentLessonIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require("lessons.personal")),
+):
+    from .lessons import add_lesson  # lessons.py тянет много — импорт по месту
+    student, matched_group_ids, groups_by_id = await _get_accessible_student(db, student_id, current_user)
+    own_groups = [row[0] for row in (await db.execute(
+        select(GroupMember.group_id).where(GroupMember.student_id == student_id, GroupMember.status == "active")
+    )).all()]
+    if own_groups:
+        if data.group_id is None and len(own_groups) == 1:
+            group_id = own_groups[0]
+        elif data.group_id in own_groups:
+            group_id = data.group_id
+        else:
+            raise HTTPException(status_code=422, detail="Выберите группу ученика")
+        if group_id not in groups_by_id:
+            raise HTTPException(status_code=403, detail="Нет доступа к этой группе")
+    else:
+        if data.group_id is None:
+            raise HTTPException(status_code=422, detail="Выберите группу")
+        if data.group_id not in groups_by_id:
+            raise HTTPException(status_code=403, detail="Нет доступа к этой группе")
+        group_id = data.group_id
+        member = (await db.execute(select(GroupMember).where(
+            GroupMember.group_id == group_id, GroupMember.student_id == student_id,
+        ))).scalar_one_or_none()
+        if member:
+            member.status = "active"
+        else:
+            db.add(GroupMember(group_id=group_id, student_id=student_id))
+        await db.flush()
+    group = (await db.execute(select(Group).where(Group.id == group_id))).scalar_one()
+    lesson = await add_lesson(db, group, current_user, data.date, is_personal=True, student_ids=[student_id])
+    await db.commit()
+    return {"lesson_id": lesson.id, "group_id": group.id}
 
 
 @router.get("/{student_id}/profile", response_model=StudentProfileOut)
 async def get_student_profile(
     student_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_teacher),
+    current_user: User = Depends(require("students.edit")),
 ):
     student, _, _ = await _get_accessible_student(db, student_id, current_user)
     return await _profile_out(db, student)
@@ -465,7 +629,7 @@ async def update_student_profile(
     student_id: int,
     data: StudentProfile,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_teacher),
+    current_user: User = Depends(require("students.edit")),
 ):
     student, _, _ = await _get_accessible_student(db, student_id, current_user)
 

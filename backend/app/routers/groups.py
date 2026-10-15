@@ -8,7 +8,7 @@ from sqlalchemy import select, func, or_
 from ..database import get_db
 from ..models import Group, GroupMember, Lesson, User, Course
 from ..schemas import GroupOut, CourseOut, GroupInviteOut, clean_video_url, DURATION_MIN, DURATION_MAX
-from ..dependencies import require_teacher, get_current_user
+from ..dependencies import has_perm, require, require_teacher, get_current_user
 from ..homework_status import oldest_lesson_to_review, to_review_by_group
 from ..lesson_work import work_to_review_by_group, work_to_review_for_teacher
 
@@ -52,10 +52,10 @@ def _guest_group_out(group: Group, teacher_name: Optional[str]) -> GroupOut:
 @router.get("/courses", response_model=list[CourseOut])
 async def get_courses_for_teacher(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_teacher)
+    current_user: User = Depends(require("catalog.view"))
 ):
     query = select(Course)
-    if current_user.role != "admin":
+    if not has_perm(current_user, "groups.all"):  # видит все группы — видит и все курсы
         query = query.where(Course.id.in_(select(Group.course_id).where(
             (Group.teacher_id == current_user.id) | Group.id.in_(_guest_group_ids(current_user.id))
         )))
@@ -72,6 +72,7 @@ class StudentGroupOut(BaseModel):
     video_url: Optional[str] = None
     telegram_chat_id: Optional[str] = None
     whatsapp: Optional[str] = None
+    teacher_name: Optional[str] = None  # для подсказки «У учителя … выходной» в календаре
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -91,7 +92,16 @@ async def get_student_groups(
         )
         .order_by(Group.name)
     )
-    return result.scalars().unique().all()
+    groups = result.scalars().unique().all()
+    names = {uid: (fn or un) for uid, fn, un in (await db.execute(
+        select(User.id, User.full_name, User.username).where(User.id.in_({g.teacher_id for g in groups}))
+    )).all()} if groups else {}
+    out = []
+    for g in groups:
+        item = StudentGroupOut.model_validate(g)
+        item.teacher_name = names.get(g.teacher_id)
+        out.append(item)
+    return out
 
 
 # Группы, куда ученик записался по QR и ждёт подтверждения педагога (Главная ученика)

@@ -175,6 +175,13 @@ function DateTimePicker({ value, onChange, onCommit, disabled, hourOnly, placeho
 }
 
 export { formatDisplay as formatDateTime };
+// Время урока по умолчанию: сегодня, следующий час, :00
+export function nextHour() {
+  const d = new Date();
+  d.setHours(d.getHours() + 1, 0, 0, 0);
+  return d;
+}
+
 
 // Попап под полем, но в координатах окна; не вылезает за нижний край.
 function floatingStyle(el) {

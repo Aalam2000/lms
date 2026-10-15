@@ -9,8 +9,8 @@ from ..models import User, Course, Group, GroupMember, Lesson, LessonMark
 from ..usages import ensure_not_used
 from ..attendance import attendance_slots, summarize, PRESENT
 from ..schemas import UserCreate, UserOut, CourseCreate, CourseOut, GroupCreate, GroupOut, clean_video_url, DURATION_MIN, DURATION_MAX, NewPasswordIn, DaysOffSettings
-from ..security import get_password_hash
-from ..dependencies import require_admin
+from ..security import get_password_hash, make_login, verify_password
+from ..dependencies import require, require_admin
 from .academy import sector_exists
 from ..phones import ensure_phone_free
 from ..teacher_report import build_teacher_report
@@ -50,8 +50,9 @@ class CourseUpdate(BaseModel):
 
 # ── ПЕДАГОГИ ──
 
+# Списки педагогов и групп — право teachers.view / groups.all (админ, куратор)
 @router.get("/teachers", response_model=list[UserOut])
-async def get_teachers(db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)):
+async def get_teachers(db: AsyncSession = Depends(get_db), admin: User = Depends(require("teachers.view"))):
     result = await db.execute(select(User).where(User.role == "teacher"))
     return result.scalars().all()
 
@@ -394,6 +395,93 @@ async def delete_admin(user_id: int, db: AsyncSession = Depends(get_db), admin: 
     await db.commit()
     return {"detail": "Удалён"}
 
+# ── КУРАТОРЫ (claude/curator-plan.md, шаг 3) ──
+# Логин генерируется из ФИО (security.make_login), пароль = логину; админ
+# выдаёт их куратору кнопками «Скопировать / Отправить». Телефон в базе не
+# повторяется. Сброс пароля — общий PUT /users/{id}/password.
+
+class CuratorCreate(BaseModel):
+    full_name: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    telegram_username: Optional[str] = None
+    whatsapp: Optional[str] = None
+
+
+class CuratorOut(UserOut):
+    password_is_login: bool = False
+
+
+def _curator_out(user: User) -> CuratorOut:
+    out = CuratorOut.model_validate(user)
+    out.password_is_login = verify_password(user.username, user.hashed_password)
+    return out
+
+
+@router.get("/curators", response_model=list[CuratorOut])
+async def get_curators(db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)):
+    result = await db.execute(select(User).where(User.role == "curator").order_by(User.full_name))
+    return [_curator_out(u) for u in result.scalars().all()]
+
+
+@router.post("/curators", response_model=CuratorOut)
+async def create_curator(data: CuratorCreate, db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)):
+    full_name = (data.full_name or "").strip()
+    if not full_name:
+        raise HTTPException(status_code=422, detail="Укажите имя и фамилию куратора")
+    phone = (data.phone or "").strip() or None
+    await ensure_phone_free(db, phone)  # номер в базе не повторяется
+    username = await make_login(db, full_name)
+    user = User(
+        username=username,
+        hashed_password=get_password_hash(username),
+        full_name=full_name,
+        email=(data.email or "").strip() or None,
+        phone=phone,
+        telegram_username=(data.telegram_username or "").strip() or None,
+        whatsapp=(data.whatsapp or "").strip() or None,
+        role="curator",
+        created_by=admin.id,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return _curator_out(user)
+
+
+@router.patch("/curators/{user_id}", response_model=CuratorOut)
+async def update_curator(
+    user_id: int,
+    data: UserAdminUpdate,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    result = await db.execute(select(User).where(User.id == user_id, User.role == "curator"))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Куратор не найден")
+    await ensure_phone_free(db, data.phone, exclude_user_id=user.id)  # номер в базе не повторяется
+    user.full_name = data.full_name
+    user.email = data.email
+    user.phone = data.phone
+    user.telegram_username = data.telegram_username
+    user.whatsapp = data.whatsapp
+    await db.commit()
+    await db.refresh(user)
+    return _curator_out(user)
+
+
+@router.delete("/curators/{user_id}")
+async def delete_curator(user_id: int, db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)):
+    result = await db.execute(select(User).where(User.id == user_id, User.role == "curator"))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Куратор не найден")
+    await ensure_not_used(db, "user", user_id)
+    await db.delete(user)
+    await db.commit()
+    return {"detail": "Удалён"}
+
 # ── КУРСЫ ──
 
 @router.get("/courses", response_model=list[CourseOut])
@@ -442,7 +530,7 @@ async def delete_course(course_id: int, db: AsyncSession = Depends(get_db), admi
 # ── ГРУППЫ ──
 
 @router.get("/groups", response_model=list[GroupOut])
-async def get_groups(db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)):
+async def get_groups(db: AsyncSession = Depends(get_db), admin: User = Depends(require("groups.all"))):
     result = await db.execute(select(Group))
     groups = result.scalars().all()
     if not groups:

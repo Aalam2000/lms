@@ -68,3 +68,44 @@ async def require_teacher(current_user: User = Depends(get_current_user)):
     if current_user.role not in ("teacher", "admin"):
         raise HTTPException(status_code=403, detail="Только для преподавателя")
     return current_user
+
+# ── Права ролей ──
+# Права задаются здесь и только здесь: роль → набор прав. Новая роль — новая
+# строка; эндпоинт проверяет право (require("…")), а не имя роли. Фронт получает
+# права пользователя в /auth/me (permissions) и по ним показывает меню и кнопки.
+#   students.view    — «Студенты»: список, карточка, отчёт по ученику
+#   students.edit    — завести ученика, править карточку, пароль, вход родителя
+#   students.all     — все ученики и группы, а не только свои
+#   lessons.personal — доп. урок ученику из «Студентов»
+#   teachers.view    — список педагогов
+#   groups.all       — список всех групп
+#   calendars.all    — уроки и выходные любого педагога
+#   catalog.view     — курсы и секторы
+#   lessons.own      — свой (созданный им) урок: перенести и открыть/закрыть, внутрь — нет
+# Остальные эндпоинты пока проверяют роль (require_admin, require_teacher).
+ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
+    "admin": frozenset({
+        "students.view", "students.edit", "students.all", "lessons.personal",
+        "teachers.view", "groups.all", "calendars.all", "catalog.view",
+    }),
+    "teacher": frozenset({"students.view", "students.edit", "lessons.personal", "catalog.view"}),
+    "curator": frozenset({
+        "students.view", "students.edit", "students.all", "lessons.personal",
+        "teachers.view", "groups.all", "calendars.all", "catalog.view", "lessons.own",
+    }),
+    "student": frozenset(),
+    "parent": frozenset(),
+}
+
+
+def has_perm(user: User, perm: str) -> bool:
+    return perm in ROLE_PERMISSIONS.get(user.role, frozenset())
+
+
+def require(*perms: str):
+    """Dependency: у пользователя есть все перечисленные права."""
+    async def dependency(current_user: User = Depends(get_current_user)):
+        if not all(has_perm(current_user, p) for p in perms):
+            raise HTTPException(status_code=403, detail="Недостаточно прав")
+        return current_user
+    return dependency

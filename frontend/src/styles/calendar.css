@@ -71,6 +71,18 @@
 .la-calendar .la-calendar__day--off {
   background: var(--color-day-off-bg);
 }
+/* Подсказка «У учителя … выходной» висит на фоне дня: слои событий пропускают
+   мышь насквозь, сами события, «+ ещё» и числа дней — кликабельны */
+.la-calendar--days-off .rbc-row-content,
+.la-calendar--days-off .rbc-events-container {
+  pointer-events: none;
+}
+.la-calendar--days-off .rbc-row-content .rbc-event,
+.la-calendar--days-off .rbc-row-content .rbc-show-more,
+.la-calendar--days-off .rbc-row-content .rbc-date-cell > *,
+.la-calendar--days-off .rbc-events-container .rbc-event {
+  pointer-events: auto;
+}
 .la-calendar .rbc-current-time-indicator {
   background: var(--color-primary);
 }

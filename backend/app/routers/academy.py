@@ -22,7 +22,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..dependencies import require_admin, require_teacher
+from ..dependencies import require, require_admin
 from ..models import Academy, Group, Link, Material, Quiz, Sector, User
 from .i18n import translator
 
@@ -150,9 +150,9 @@ def _require_text(value: str, message: str) -> str:
     return value
 
 
-# Список секторов нужен формам группы и Базы знаний — доступен педагогу и админу
+# Список секторов нужен формам группы, Базы знаний и нового ученика (право catalog.view)
 @router.get("/academy/sectors", response_model=list[SectorOut])
-async def list_sectors(db: AsyncSession = Depends(get_db), user: User = Depends(require_teacher)):
+async def list_sectors(db: AsyncSession = Depends(get_db), user: User = Depends(require("catalog.view"))):
     return (await db.execute(select(Sector).order_by(Sector.id))).scalars().all()
 
 

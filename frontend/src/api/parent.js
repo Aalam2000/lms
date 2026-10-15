@@ -13,6 +13,22 @@ export function makeParentLink(studentId, renew = false) {
   return api.post(`/parent-links/student/${studentId}`, { renew }).then(res => res.data);
 }
 
+// «Сбросить на логин» — пароль входа родителя снова равен логину
+export function resetParentPassword(studentId) {
+  return api.post(`/parent-links/student/${studentId}/reset-password`).then(res => res.data);
+}
+
+// Вошедший по логину родитель: токен его действующей ссылки (страница /p/<токен>)
+export function getMyParentToken() {
+  return api.get('/parent/me').then(res => res.data.token);
+}
+
+// Адрес входа в платформу — для логина и пароля
+export function loginUrl() {
+  const base = (import.meta.env.REACT_APP_PUBLIC_URL || window.location.origin).replace(/\/$/, '');
+  return `${base}/login`;
+}
+
 // Адрес, который отправляем родителю. REACT_APP_PUBLIC_URL — внешний адрес сайта
 // (в проде задан в docker-compose.prod.yml), иначе — адрес, с которого открыта платформа.
 export function parentLinkUrl(token) {

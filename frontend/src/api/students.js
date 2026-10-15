@@ -36,3 +36,14 @@ export function getStudents(params) {
 export function deleteStudent(studentId, { force = false } = {}) {
   return api.delete(`/students/${studentId}`, { params: force ? { force: true } : {} }).then(res => res.data);
 }
+
+// Доп. урок ученику из «Студентов»: date — ISO; groupId — если у ученика нет
+// группы (он запишется в неё) или групп несколько. Ответ: { lesson_id, group_id }
+export function createStudentLesson(studentId, date, groupId) {
+  return api.post(`/students/${studentId}/lesson`, { date, group_id: groupId || null }).then(res => res.data);
+}
+
+// Метка NEW у пункта «Студенты»: { count } — учеников без единого посещённого урока
+export function getNewStudentsCount() {
+  return api.get('/students/new-count').then(res => res.data.count);
+}

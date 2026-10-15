@@ -74,10 +74,10 @@ function App() {
             <RoleRoute roles={['teacher', 'admin']}><KnowledgeBasePage /></RoleRoute>
           } />
           <Route path="students" element={
-            <RoleRoute roles={['teacher', 'admin']}><StudentsPage /></RoleRoute>
+            <RoleRoute perm="students.view"><StudentsPage /></RoleRoute>
           } />
           <Route path="students/:studentId/report" element={
-            <RoleRoute roles={['teacher', 'admin']}><StudentReportPage /></RoleRoute>
+            <RoleRoute perm="students.view"><StudentReportPage /></RoleRoute>
           } />
           <Route path="teachers" element={
             <RoleRoute roles={['admin']}><TeachersDirectoryPage /></RoleRoute>

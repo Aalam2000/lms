@@ -217,12 +217,16 @@ async def student_homework_debts(db: AsyncSession, student_id: int) -> dict:
 
     Уроки — те же, что студент видит на Главной: открытые уроки его активных
     групп, персональные — только свои. Долг — ответа нет или ДЗ возвращено на
-    доработку; просрочен — срок сдачи прошёл. Показываем один урок: просроченный
+    доработку; просрочен — срок сдачи прошёл. ДЗ с уроков до прихода ученика в
+    группу (joined_at) долгом не считаются — сдаст их, оценка пойдёт в плюс
+    (решение Андрея 15.10). Показываем один урок: просроченный
     (самый давний), иначе с ближайшим сроком, иначе самый ранний."""
     empty = {"count": 0, "overdue": False, "lesson_id": None, "lesson_title": None, "deadline": None}
-    group_ids = [row[0] for row in (await db.execute(
-        select(GroupMember.group_id).where(GroupMember.student_id == student_id, GroupMember.status == "active")
-    )).all()]
+    joined = {gid: (baku_day(at) if at else None) for gid, at in (await db.execute(
+        select(GroupMember.group_id, GroupMember.joined_at)
+        .where(GroupMember.student_id == student_id, GroupMember.status == "active")
+    )).all()}
+    group_ids = list(joined)
     if not group_ids:
         return empty
     lessons = {l.id: l for l in (await db.execute(
@@ -238,8 +242,12 @@ async def student_homework_debts(db: AsyncSession, student_id: int) -> dict:
     for lesson_id, hw in (await student_homework(db, list(lessons), student_id)).items():
         if hw["status"] not in ("pending", "expired", "returned"):
             continue
+        lesson = lessons[lesson_id]
+        joined_day = joined.get(lesson.group_id)
+        if joined_day and lesson.date and baku_day(lesson.date) < joined_day:
+            continue  # урок был до прихода ученика в группу
         overdue = hw["status"] == "expired" or expired(hw["deadline"])
-        debts.append((overdue, lessons[lesson_id], hw["deadline"]))
+        debts.append((overdue, lesson, hw["deadline"]))
     if not debts:
         return empty
 

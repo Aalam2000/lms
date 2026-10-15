@@ -9,7 +9,14 @@
 (только открытые уроки его активных групп, персональные — только свои).
 
 Создаёт и меняет ссылку педагог (ученику своих групп) или админ — в карточке
-ученика. «Новая ссылка» отключает старую (revoked_at). Токен — 8 знаков
+ученика. «Новая ссылка» отключает старую (revoked_at).
+
+Вход родителя по логину (claude/curator-plan.md, шаг 2): вместе со ссылкой
+создаётся пользователь role="parent" — тоже на телефон родителя (лежит в его
+users.parent_phone, а не в phone: телефон ученика может совпадать с родительским).
+Логин p.<логин ребёнка>, пароль = логину. После входа родитель попадает на
+ту же страницу /p/<токен> (GET /parent/me отдаёт действующий токен).
+«Новая ссылка» пароль родителя не меняет. Токен — 8 знаков
 латиницы и цифр; ограничения попыток подбора нет (nginx не передаёт настоящий IP),
 защита — длина токена.
 """
@@ -28,8 +35,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import storage
 from ..database import get_db
-from ..dependencies import require_teacher
+from ..dependencies import get_current_user, require
 from ..homework_status import task_is_for
+from ..security import get_password_hash, verify_password
 from ..models import GroupMember, HomeworkTask, Material, ParentLink, User
 from . import homework, lessons, materials
 from .students import _get_accessible_student
@@ -83,6 +91,35 @@ class ParentLinkOut(BaseModel):
     token: Optional[str] = None           # нет — ссылку ещё не создавали (или нет телефона родителя)
     children: list[str] = []              # кого родитель увидит по ссылке
     last_used_at: Optional[datetime] = None
+    login: Optional[str] = None           # вход родителя; нет — ещё не создан
+    password_is_login: bool = False       # пароль всё ещё равен логину — можно показать
+
+
+async def _parent_user(db: AsyncSession, phone: Optional[str]) -> Optional[User]:
+    if not phone:
+        return None
+    return (await db.execute(
+        select(User).where(User.role == "parent", User.parent_phone == phone).order_by(User.id).limit(1)
+    )).scalar_one_or_none()
+
+
+async def _ensure_parent_user(db: AsyncSession, student: User, created_by: int) -> User:
+    """Вход родителя на телефон родителя: есть — возвращаем, нет — создаём p.<логин ребёнка>."""
+    user = await _parent_user(db, student.parent_phone)
+    if user:
+        return user
+    base = f"p.{student.username}"
+    login, n = base, 1
+    while (await db.execute(select(User.id).where(User.username == login))).first():
+        n += 1
+        login = f"{base}{n}"
+    user = User(
+        username=login, hashed_password=get_password_hash(login), role="parent",
+        full_name=student.parent_name, parent_phone=student.parent_phone, created_by=created_by,
+    )
+    db.add(user)
+    await db.flush()
+    return user
 
 
 class ParentLinkIn(BaseModel):
@@ -92,10 +129,13 @@ class ParentLinkIn(BaseModel):
 async def _link_out(db: AsyncSession, student: User) -> ParentLinkOut:
     link = await _active_link(db, student.parent_phone)
     children = [_name(u) for u in await _children(db, student.parent_phone)] if student.parent_phone else []
+    parent = await _parent_user(db, student.parent_phone)
     return ParentLinkOut(
         parent_name=student.parent_name, parent_phone=student.parent_phone,
         token=link.token if link else None, children=children,
         last_used_at=link.last_used_at if link else None,
+        login=parent.username if parent else None,
+        password_is_login=bool(parent) and verify_password(parent.username, parent.hashed_password),
     )
 
 
@@ -103,7 +143,7 @@ async def _link_out(db: AsyncSession, student: User) -> ParentLinkOut:
 async def get_parent_link(
     student_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_teacher),
+    current_user: User = Depends(require("students.edit")),
 ):
     student, _, _ = await _get_accessible_student(db, student_id, current_user)
     return await _link_out(db, student)
@@ -114,7 +154,7 @@ async def make_parent_link(
     student_id: int,
     data: ParentLinkIn,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_teacher),
+    current_user: User = Depends(require("students.edit")),
 ):
     student, _, _ = await _get_accessible_student(db, student_id, current_user)
     if not student.parent_phone:
@@ -125,8 +165,43 @@ async def make_parent_link(
         link = None
     if link is None:
         db.add(ParentLink(parent_phone=student.parent_phone, token=await _new_token(db), created_by=current_user.id))
+    await _ensure_parent_user(db, student, current_user.id)
     await db.commit()
     return await _link_out(db, student)
+
+
+# «Сбросить на логин» — пароль родителя снова равен его логину
+@router.post("/parent-links/student/{student_id}/reset-password", response_model=ParentLinkOut)
+async def reset_parent_password(
+    student_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require("students.edit")),
+):
+    student, _, _ = await _get_accessible_student(db, student_id, current_user)
+    parent = await _parent_user(db, student.parent_phone)
+    if not parent:
+        raise HTTPException(status_code=404, detail="Вход для родителя ещё не создан")
+    parent.hashed_password = get_password_hash(parent.username)
+    await db.commit()
+    return await _link_out(db, student)
+
+
+# ---------- Родитель вошёл по логину: его действующая ссылка ----------
+
+class ParentMeOut(BaseModel):
+    token: str
+
+
+@router.get("/parent/me", response_model=ParentMeOut)
+async def parent_me(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.role != "parent" or not current_user.parent_phone:
+        raise HTTPException(status_code=403, detail="Только для родителя")
+    link = await _active_link(db, current_user.parent_phone)
+    if link is None:
+        link = ParentLink(parent_phone=current_user.parent_phone, token=await _new_token(db), created_by=current_user.id)
+        db.add(link)
+        await db.commit()
+    return ParentMeOut(token=link.token)
 
 
 # ---------- Родитель: всё только для чтения ----------

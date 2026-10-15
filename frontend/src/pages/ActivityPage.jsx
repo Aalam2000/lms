@@ -14,8 +14,9 @@ const ROLE_OPTIONS = [
   { value: 'teacher', label: 'Педагоги' },
   { value: 'student', label: 'Студенты' },
   { value: 'admin', label: 'Админы' },
+  { value: 'curator', label: 'Кураторы' },
 ];
-const ROLE_LABELS = { admin: 'Админ', teacher: 'Педагог', student: 'Студент' };
+const ROLE_LABELS = { admin: 'Админ', teacher: 'Педагог', student: 'Студент', curator: 'Куратор' };
 
 const pad = (n) => String(n).padStart(2, '0');
 const isoDay = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;

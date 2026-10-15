@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { getMyLessons, createLesson } from '../api/lessons';
 import { getMyGroups, getCourses } from '../api/groups';
 import Modal from '../components/Modal';
+import DateTimePicker, { nextHour } from '../components/DateTimePicker';
 
 function TeacherHome() {
   const navigate = useNavigate();
@@ -14,7 +15,7 @@ function TeacherHome() {
   const [filterCourse, setFilterCourse] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newLessonGroup, setNewLessonGroup] = useState('');
-  const [newLessonDate, setNewLessonDate] = useState('');
+  const [newLessonDate, setNewLessonDate] = useState(nextHour); // Date: сегодня, следующий час, :00
   const [createError, setCreateError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
@@ -62,7 +63,7 @@ function TeacherHome() {
 
   const openCreateModal = () => {
     setCreateError('');
-    setNewLessonDate('');
+    setNewLessonDate(nextHour());
     if (filterGroup) {
       setNewLessonGroup(filterGroup);
     } else if (availableGroups.length === 1) {
@@ -92,7 +93,7 @@ function TeacherHome() {
     try {
       const payload = {
         group_id: parseInt(newLessonGroup),
-        date: new Date(newLessonDate).toISOString(),
+        date: newLessonDate.toISOString(),
       };
       const created = await createLesson(payload);
       setLessons(prev => [...prev, created]);
@@ -183,16 +184,12 @@ function TeacherHome() {
               </select>
             </label>
 
-            <label className="field-label">
+            <div className="field-label">
               {'Дата и время начала'}
-              <input
-                type="datetime-local"
-                className="input"
-                value={newLessonDate}
-                onChange={e => setNewLessonDate(e.target.value)}
-                required
-              />
-            </label>
+              <div>
+                <DateTimePicker value={newLessonDate} onChange={setNewLessonDate} floating />
+              </div>
+            </div>
 
             {createError && <div className="form-field__error">{createError}</div>}
           </form>

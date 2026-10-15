@@ -1,16 +1,16 @@
-<!-- autoi18n: source=student.md lang=az sha1=065bd777772fe14feeeb269f7813f6992cd851d8 -->
+<!-- autoi18n: source=student.md lang=az sha1=598774176e678eb55b61b02c82fb55c61f23c71a -->
 # Platformada necə işləmək
 
 ## Ana səhifə — mənim dərslərim
 
-Əgər siz yeni qeydiyyatdan keçmisinizsə, Ana səhifədə "Müəllim təsdiqləməyini gözləyirik" yazısı görünəcək. Müəllim sizi qrupa qəbul etdikdə, burada dərslər görünəcək.
+Əgər siz yeni qeydiyyatdan keçmisinizsə, Ana səhifədə "Müəllim təsdiqləyənə qədər gözləyirik" yazılıb. Müəllim sizi qrupa qəbul etdikdə, burada dərslər görünəcək.
 
 Ana səhifədə [Ana səhifə](/dashboard) — bütün dərsləriniz. Yuxarıda — qrupunuzun adı və videokonfransa giriş düyməsi.
 
-Dərsləri iki yolla izləmək mümkündür:
+Dərsləri iki yolla izləmək olar:
 
-- **Cədvəl** — müəllim tərəfindən açılmış dərslərin siyahısı. Bu günün dərsi "Bu gün" ilə işarələnib.
-- **Təqvim** — qrupun bütün dərsləri tarixlər üzrə. Boz dərslər müəllim hələ açmamışdır. Qırmızı günlər — müəllimin istirahət günləridir.
+- **Cədvəl** — müəllimin açdığı dərslərin siyahısı. Bu günün dərsi "Bu gün" ilə işarələnib.
+- **Təqvim** — qrupun bütün dərsləri tarixlər üzrə. Boz dərslər müəllim hələ açmayıb. Qırmızı günlər — müəllimin istirahət günləri.
 
 Sizdən nəsə tələb olunan dərs işarələnib:
 
@@ -20,15 +20,15 @@ Sizdən nəsə tələb olunan dərs işarələnib:
 
 Dərsi açmaq üçün üzərinə klikləyin.
 
-Əgər sizdə təqdim edilməmiş ev tapşırığı varsa, hər hansı bir səhifənin başlığının altında dərsin adı və müddəti ilə rəngli bir zolaq görünəcək: narıncı — ev tapşırığı cavab gözləyir və ya yenidən işləməyə qaytarılıb, qırmızı — təqdim etmə müddəti keçib. **Dərsi aç** linki birbaşa tapşırığa aparır. Zolaq, cavabınızı əlavə etdikdən sonra yox olur.
+Əgər sizdə təqdim edilməmiş ev tapşırığı varsa, hər hansı bir səhifənin başlığının altında dərsin adı və müddəti ilə rəngli bir zolaq görünür: narıncı — ev tapşırığı cavab gözləyir və ya yenidən işləməyə qaytarılıb, qırmızı — təqdim etmə müddəti keçib. **Dərsi aç** linki birbaşa tapşırığa aparır. Zolaq, cavabınızı əlavə etdikdən sonra yox olur. Qrupun sizin gəlməyinizdən əvvəl aldığı tapşırıqlar borc sayılmır — amma əgər siz onları yerinə yetirsəniz, qiymət hesablanacaq.
 
 ## Dərs
 
 Dərs başladıqda, yuxarı sağda **"Dərsi necə bəyəndin?"** sualı və üç smileyk görünür: yaşıl — bəyəndim, sarı — normal, qırmızı — bəyənmədim. Onlardan birinə klikləyin. Qiyməti dəyişmək mümkündür. Müəllim kiminsə hansı smileyk qoyduğunu görmür.
 
-👤 işarəsi olan dərs — fərdi: onu yalnız siz və müəllimin dəvət etdiyi şəxslər görür.
+👤 işarəsi olan dərs — şəxsi: onu yalnız siz və müəllimin dəvət etdiyi şəxslər görür.
 
-Aşağıda dörd sekme var: **Materiallar**, **Dərsdə iş**, **Ev tapşırığı** və **Dialoq**. Sekmədəki rəqəm, orada sizi nəyinsə gözlədiyini göstərir; "Dərsdə iş" sekmesində — təqdim etdiyiniz faylların sayı.
+Aşağıda dörd sekme var: **Materiallar**, **Dərsdə iş**, **Ev tapşırığı** və **Dialoq**. Sekmədəki rəqəm, orada sizi nəyinsə gözlədiyini bildirir; "Dərsdə iş" sekmesində — təqdim etdiyiniz faylların sayı.
 
 ### Materiallar
 
@@ -38,24 +38,24 @@ Dərs üçün fayllar və bağlantılar. Adına klikləyin — material yeni tab
 
 Buraya müəllimin dərsdə etməyinizi istədiyi işi təqdim edirsiniz.
 
-1. **Fayl yüklə** düyməsini basın və ya faylları çərçivəyə sürükləyin. Eyni anda bir neçə fayl yükləyə bilərsiniz.
-2. Müəllim işi yoxlamadığı müddətcə, əlavə faylı silmək mümkündür (✕).
+1. **Fayl yüklə** düyməsinə basın və ya faylları çərçivəyə sürükləyin. Eyni anda bir neçə fayl yükləyə bilərsiniz.
+2. Müəllim işi yoxlamayıbsa, əlavə faylı silmək mümkündür (✕).
 3. Müəllim yoxladıqdan sonra **Qəbul edildi** və ya **Qiymət** görünəcək — bu dərs üçün qiymətdir. Yoxlamadan sonra işi dəyişdirmək mümkün deyil.
 
 İşi dərs açıq olduğu müddətdə və dərs gününün sonuna qədər təqdim etmək olar.
 
 ### Ev tapşırığı
 
-1. Tapşırığın adına klikləyin — fayl yüklənəcək. Yanında təqdim etmə müddəti göstərilir.
-2. Tapşırığı yerinə yetirin və cavabı yükləmək üçün **+ Fayl** düyməsini basın. Bir neçə fayl yükləmək mümkündür.
-3. Müəllim cavabı yoxlamadığı və müddət keçmədiyi müddətcə, faylı silmək (✕) və yeni fayl yükləmək mümkündür.
+1. Tapşırığın adına klikləyin — fayl yüklənəcək. Yanında təqdim etmə müddəti göstərilib.
+2. Tapşırığı yerinə yetirin və cavabı yükləmək üçün **+ Fayl** düyməsinə basın. Bir neçə fayl yükləmək mümkündür.
+3. Müəllim cavabı yoxlamayıbsa və müddət keçməyibsə, faylı silmək (✕) və yeni fayl yükləmək mümkündür.
 
 Cavabın statusu:
 
 - **Təqdim edilməyib** — hələ cavabı yükləməmisiniz;
 - **Yoxlanma gözləyir** — cavab müəllimdədir;
 - **Təkmilləşdirməyə qaytarılıb** — düzəldin və yeni fayl yükləyin, ətraflı «Dialoq»da;
-- **Qəbul edildi** və ya **Qiymət** — cavab yoxlanılıb, artıq onu dəyişdirmək mümkün deyil;
+- **Qəbul edildi** və ya **Qiymət** — cavab yoxlanılıb, onu dəyişdirmək artıq mümkün deyil;
 - **Təqdim edilməyib, müddət bitib** — təqdim etmə müddəti keçib.
 
 ### Dialoq
@@ -64,7 +64,7 @@ Bu dərs üzrə müəllimlə yazışma. Mesaj yazın və göndərin. Öz mesajı
 
 ## Uğur
 
-[Uğur](/dashboard/performance) bölməsində — dərslər, ev tapşırıqları və imtahanlar üzrə bütün qiymətləriniz, eləcə də davamiyyət. Hər dərs üçün qiymətləri burada görün — dərsin öz səhifəsində yoxdur. İcazəsiz keçid bağlana bilər: əgər ondan sonra əlavə (şəxsi) dərsdə olmusunuzsa, bu «İcazəsiz keçid bağlandı» kimi qeyd olunur və hesaba alınmır.
+[Uğur](/dashboard/performance) bölməsində — dərslər, ev tapşırıqları və imtahanlar üzrə bütün qiymətləriniz, eləcə də davamiyyət. Hər dərs üçün qiymətləri burada görün — dərsin öz səhifəsində yoxdur. İcazəsiz keçmişi bağlamaq mümkündür: əgər ondan sonra əlavə (şəxsi) dərsdə olmusunuzsa, bu «İcazəsiz keçmiş bağlandı» kimi qeyd olunur və hesaba alınmır.
 
 ## Profil
 

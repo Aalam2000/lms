@@ -29,7 +29,7 @@ from ..models import (
     HomeworkTask, HomeworkAnswer, HomeworkAnswerFile, LessonMessage, LessonStudent, LessonFeedback,
     LessonWorkFile,
 )
-from ..dependencies import require_teacher, get_current_user
+from ..dependencies import has_perm, require_teacher, get_current_user
 from ..resources import RESOURCE_MODELS, RESOURCE_NOT_FOUND, fetch_resource_details, resource_exists
 
 router = APIRouter(prefix="/lessons", tags=["lessons"])
@@ -79,6 +79,7 @@ class LessonOut(BaseModel):
     # подхватил заметки в списки уроков ученика.
     teacher_notes: Optional[str] = None
     created_at: datetime
+    created_by: Optional[int] = None  # кто создал урок (куратор переносит свои)
     # Персональный урок и его участники (участников отдаём только педагогу/админу)
     is_personal: bool = False
     participants: list[LessonParticipantOut] = []
@@ -540,6 +541,34 @@ async def get_group_lessons(
     return await with_unreviewed_flag(db, lessons, current_user)
 
 
+async def add_lesson(
+    db: AsyncSession, group: Group, actor: User, date: Optional[datetime], *,
+    title: Optional[str] = None, order: int = 0, duration_min: Optional[int] = None,
+    source: Optional[str] = "teacher", is_personal: bool = False, student_ids=(),
+) -> Lesson:
+    """Новый урок группы (без commit): выходной педагога — отказ, если ставит не
+    он сам; персональный — с участниками (app/personal.py). Его же вызывает
+    «Урок» ученику из «Студентов» (routers/students.py)."""
+    await ensure_lessons_allowed(db, [(group.teacher_id, date)], actor)
+    lesson = Lesson(
+        group_id=group.id,
+        title=(title or "").strip() or await lesson_word(db, group.sector),
+        order=order,
+        date=date,
+        duration_min=duration_min or group.lesson_duration_min,
+        source=source,
+        is_open=False,
+        is_personal=is_personal,
+        teacher_id=group.teacher_id,
+        created_by=actor.id,
+    )
+    db.add(lesson)
+    if is_personal:
+        await db.flush()  # нужен id урока для списка участников
+        await set_participants(db, lesson, student_ids)
+    return lesson
+
+
 # Создать урок
 @router.post("/", response_model=LessonOut)
 async def create_lesson(
@@ -554,23 +583,11 @@ async def create_lesson(
     group = (await db.execute(group_query)).scalar_one_or_none()
     if not group:
         raise HTTPException(status_code=403, detail="Нет доступа к этой группе")
-    await ensure_lessons_allowed(db, [(group.teacher_id, data.date)], current_user)
-
-    lesson = Lesson(
-        group_id=data.group_id,
-        title=(data.title or "").strip() or await lesson_word(db, group.sector),
-        order=data.order,
-        date=data.date,
-        duration_min=data.duration_min or group.lesson_duration_min,
-        source=data.source,
-        is_open=False,
-        is_personal=data.is_personal,
-        teacher_id=group.teacher_id,
+    lesson = await add_lesson(
+        db, group, current_user, data.date, title=data.title, order=data.order,
+        duration_min=data.duration_min, source=data.source,
+        is_personal=data.is_personal, student_ids=data.student_ids,
     )
-    db.add(lesson)
-    if data.is_personal:
-        await db.flush()  # нужен id урока для списка участников
-        await set_participants(db, lesson, data.student_ids)
     await db.commit()
     await db.refresh(lesson)
     return (await with_unreviewed_flag(db, [lesson], current_user))[0]
@@ -815,11 +832,18 @@ class DaysOffDatesOut(BaseModel):
     dates: list[date_type]
 
 
+def _require_calendar(user: User) -> None:
+    """Календарь уроков: педагог (свой) или право calendars.all (любой педагог)."""
+    if user.role not in ("teacher", "admin") and not has_perm(user, "calendars.all"):
+        raise HTTPException(status_code=403, detail="Недостаточно прав")
+
+
 @router.get("/days-off", response_model=DaysOffDatesOut)
 async def get_teacher_days_off_dates(
     teacher_id: int, date_from: date_type, date_to: date_type,
-    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_teacher),
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user),
 ):
+    _require_calendar(current_user)
     check_range(date_from, date_to)
     teacher = (await db.execute(select(User).where(User.id == teacher_id))).scalar_one_or_none()
     if not teacher or teacher.role != "teacher":
@@ -843,12 +867,14 @@ async def get_my_lessons(
     teacher_id: Optional[int] = None,
     mine: bool = False,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_teacher)
+    current_user: User = Depends(get_current_user)
 ):
     # Уроки педагога = все уроки групп, где он основной, + уроки других
     # групп, которые ведёт он сам (замены, уроки до передачи группы).
+    # Чужие календари (teacher_id) — с правом calendars.all (админ, куратор).
+    _require_calendar(current_user)
     scope_teacher_id = teacher_id
-    if current_user.role != "admin" or mine:
+    if not has_perm(current_user, "calendars.all") or mine:
         scope_teacher_id = current_user.id
     query = select(Lesson).order_by(Lesson.date)
     if scope_teacher_id is not None:
@@ -1597,6 +1623,36 @@ async def update_lesson_participants(
     await db.commit()
     await db.refresh(lesson)
     return (await with_unreviewed_flag(db, [lesson], current_user))[0]
+
+
+# Свой урок (lessons.created_by) — перенести и открыть/закрыть, без доступа
+# внутрь урока: право lessons.own (куратор). Полночь и выходные педагога — как у всех.
+class OwnLessonIn(BaseModel):
+    date: Optional[datetime] = None
+    is_open: Optional[bool] = None
+
+
+@router.patch("/{lesson_id}/own")
+async def update_own_lesson(
+    lesson_id: int,
+    data: OwnLessonIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not has_perm(current_user, "lessons.own"):
+        raise HTTPException(status_code=403, detail="Недостаточно прав")
+    lesson = (await db.execute(select(Lesson).where(Lesson.id == lesson_id))).scalar_one_or_none()
+    if not lesson or lesson.created_by != current_user.id:
+        raise HTTPException(status_code=404, detail="Урок не найден")
+    if data.date is not None and data.date != lesson.date:
+        if lesson_locked_for(lesson, current_user):
+            raise HTTPException(status_code=403, detail=LOCK_DETAIL.format(what="дату урока"))
+        await ensure_lessons_allowed(db, [(lesson.teacher_id, data.date)], current_user)
+        lesson.date = data.date
+    if data.is_open is not None:
+        lesson.is_open = data.is_open
+    await db.commit()
+    return {"id": lesson.id, "date": lesson.date, "is_open": lesson.is_open}
 
 
 @router.patch("/{lesson_id}", response_model=LessonOut)

@@ -68,7 +68,7 @@ async def purge_old(db: AsyncSession) -> None:
     await db.commit()
 
 
-ROLES = ("admin", "teacher", "student")
+ROLES = ("admin", "teacher", "curator", "student")
 MAX_REPORT_DAYS = 366
 
 

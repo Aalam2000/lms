@@ -1,4 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { getNewStudentsCount } from '../api/students';
+import { useHomeworkRefresh } from '../hooks/useHomeworkRefresh';
+import { useAuth } from '../context/AuthContext';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAcademyName } from '../utils/academyName';
 import {
@@ -22,8 +25,18 @@ const IS_LOCAL_NETWORK = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[0
   .test(window.location.hostname);
 
 function Navigation({ user, isOpen, onClose }) {
+  const { can } = useAuth();
   const academyName = useAcademyName();
+  // Пункты только педагога и админа (База знаний, Методика)
+  const isStaff = user?.role === 'teacher' || user?.role === 'admin';
   const { pathname } = useLocation();
+  // NEW у «Студентов»: ученики без единого посещённого урока; раз в 15 с и при переходах
+  const canStudents = can('students.view');
+  const [newCount, setNewCount] = useState(0);
+  useEffect(() => {
+    if (canStudents) getNewStudentsCount().then(setNewCount).catch(() => {});
+  }, [canStudents, pathname]);
+  useHomeworkRefresh(() => getNewStudentsCount().then(setNewCount).catch(() => {}), canStudents);
   const linkClass = ({ isActive }) => `nav__link${isActive ? ' nav__link--active' : ''}`;
 
   // Вложенные страницы подсвечивают свой раздел меню: группа и урок открываются
@@ -62,7 +75,7 @@ function Navigation({ user, isOpen, onClose }) {
             </NavLink>
           </li>
         )}
-        {user?.role !== 'student' && (
+        {isStaff && (
           <li className="nav__item">
             <NavLink to="/dashboard/materials" className={() => activeClass(materialsActive)} onClick={handleLinkClick}>
               <IconKnowledge className="nav__icon" />
@@ -70,11 +83,12 @@ function Navigation({ user, isOpen, onClose }) {
             </NavLink>
           </li>
         )}
-        {user?.role !== 'student' && (
+        {can('students.view') && (
           <li className="nav__item">
             <NavLink to="/dashboard/students" className={linkClass} onClick={handleLinkClick}>
               <IconStudents className="nav__icon" />
               <span>{'Студенты'}</span>
+              {newCount > 0 && <span className="new-badge" data-tip="Новые ученики — ещё не были на уроке">{'NEW'} {newCount}</span>}
             </NavLink>
           </li>
         )}
@@ -122,7 +136,7 @@ function Navigation({ user, isOpen, onClose }) {
       </ul>
       {/* «Методика» — методические материалы (педагоги и админы), прижата к низу
           над «Помощью»; оранжевый значок «?!» горит всегда, чтобы пункт выделялся */}
-      {user && user.role !== 'student' && (
+      {isStaff && (
         <NavLink
           to="/dashboard/methodology"
           className={({ isActive }) => `nav__link nav__method${isActive ? ' nav__link--active' : ''}`}
