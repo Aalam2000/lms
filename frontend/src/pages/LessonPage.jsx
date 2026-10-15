@@ -125,10 +125,10 @@ function LessonPage() {
         const [lessonData, groupsData] = await Promise.all([getLesson(lessonId), getMyGroups()]);
         setLesson(lessonData);
         setGroups(groupsData);
-        setDateValue(lessonRes.data?.date ? new Date(lessonRes.data.date) : null);
-        setDurationValue(lessonRes.data?.duration_min || DEFAULT_DURATION_MIN);
-        setLessonComment(lessonRes.data?.comment || '');
-        setPrivateNote(lessonRes.data?.teacher_notes || '');
+        setDateValue(lessonData?.date ? new Date(lessonData.date) : null);
+        setDurationValue(lessonData?.duration_min || DEFAULT_DURATION_MIN);
+        setLessonComment(lessonData?.comment || '');
+        setPrivateNote(lessonData?.teacher_notes || '');
       } catch (err) {
         setError(extractErrorMessage(err, 'Не удалось загрузить урок'));
       } finally {
