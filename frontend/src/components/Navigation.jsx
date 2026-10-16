@@ -4,6 +4,7 @@ import { useHomeworkRefresh } from '../hooks/useHomeworkRefresh';
 import { useAuth } from '../context/AuthContext';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAcademyName } from '../utils/academyName';
+import InstallButton from './InstallButton';
 import {
   IconDashboard,
   IconKnowledge,
@@ -134,6 +135,8 @@ function Navigation({ user, isOpen, onClose }) {
           </li>
         )}
       </ul>
+      {/* «На рабочий стол» — посередине между пунктами меню и «Методикой»/«Помощью» */}
+      <InstallButton onDone={handleLinkClick} />
       {/* «Методика» — методические материалы (педагоги и админы), прижата к низу
           над «Помощью»; оранжевый значок «?!» горит всегда, чтобы пункт выделялся */}
       {isStaff && (

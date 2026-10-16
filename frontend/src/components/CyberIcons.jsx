@@ -150,3 +150,16 @@ export function IconNetwork(props) {
     </svg>
   );
 }
+
+// На рабочий стол: монитор со стрелкой вниз (кнопка «На рабочий стол»)
+export function IconInstall(props) {
+  return (
+    <svg {...baseProps} {...props}>
+      <rect x="3" y="4" width="18" height="12" />
+      <line x1="8" y1="20" x2="16" y2="20" />
+      <line x1="12" y1="16" x2="12" y2="20" />
+      <line x1="12" y1="7" x2="12" y2="12" />
+      <polyline points="9.5,10 12,12.5 14.5,10" />
+    </svg>
+  );
+}
