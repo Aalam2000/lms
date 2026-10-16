@@ -12,6 +12,8 @@ import { useAuth } from '../context/AuthContext';
 import AcademyTab from '../components/AcademyTab';
 import { AccessBlock } from '../components/ParentLinkBlock';
 import { getSectors } from '../api/academy';
+import PushMark from '../components/PushMark';
+import { usePushUsers } from '../hooks/usePushUsers';
 
 const emptyTeacher = { username: '', password: '', full_name: '', email: '', phone: '', telegram_username: '', whatsapp: '' };
 const emptyAdmin   = { username: '', password: '', full_name: '', email: '', phone: '', telegram_username: '', whatsapp: '' };
@@ -26,6 +28,7 @@ const emptyCourseEdit = { title: '', description: '' };
 function AdminPage() {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
+  const pushUsers = usePushUsers(); // кто разрешил уведомления
   const [tab, setTab] = useState('teachers');
 
   const [teachers, setTeachers] = useState([]);
@@ -445,7 +448,7 @@ function AdminPage() {
                   <input className="input input--min160" value={editingDraft.full_name}
                     onChange={e => setEditingDraft({ ...editingDraft, full_name: e.target.value })}
                   />
-                ) : u.full_name}
+                ) : <>{u.full_name}{pushUsers.has(u.id) && <PushMark />}</>}
               </td>
               <td>{u.username}</td>
               <td>

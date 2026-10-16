@@ -1,6 +1,6 @@
 """Проверка прод-БД перед выкаткой миграций (ничего не меняет).
 
-Текущая выкатка: 0026_student_course_teacher + 0027_lesson_created_by (куратор: у ученика курс, сектор и педагог; кто создал урок).
+Текущая выкатка: 0028_push_subscriptions (согласия на уведомления).
 Перед следующей выкаткой с миграциями — поправить EXPECTED_* ниже.
 
 Запуск на сервере (работает и на СТАРОМ образе бэкенда):
@@ -11,10 +11,10 @@ import asyncio
 from sqlalchemy import text
 from app.database import engine
 
-EXPECTED_REVISION = "0025_teacher_days_off"   # последняя уже выкаченная
-NEW_TABLES = []
-NEW_COLUMNS = [("users", "course_id"), ("users", "sector"), ("users", "teacher_id"), ("lessons", "created_by")]
-NEW_INDEXES = ["ix_users_teacher_id"]
+EXPECTED_REVISION = "0027_lesson_created_by"   # последняя уже выкаченная
+NEW_TABLES = ["push_subscriptions"]
+NEW_COLUMNS = []
+NEW_INDEXES = ["ix_push_subscriptions_user_id"]
 
 
 async def main():

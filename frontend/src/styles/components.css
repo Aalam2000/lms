@@ -2432,6 +2432,16 @@ a.row-icon:hover {
 .nav__install + .nav__help {
   margin-top: 0;
 }
+.push-mark {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: var(--space-1);
+  color: var(--color-success-text);
+}
+.push-mark__icon {
+  width: 14px;
+  height: 14px;
+}
 .install-steps {
   margin: 0;
   padding-left: var(--space-5);

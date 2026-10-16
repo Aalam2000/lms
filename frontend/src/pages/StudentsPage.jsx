@@ -14,6 +14,8 @@ import Modal from '../components/Modal';
 import DateTimePicker, { nextHour } from '../components/DateTimePicker';
 import { setStudentPassword, getStudents, deleteStudent, createStudentLesson } from '../api/students';
 import { extractErrorMessage } from '../utils/errors';
+import PushMark from '../components/PushMark';
+import { usePushUsers } from '../hooks/usePushUsers';
 
 // Последний вход: «05.10.2026 14:32», нет входов — «—»
 const formatLogin = (value) => {
@@ -74,6 +76,7 @@ function StudentLessonModal({ student, groups, onClose, onDone }) {
 
 function StudentsPage() {
   const { user, hasRole, can } = useAuth();
+  const pushUsers = usePushUsers(); // кто разрешил уведомления
   // Все ученики и фильтр по учителю — право students.all (админ, куратор)
   const isAdmin = can('students.all');
   const canDelete = hasRole('admin');
@@ -288,6 +291,7 @@ function StudentsPage() {
                     >
                       {s.full_name}
                     </Link>
+                    {pushUsers.has(s.id) && <PushMark />}
                     {s.is_new && <span className="new-badge" data-tip="Ещё не был на уроке — поставьте доп. урок">{'NEW'}</span>}
                   </td>
                   <td>{s.groups.length ? s.groups.map(g => g.name).join(', ') : <span className="chip chip--amber">{'без группы'}</span>}</td>

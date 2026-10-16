@@ -163,3 +163,13 @@ export function IconInstall(props) {
     </svg>
   );
 }
+
+// Уведомления: колокольчик (кнопка «Включить уведомления», значок в списках)
+export function IconBell(props) {
+  return (
+    <svg {...baseProps} {...props}>
+      <path d="M6 16 L6 10 C6 6.5 8.5 4 12 4 C15.5 4 18 6.5 18 10 L18 16 L20 18 L4 18 Z" />
+      <path d="M10 21 L14 21" />
+    </svg>
+  );
+}

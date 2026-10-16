@@ -386,3 +386,18 @@ class ParentLink(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_used_at = Column(DateTime(timezone=True), nullable=True)
     revoked_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class PushSubscription(Base):
+    """Согласие на уведомления: устройство (браузер) пользователя.
+    Появляется по кнопке «На рабочий стол», если человек разрешил уведомления.
+    endpoint — адрес службы уведомлений браузера, уникален для устройства."""
+    __tablename__ = "push_subscriptions"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    endpoint = Column(Text, nullable=False, unique=True)
+    p256dh = Column(String(255), nullable=False)
+    auth = Column(String(255), nullable=False)
+    user_agent = Column(String(500), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now())
