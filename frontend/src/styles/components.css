@@ -2881,68 +2881,150 @@ a.row-icon:hover {
   vertical-align: middle;
 }
 
-/* ===== Печатное расписание «Аудитории» (pages/RoomsPage.jsx, RoomsPrint) ===== */
+/* ===== Печатный отчёт «Расписание аудиторий» (pages/RoomsPage.jsx, RoomsPrint) ===== */
 .rooms-print__week {
   font-weight: 600;
   min-width: 110px;
   text-align: center;
 }
 .rooms-print {
-  max-width: 760px;
+  max-width: 900px;
 }
 .rooms-print__title {
   font-size: 20px;
-  margin: 8px 0 12px;
+  margin: 8px 0 2px;
 }
-.rooms-print__day {
-  margin-bottom: 20px;
-  break-inside: avoid;
+.rooms-print__sum {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 12px 0 18px;
 }
-.rooms-print__day-title {
-  font-size: 16px;
-  margin: 0 0 6px;
+.rooms-kpi {
+  border: 1px solid var(--color-border-light);
+  padding: 8px 10px;
 }
-.rooms-print__table {
-  width: 100%;
-  border-collapse: collapse;
-  border: 1px solid var(--color-primary-border);
-  font-size: 13px;
-}
-.rooms-print__table th {
-  background: var(--color-primary-border);
-  color: var(--color-white);
-  text-align: left;
-  padding: 6px 10px;
-}
-.rooms-print__table td {
-  padding: 5px 10px;
-  border-top: 1px solid var(--color-border-light);
-}
-.rooms-print__table td small {
+.rooms-kpi b {
   display: block;
+  font-size: 20px;
+}
+.rooms-kpi span {
   color: var(--color-muted);
   font-size: 11px;
 }
-.rooms-print__table tfoot td {
-  text-align: right;
-  font-weight: 700;
-  background: var(--color-bg-soft);
-}
-.rooms-print__over {
-  color: var(--color-warning);
-  font-weight: 700;
-}
-.rooms-print__room {
-  font-weight: 700;
-  text-align: center;
-  width: 110px;
-  background: var(--room-bg);
-  color: var(--room-border);
-}
-.rooms-print__room--none,
-.rooms-print__row--none td {
+.rooms-kpi--bad {
+  border-color: var(--color-danger);
   background: var(--color-danger-bg-light);
+}
+.rooms-kpi--bad b {
   color: var(--color-danger-text);
+}
+.rooms-kpi__load {
+  display: grid;
+  grid-template-columns: 28px 1fr 34px;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  margin-top: 3px;
+}
+.rooms-kpi__bar {
+  height: 6px;
+  background: var(--color-border-light);
+}
+.rooms-kpi__bar i {
+  display: block;
+  height: 100%;
+  width: calc(var(--pct) * 1%);
+  background: var(--room-border);
+}
+.rooms-print__day {
+  margin-bottom: 18px;
+  break-inside: avoid;
+}
+.rooms-print__day-title {
+  font-size: 15px;
+  margin: 0 0 6px;
+}
+.rooms-print__day-title small {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.rooms-print__bad {
+  font-size: 12px;
+  color: var(--color-danger-text);
+}
+
+/* Блок дня: строки — аудитории, по горизонтали — часы */
+.rooms-tl {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  border: 1px solid var(--color-border-light);
+  font-size: 11px;
+}
+.rooms-tl__axis {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: repeat(var(--h), 1fr);
+  color: var(--color-muted);
+  font-size: 10px;
+  border-bottom: 1px solid var(--color-border-light);
+}
+.rooms-tl__axis div {
+  padding: 2px 3px;
+  border-left: 1px solid var(--color-border-light);
+}
+.rooms-tl__room {
+  padding: 4px 6px;
+  font-weight: 700;
+  font-size: 12px;
+  white-space: nowrap;
+  border-top: 1px solid var(--color-border-light);
+}
+.rooms-tl__room small {
+  display: block;
+  font-weight: 400;
+  font-size: 10px;
+  color: var(--color-muted);
+}
+.rooms-tl__room--none {
+  color: var(--color-danger-text);
+}
+.rooms-tl__lane {
+  position: relative;
+  height: 34px;
+  border-top: 1px solid var(--color-border-light);
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 calc(100% / var(--h) - 1px),
+    var(--color-border-light) calc(100% / var(--h) - 1px) calc(100% / var(--h))
+  );
+}
+.rooms-tl__event {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: calc(var(--a) / var(--h) * 100%);
+  width: calc(var(--l) / var(--h) * 100% - 2px);
+  padding: 1px 5px;
+  overflow: hidden;
+  white-space: nowrap;
+  line-height: 14px;
+  background: var(--room-bg);
+  border-left: 3px solid var(--room-border);
+  color: var(--color-text);
+}
+.rooms-tl__event--none {
+  background: var(--color-danger-bg-light);
+  border-left-color: var(--color-danger);
+  color: var(--color-danger-text);
+}
+.rooms-tl__seat {
+  font-weight: 700;
+}
+.rooms-tl__seat--over {
+  font-weight: 700;
+  color: var(--color-warning);
 }
 
 /* Цвета аудиторий: фон ячейки и цвет номера */
@@ -2956,11 +3038,57 @@ a.row-icon:hover {
 /* На печать — только лист (меню, шапка и .toolbar скрыты общим правилом в media.css);
    цветные ячейки печатаются цветом */
 @media print {
-  .rooms-print__table th,
-  .rooms-print__room,
-  .rooms-print__table tfoot td,
-  .rooms-print__row--none td {
+  .rooms-tl__event,
+  .rooms-kpi__bar i,
+  .rooms-kpi--bad {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+}
+
+/* ===== Аудитория урока (pages/LessonPage.jsx) ===== */
+.lesson-room {
+  font-weight: 700;
+  font-size: 16px;
+  padding: 2px 10px;
+  border: 1px solid var(--color-primary-border);
+  background: var(--color-white);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.lesson-room--static {
+  cursor: default;
+}
+.lesson-room--none {
+  font-size: 13px;
+  border-color: var(--color-danger);
+  color: var(--color-danger-text);
+  background: var(--color-danger-bg-light);
+}
+.lesson-room-option {
+  display: grid;
+  grid-template-columns: 60px 80px 1fr;
+  gap: 8px;
+  align-items: center;
+  text-align: left;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-light);
+  background: var(--color-white);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.lesson-room-option:hover {
+  border-color: var(--color-primary-border);
+}
+.lesson-room-option--busy {
+  background: var(--color-bg-soft);
+  color: var(--color-muted);
+}
+.lesson-room-option--current {
+  border-color: var(--color-primary);
+  border-width: 2px;
+}
+.lesson-room-option__over {
+  color: var(--color-warning);
+  font-weight: 700;
 }

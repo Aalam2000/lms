@@ -19,8 +19,9 @@ import { useHomeworkRefresh } from '../hooks/useHomeworkRefresh';
 import { uploadMaterial, openPendingTab, showMaterialInTab } from '../api/materials';
 import {
   getLesson, getLessonMarks, saveLessonMark, saveLessonMarksBulk, updateLesson, openLesson, deleteLesson,
-  getLessonItems, attachLessonItem, detachLessonItem,
+  getLessonItems, attachLessonItem, detachLessonItem, getLessonRooms, setLessonRoom,
 } from '../api/lessons';
+import Modal from '../components/Modal';
 import { getMyGroups } from '../api/groups';
 import { getQuizHtml } from '../api/quizzes';
 import { openLiveQuiz } from '../api/quizLive';
@@ -54,6 +55,9 @@ function LessonPage() {
   }, [location.key, location.search]);
 
   const [lesson, setLesson] = useState(null);
+  // Выбор аудитории урока: null — окно закрыто
+  const [roomChoice, setRoomChoice] = useState(null);
+  const [roomError, setRoomError] = useState('');
   const [participantsOpen, setParticipantsOpen] = useState(false); // смена участников персонального урока
   const [groups, setGroups] = useState([]);
   const [dateValue, setDateValue] = useState(null);
@@ -616,8 +620,60 @@ function LessonPage() {
           <button className="btn btn--outline" onClick={() => navigate(`/dashboard/groups/${lesson.group_id}`)}>
             {'Назад'}
           </button>
-          {lesson.room_number && (
-            <strong className="lesson-toolbar__title" data-tip={'Аудитория'}>{`А${lesson.room_number}`}</strong>
+          {canManage ? (
+            <button
+              type="button"
+              className={`lesson-room${lesson.room_number ? '' : ' lesson-room--none'}`}
+              data-tip={'Выбрать аудиторию урока'}
+              onClick={() => {
+                setRoomError('');
+                getLessonRooms(lesson.id)
+                  .then(setRoomChoice)
+                  .catch(err => setRoomError(extractErrorMessage(err, 'Не удалось загрузить аудитории')));
+              }}
+            >
+              {lesson.room_number ? `А${lesson.room_number}` : 'аудитория не назначена'}
+            </button>
+          ) : lesson.room_number && (
+            <strong className="lesson-room lesson-room--static" data-tip={'Аудитория'}>{`А${lesson.room_number}`}</strong>
+          )}
+          {roomError && <span className="error-text">{roomError}</span>}
+          {roomChoice && (
+            <Modal title={'Аудитория урока'} onClose={() => setRoomChoice(null)} footer={(
+              <>
+                {lesson.room_id && (
+                  <button type="button" className="btn btn--secondary" onClick={() => setLessonRoom(lesson.id, null)
+                    .then(r => { setLesson(prev => ({ ...prev, ...r })); setRoomChoice(null); })
+                    .catch(err => setRoomError(extractErrorMessage(err, 'Не удалось снять аудиторию')))}>
+                    {'Снять аудиторию'}
+                  </button>
+                )}
+                <button type="button" className="btn btn--secondary" onClick={() => setRoomChoice(null)}>{'Отмена'}</button>
+              </>
+            )}>
+              <div className="form-stack">
+                <p className="text-muted">{`Учеников на уроке: ${roomChoice.people}. Аудитория меняется только у этого урока.`}</p>
+                {roomChoice.rooms.length === 0 && <p className="text-muted">{'Аудиторий пока нет — их заводят на странице «Аудитории».'}</p>}
+                {roomChoice.rooms.map(r => {
+                  const busy = r.busy_with.length > 0;
+                  const small = r.capacity < roomChoice.people;
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      className={`lesson-room-option${busy ? ' lesson-room-option--busy' : ''}${r.id === roomChoice.room_id ? ' lesson-room-option--current' : ''}`}
+                      onClick={() => setLessonRoom(lesson.id, r.id)
+                        .then(res => { setLesson(prev => ({ ...prev, ...res })); setRoomChoice(null); })
+                        .catch(err => setRoomError(extractErrorMessage(err, 'Не удалось сохранить аудиторию')))}
+                    >
+                      <b>{`А${r.number}`}</b>
+                      <span className={small ? 'lesson-room-option__over' : undefined}>{`мест ${r.capacity}`}</span>
+                      <span>{busy ? `занята: ${r.busy_with.join(', ')}` : 'свободна'}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Modal>
           )}
           <span className="lesson-toolbar__title">{lesson.title}</span>
           <span className="lesson-toolbar__group">{'Группа'}: {groupName}</span>

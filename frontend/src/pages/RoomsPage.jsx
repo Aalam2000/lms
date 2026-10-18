@@ -18,12 +18,13 @@ const toPositiveInt = (v) => {
   return Number.isInteger(n) && n > 0 ? n : null;
 };
 
-// ── Печатная форма «Расписание занятий» ──
-// Открывается кнопкой «Печать» на странице «Аудитории». Неделя листается
-// стрелками; на листе — по таблице на каждый день, в который есть уроки
-// (как бумажное расписание): группа и педагог, время, учеников, аудитория.
-// Учеников больше, чем мест, — жёлтым (часть занимается удалённо);
-// урок без аудитории — красным.
+// ── Печатный отчёт «Расписание аудиторий» ──
+// Открывается кнопкой «Печать» на странице «Аудитории». Период — неделя
+// (стрелками) или произвольный (две даты); панель выбора не печатается.
+// На листе: итог за период и по маленькому блоку на каждый день, в который
+// есть уроки: по горизонтали часы, по вертикали аудитории, в уроке — группа и
+// «учеников/мест». Учеников больше, чем мест, — жёлтым (часть удалённо);
+// уроки без аудитории — отдельной красной строкой.
 
 const ROOM_COLORS = 6; // классы room-color-0..5 в components.css
 
@@ -37,22 +38,34 @@ const dayKey = (d) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 const pad = (n) => String(n).padStart(2, '0');
 const hm = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 const dm = (d) => `${pad(d.getDate())}.${pad(d.getMonth() + 1)}`;
+const isoDay = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const fromIso = (v) => { const [y, m, d] = v.split('-').map(Number); return new Date(y, m - 1, d); };
+const hoursOf = (d) => d.getHours() + d.getMinutes() / 60;
 const DAY_NAMES = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
 
 function RoomsPrint({ rooms, onBack }) {
+  const [mode, setMode] = useState('week');                 // week | custom
   const [week, setWeek] = useState(() => mondayOf(new Date()));
+  const [customFrom, setCustomFrom] = useState(() => isoDay(mondayOf(new Date())));
+  const [customTo, setCustomTo] = useState(() => isoDay(addDays(mondayOf(new Date()), 6)));
   const [lessons, setLessons] = useState([]);
   const [error, setError] = useState('');
 
+  // Период: [from, to) — to не включительно
+  const from = mode === 'week' ? week : fromIso(customFrom);
+  const to = mode === 'week' ? addDays(week, 7) : addDays(fromIso(customTo), 1);
+  const periodLabel = `${dm(from)} – ${dm(addDays(to, -1))}.${addDays(to, -1).getFullYear()}`;
+
   useEffect(() => {
+    if (!(to > from)) { setLessons([]); return; }
     setError('');
-    getRoomsReport(week, addDays(week, 7))
+    getRoomsReport(from, to)
       .then(data => setLessons(data.map(l => {
         const start = new Date(l.date);
         return { ...l, start, end: new Date(start.getTime() + l.duration_min * 60000) };
       })))
       .catch(err => setError(extractErrorMessage(err, 'Не удалось загрузить расписание')));
-  }, [week]);
+  }, [from.getTime(), to.getTime()]); // eslint-disable-line
 
   const roomById = useMemo(() => {
     const m = {};
@@ -60,7 +73,7 @@ function RoomsPrint({ rooms, onBack }) {
     return m;
   }, [rooms]);
 
-  // Дни недели, в которые есть уроки
+  // Дни, в которые есть уроки
   const days = useMemo(() => {
     const map = new Map();
     lessons.forEach(l => {
@@ -68,68 +81,114 @@ function RoomsPrint({ rooms, onBack }) {
       if (!map.has(k)) map.set(k, { date: new Date(l.start.getFullYear(), l.start.getMonth(), l.start.getDate()), items: [] });
       map.get(k).items.push(l);
     });
-    const roomNo = (l) => roomById[l.room_id]?.number ?? 1e9;
-    return [...map.values()]
-      .sort((a, b) => a.date - b.date)
-      .map(d => ({ ...d, items: d.items.sort((a, b) => a.start - b.start || roomNo(a) - roomNo(b)) }));
-  }, [lessons, roomById]);
+    return [...map.values()].sort((a, b) => a.date - b.date);
+  }, [lessons]);
+
+  // Ось часов: 10–20, раздвигается под уроки периода
+  const h0 = Math.min(10, ...lessons.map(l => Math.floor(hoursOf(l.start))));
+  const h1 = Math.max(20, ...lessons.map(l => Math.ceil(hoursOf(l.end) || 24)));
+  const hours = h1 - h0;
+
+  const unassigned = lessons.filter(l => !roomById[l.room_id]).length;
+  const people = lessons.reduce((s, l) => s + l.people, 0);
+  const loadPct = (r) => (days.length ? Math.round(
+    lessons.filter(l => l.room_id === r.id).reduce((s, l) => s + (l.end - l.start) / 3600000, 0) / (days.length * hours) * 100,
+  ) : 0);
+
+  const block = (l) => {
+    const r = roomById[l.room_id];
+    const over = r && l.people > r.capacity;
+    const a = hoursOf(l.start) - h0;
+    const len = (hoursOf(l.end) || 24) - hoursOf(l.start);
+    return (
+      <div key={l.id} className={`rooms-tl__event${r ? ` room-color-${r.color}` : ' rooms-tl__event--none'}`}
+        style={{ '--a': a, '--l': len }}
+        data-tip={`${l.group_name} · ${l.title} · ${hm(l.start)}–${hm(l.end)}${l.teacher_name ? ` · ${l.teacher_name}` : ''}`}>
+        <b>{l.group_name}</b>{' '}
+        <span className={over ? 'rooms-tl__seat--over' : 'rooms-tl__seat'}>{r ? `${l.people}/${r.capacity}` : l.people}</span>
+      </div>
+    );
+  };
 
   return (
     <div className="page">
       <div className="toolbar toolbar--start rooms-print__controls">
         <button type="button" className="btn btn--secondary" onClick={onBack}>{'Назад'}</button>
-        <button type="button" className="btn btn--secondary" onClick={() => setWeek(addDays(week, -7))}>{'‹'}</button>
-        <span className="rooms-print__week">{`${dm(week)} – ${dm(addDays(week, 6))}`}</span>
-        <button type="button" className="btn btn--secondary" onClick={() => setWeek(addDays(week, 7))}>{'›'}</button>
+        <button type="button" className={`btn${mode === 'week' ? '' : ' btn--secondary'}`} onClick={() => setMode('week')}>{'Неделя'}</button>
+        {mode === 'week' && (
+          <>
+            <button type="button" className="btn btn--secondary" onClick={() => setWeek(addDays(week, -7))}>{'‹'}</button>
+            <span className="rooms-print__week">{`${dm(week)} – ${dm(addDays(week, 6))}`}</span>
+            <button type="button" className="btn btn--secondary" onClick={() => setWeek(addDays(week, 7))}>{'›'}</button>
+          </>
+        )}
+        <button type="button" className={`btn${mode === 'custom' ? '' : ' btn--secondary'}`} onClick={() => setMode('custom')}>{'Произвольный'}</button>
+        {mode === 'custom' && (
+          <>
+            <input type="date" className="input" value={customFrom} onChange={e => e.target.value && setCustomFrom(e.target.value)} />
+            <span>{'–'}</span>
+            <input type="date" className="input" value={customTo} onChange={e => e.target.value && setCustomTo(e.target.value)} />
+          </>
+        )}
         <Button onClick={() => window.print()} disabled={days.length === 0}>{'Печать'}</Button>
       </div>
       {error && <div className="error-text error-text--muted">{error}</div>}
 
       <div className="rooms-print">
-        <h1 className="rooms-print__title">{`Расписание занятий · ${dm(week)} – ${dm(addDays(week, 6))}`}</h1>
-        {!error && days.length === 0 && <p className="text-muted">{'На этой неделе уроков нет'}</p>}
+        <h1 className="rooms-print__title">{'Расписание аудиторий'}</h1>
+        <div className="text-muted">{`${periodLabel} · дней с уроками: ${days.length}`}</div>
+        {!error && days.length === 0 && <p className="text-muted">{'За этот период уроков нет'}</p>}
+
+        {days.length > 0 && (
+          <div className="rooms-print__sum">
+            <div className="rooms-kpi"><b>{lessons.length}</b><span>{'уроков за период'}</span></div>
+            <div className="rooms-kpi"><b>{people}</b><span>{'учеников на уроках'}</span></div>
+            <div className={`rooms-kpi${unassigned ? ' rooms-kpi--bad' : ''}`}><b>{unassigned}</b><span>{'без аудитории'}</span></div>
+            <div className="rooms-kpi">
+              <span>{`Загрузка за период (дни с уроками, ${pad(h0)}:00–${pad(h1)}:00)`}</span>
+              {rooms.map(r => (
+                <div key={r.id} className="rooms-kpi__load">
+                  {`А${r.number}`}
+                  <div className="rooms-kpi__bar"><i className={`room-color-${roomById[r.id].color}`} style={{ '--pct': loadPct(r) }} /></div>
+                  {`${loadPct(r)}%`}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {days.map(d => {
-          const total = d.items.reduce((s, l) => s + l.people, 0);
+          const none = d.items.filter(l => !roomById[l.room_id]);
           return (
             <div key={dayKey(d.date)} className="rooms-print__day">
-              <h2 className="rooms-print__day-title">{`${DAY_NAMES[(d.date.getDay() + 6) % 7]}, ${dm(d.date)}`}</h2>
-              <table className="rooms-print__table">
-                <thead>
-                  <tr>
-                    <th>{'Группа'}</th>
-                    <th>{'Время'}</th>
-                    <th>{'Учеников'}</th>
-                    <th>{'Аудитория'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {d.items.map(l => {
-                    const r = roomById[l.room_id];
-                    const over = r && l.people > r.capacity;
-                    return (
-                      <tr key={l.id} className={r ? undefined : 'rooms-print__row--none'}>
-                        <td>
-                          <b>{l.group_name}</b>
-                          {l.teacher_name && <small>{l.teacher_name}</small>}
-                        </td>
-                        <td>{`${hm(l.start)}–${hm(l.end)}`}</td>
-                        <td className={over ? 'rooms-print__over' : undefined}>
-                          {r ? `${l.people} / ${r.capacity}` : l.people}
-                        </td>
-                        <td className={r ? `rooms-print__room room-color-${r.color}` : 'rooms-print__room rooms-print__room--none'}>
-                          {r ? `А${r.number}` : 'не назначена'}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr><td colSpan={4}>{`Всего: ${total} чел.`}</td></tr>
-                </tfoot>
-              </table>
+              <h2 className="rooms-print__day-title">
+                {`${DAY_NAMES[(d.date.getDay() + 6) % 7]}, ${dm(d.date)}`}
+                <small>{` уроков: ${d.items.length} · учеников: ${d.items.reduce((s, l) => s + l.people, 0)}`}</small>
+                {none.length > 0 && <span className="rooms-print__bad">{` без аудитории: ${none.length}`}</span>}
+              </h2>
+              <div className="rooms-tl" style={{ '--h': hours }}>
+                <div className="rooms-tl__axis">
+                  {Array.from({ length: hours }, (_, i) => <div key={i}>{`${pad(h0 + i)}:00`}</div>)}
+                </div>
+                {rooms.map(r => (
+                  <React.Fragment key={r.id}>
+                    <div className="rooms-tl__room">{`А${r.number}`}<small>{`${r.capacity} мест`}</small></div>
+                    <div className="rooms-tl__lane">{d.items.filter(l => l.room_id === r.id).map(block)}</div>
+                  </React.Fragment>
+                ))}
+                {none.length > 0 && (
+                  <>
+                    <div className="rooms-tl__room rooms-tl__room--none">{'Без ауд.'}</div>
+                    <div className="rooms-tl__lane">{none.map(block)}</div>
+                  </>
+                )}
+              </div>
             </div>
           );
         })}
+        {days.length > 0 && (
+          <p className="text-muted">{'«9/14» — учеников / мест. Жёлтым — учеников больше, чем мест (часть занимается удалённо). Красная строка «Без ауд.» — уроки без аудитории.'}</p>
+        )}
       </div>
     </div>
   );

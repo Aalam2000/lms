@@ -43,6 +43,16 @@ export function fillGroupSchedule(groupId, payload) {
   return api.post(`/lessons/group/${groupId}/fill-schedule`, payload).then(res => res.data);
 }
 
+// Аудитории на время урока: {people, room_id, rooms: [{id, number, capacity, busy_with: [группы]}]}
+export function getLessonRooms(lessonId) {
+  return api.get(`/lessons/${lessonId}/rooms`).then(res => res.data);
+}
+
+// Аудитория одного урока (null — снять): {room_id, room_number}
+export function setLessonRoom(lessonId, roomId) {
+  return api.put(`/lessons/${lessonId}/room`, { room_id: roomId }).then(res => res.data);
+}
+
 // Аудитории группы по дням недели (будущие уроки): {group_size, days: [{weekday, lesson_count, times, room_id, mixed, rooms: [{id, number, capacity, busy_count}]}]}
 export function getGroupRoomDays(groupId) {
   return api.get(`/lessons/group/${groupId}/room-days`).then(res => res.data);

@@ -1706,6 +1706,80 @@ async def detach_lesson_item(
     return {"ok": True}
 
 
+# ── Аудитория одного урока ──
+# В открытом уроке: список аудиторий на время урока (свободна / какой группой
+# занята, мест) и смена аудитории только у этого урока. Меняет тот, кто
+# управляет расписанием урока (основной педагог группы, админ).
+
+class LessonRoomOptionOut(BaseModel):
+    id: int
+    number: int
+    capacity: int
+    busy_with: list[str] = []   # группы, чьи уроки в это время в этой аудитории
+
+
+class LessonRoomsOut(BaseModel):
+    people: int
+    room_id: Optional[int] = None
+    rooms: list[LessonRoomOptionOut]
+
+
+class LessonRoomIn(BaseModel):
+    room_id: Optional[int] = None   # None — снять аудиторию
+
+
+@router.get("/{lesson_id}/rooms", response_model=LessonRoomsOut)
+async def get_lesson_rooms(
+    lesson_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_teacher),
+):
+    lesson = await get_lesson_for_teacher_or_admin(lesson_id, db, current_user, write=False)
+    rooms = (await db.execute(select(Room).order_by(Room.number))).scalars().all()
+    busy: dict[int, list[str]] = {}
+    if lesson.date:
+        start, end = _lesson_span(lesson)
+        rows = (await db.execute(
+            select(Lesson, Group.name)
+            .join(Group, Group.id == Lesson.group_id)
+            .where(
+                Lesson.id != lesson.id,
+                Lesson.room_id.is_not(None),
+                Lesson.date < end,
+                Lesson.date > start - timedelta(days=1),
+            )
+        )).all()
+        for other, gname in rows:
+            a, b = _lesson_span(other)
+            if a < end and start < b:
+                busy.setdefault(other.room_id, []).append(gname)
+    people = len(await lesson_student_ids(db, lesson))
+    return LessonRoomsOut(
+        people=people,
+        room_id=lesson.room_id,
+        rooms=[LessonRoomOptionOut(id=r.id, number=r.number, capacity=r.capacity, busy_with=busy.get(r.id, []))
+               for r in rooms],
+    )
+
+
+@router.put("/{lesson_id}/room")
+async def set_lesson_room(
+    lesson_id: int,
+    data: LessonRoomIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_teacher),
+):
+    lesson = await get_lesson_for_teacher_or_admin(lesson_id, db, current_user, write=False, manage=True)
+    room = None
+    if data.room_id is not None:
+        room = await db.get(Room, data.room_id)
+        if not room:
+            raise HTTPException(status_code=404, detail="Аудитория не найдена")
+    lesson.room_id = room.id if room else None
+    await db.commit()
+    return {"room_id": lesson.room_id, "room_number": room.number if room else None}
+
+
 @router.get("/{lesson_id}", response_model=LessonOut)
 async def get_lesson(
     lesson_id: int,
