@@ -39,6 +39,7 @@ const MESSAGES_BY_LANG = {
     previous: 'Назад',
     next: 'Вперёд',
     noEventsInRange: 'Уроков нет',
+    room: 'А',
     showMore: (count) => `ещё ${count}`,
     dayOff: (name) => (name ? `У учителя ${name} выходной` : 'У учителя выходной'),
   },
@@ -50,6 +51,7 @@ const MESSAGES_BY_LANG = {
     previous: 'Geri',
     next: 'İrəli',
     noEventsInRange: 'Dərs yoxdur',
+    room: 'A',
     showMore: (count) => `daha ${count}`,
     dayOff: (name) => (name ? `Müəllim ${name} istirahət günündədir` : 'Müəllimin istirahət günüdür'),
   },
@@ -61,6 +63,7 @@ const MESSAGES_BY_LANG = {
     previous: 'Back',
     next: 'Next',
     noEventsInRange: 'No lessons',
+    room: 'A',
     showMore: (count) => `+${count} more`,
     dayOff: (name) => (name ? `Teacher ${name} is off` : 'Teacher is off'),
   },
@@ -144,6 +147,8 @@ function Calendar({ lessons, onSelectLesson, getEventColor, defaultView = 'month
     moment.locale(momentLocale);
   }, [momentLocale]);
 
+  // Буква аудитории перед номером («А2») — по языку, из словаря выше
+  const roomLetter = (MESSAGES_BY_LANG[momentLocale] || MESSAGES_BY_LANG.ru).room;
   const events = useMemo(() => lessons
     .filter(l => l.date)
     .map(l => {
@@ -152,12 +157,12 @@ function Calendar({ lessons, onSelectLesson, getEventColor, defaultView = 'month
         // 👤 — персональный урок (у педагога — с именами участников перед названием);
         // в конце — кто ведёт урок, если это не основной педагог группы
         // А2 — аудитория урока (номер), первым
-        title: `${l.room_number ? `А${l.room_number} ` : ''}${highlight(l)}${l.is_personal ? '👤 ' : ''}${l.group_name ? `${l.group_name}: ` : ''}${personalNames(l)}${l.title}${l.teacher_name ? ` · ${l.teacher_name}` : ''}`,
+        title: `${l.room_number ? `${roomLetter}${l.room_number} ` : ''}${highlight(l)}${l.is_personal ? '👤 ' : ''}${l.group_name ? `${l.group_name}: ` : ''}${personalNames(l)}${l.title}${l.teacher_name ? ` · ${l.teacher_name}` : ''}`,
         start: new Date(l.date),
         end: lessonEnd(l), // реальная длительность — растягивается в «Неделе»/«Дне»
         resource: l,
       };
-    }), [lessons, highlight]);
+    }), [lessons, highlight, roomLetter]);
 
   const { min, max } = useMemo(() => visibleHours(events), [events]);
 

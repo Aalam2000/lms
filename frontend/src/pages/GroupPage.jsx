@@ -846,7 +846,7 @@ function GroupPage() {
             {roomDays.days.map(d => (
               <label key={d.weekday} className="field-label">
                 <span>
-                  {`${WEEKDAY_LABELS[d.weekday]} · ${d.times.join(', ')} · уроков: ${d.lesson_count}`}
+                  {WEEKDAY_LABELS[d.weekday]}{` · ${d.times.join(', ')} · `}{'уроков'}{`: ${d.lesson_count}`}
                   {!d.room_id && <span className="error-text">{d.mixed ? ' — аудитории разные' : ' — аудитория не выбрана'}</span>}
                 </span>
                 <select

@@ -162,7 +162,7 @@ function RoomsPrint({ rooms, onBack }) {
           return (
             <div key={dayKey(d.date)} className="rooms-print__day">
               <h2 className="rooms-print__day-title">
-                {`${DAY_NAMES[(d.date.getDay() + 6) % 7]}, ${dm(d.date)}`}
+                {DAY_NAMES[(d.date.getDay() + 6) % 7]}{`, ${dm(d.date)}`}
                 <small>{` уроков: ${d.items.length} · учеников: ${d.items.reduce((s, l) => s + l.people, 0)}`}</small>
                 {none.length > 0 && <span className="rooms-print__bad">{` без аудитории: ${none.length}`}</span>}
               </h2>
