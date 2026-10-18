@@ -86,12 +86,13 @@ async def require_teacher(current_user: User = Depends(get_current_user)):
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     "admin": frozenset({
         "students.view", "students.edit", "students.all", "lessons.personal",
-        "teachers.view", "groups.all", "calendars.all", "catalog.view",
+        "teachers.view", "groups.all", "calendars.all", "catalog.view", "rooms.edit",
     }),
     "teacher": frozenset({"students.view", "students.edit", "lessons.personal", "catalog.view"}),
     "curator": frozenset({
         "students.view", "students.edit", "students.all", "lessons.personal",
         "teachers.view", "groups.all", "calendars.all", "catalog.view", "lessons.own",
+        "rooms.edit",
     }),
     "student": frozenset(),
     "parent": frozenset(),

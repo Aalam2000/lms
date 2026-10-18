@@ -130,3 +130,32 @@ export function previewTeacherDaysOff(teacherId, settings, dateFrom, dateTo) {
   return api.post(`/admin/teachers/${teacherId}/days-off/preview`, { ...settings, date_from: dateFrom, date_to: dateTo })
     .then(res => res.data);
 }
+
+// Аудитории: [{id, number, capacity}] — справочник ведут админ и куратор (право rooms.edit)
+export function getRooms() {
+  return api.get('/admin/rooms').then(res => res.data);
+}
+
+export function createRoom(data) {
+  return api.post('/admin/rooms', data).then(res => res.data);
+}
+
+export function updateRoom(roomId, data) {
+  return api.patch(`/admin/rooms/${roomId}`, data).then(res => res.data);
+}
+
+export function deleteRoom(roomId) {
+  return api.delete(`/admin/rooms/${roomId}`).then(res => res.data);
+}
+
+// Календарь аудитории: уроки, записанные в неё
+export function getRoomLessons(roomId) {
+  return api.get(`/admin/rooms/${roomId}/lessons`).then(res => res.data);
+}
+
+// Отчёт «Аудитории»: все уроки за период [{id, group_name, title, teacher_name, date, duration_min, people, room_id}]
+export function getRoomsReport(dateFrom, dateTo) {
+  return api.get('/admin/rooms/report', {
+    params: { date_from: dateFrom.toISOString(), date_to: dateTo.toISOString() },
+  }).then(res => res.data);
+}

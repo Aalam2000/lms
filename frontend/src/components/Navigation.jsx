@@ -17,6 +17,7 @@ import {
   IconActivity,
   IconBook,
   IconNetwork,
+  IconRooms,
 } from './CyberIcons';
 
 // Сайт открыт по адресу локальной сети (192.168.x.x, 10.x.x.x, 172.16–31.x.x,
@@ -98,6 +99,14 @@ function Navigation({ user, isOpen, onClose }) {
             <NavLink to="/dashboard/teachers" className={linkClass} onClick={handleLinkClick}>
               <IconTeachers className="nav__icon" />
               <span>{'Учителя'}</span>
+            </NavLink>
+          </li>
+        )}
+        {can('rooms.edit') && (
+          <li className="nav__item">
+            <NavLink to="/dashboard/rooms" className={linkClass} onClick={handleLinkClick}>
+              <IconRooms className="nav__icon" />
+              <span>{'Аудитории'}</span>
             </NavLink>
           </li>
         )}

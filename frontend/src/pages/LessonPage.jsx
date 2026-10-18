@@ -616,6 +616,9 @@ function LessonPage() {
           <button className="btn btn--outline" onClick={() => navigate(`/dashboard/groups/${lesson.group_id}`)}>
             {'Назад'}
           </button>
+          {lesson.room_number && (
+            <strong className="lesson-toolbar__title" data-tip={'Аудитория'}>{`А${lesson.room_number}`}</strong>
+          )}
           <span className="lesson-toolbar__title">{lesson.title}</span>
           <span className="lesson-toolbar__group">{'Группа'}: {groupName}</span>
           {/* Персональный урок: метка с участниками, по клику — смена состава */}

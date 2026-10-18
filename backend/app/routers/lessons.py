@@ -27,7 +27,7 @@ from .. import storage
 from ..models import (
     Lesson, Group, GroupMember, User, LessonMark, LessonResource, Material, Link, Quiz,
     HomeworkTask, HomeworkAnswer, HomeworkAnswerFile, LessonMessage, LessonStudent, LessonFeedback,
-    LessonWorkFile,
+    LessonWorkFile, Room,
 )
 from ..dependencies import has_perm, require_teacher, get_current_user
 from ..resources import RESOURCE_MODELS, RESOURCE_NOT_FOUND, fetch_resource_details, resource_exists
@@ -103,6 +103,9 @@ class LessonOut(BaseModel):
     teacher_name: Optional[str] = None   # заполняется, если урок ведёт не основной педагог группы
     can_edit: bool = True                # False — урок доступен только для просмотра
     can_manage: bool = True              # расписание и состав урока: основной педагог группы и админ
+    # Аудитория урока: id и номер («А2» в календарях и в уроке) — только педагогу/админу/куратору
+    room_id: Optional[int] = None
+    room_number: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -511,7 +514,12 @@ async def _fill_teacher_info(db: AsyncSession, out: list[LessonOut], lessons: li
                 select(User.id, User.full_name, User.username).where(User.id.in_(other_ids))
             )).all()
         }
+    room_ids = {l.room_id for l in lessons if l.room_id}
+    room_numbers = dict((await db.execute(
+        select(Room.id, Room.number).where(Room.id.in_(room_ids))
+    )).all()) if room_ids else {}
     for item, lesson in zip(out, lessons):
+        item.room_number = room_numbers.get(lesson.room_id)
         group_teacher_id = group_teachers.get(lesson.group_id)
         item.teacher_name = names.get(lesson.teacher_id) if lesson.teacher_id != group_teacher_id else None
         item.can_edit = can_edit_lesson(lesson, group_teacher_id, user)
@@ -763,6 +771,126 @@ async def fill_group_schedule(
     attached = await _apply_positions_to_lessons(db, lessons_by_order, positions, data.mode, current_user)
     await db.commit()
     return {"ok": True, "attached": attached}
+
+
+# ── Аудитории группы по дням недели ──
+# В «Расписание и материалы»: будущие уроки группы (без персональных)
+# раскладываются по дням недели (по Баку); на каждый день выбирается аудитория,
+# и она записывается во все будущие уроки группы в этот день. Прошлые не трогаем.
+
+class RoomChoiceOut(BaseModel):
+    id: int
+    number: int
+    capacity: int
+    busy_count: int      # сколько уроков этого дня пересекаются с уроками других групп в этой аудитории
+
+
+class RoomDayOut(BaseModel):
+    weekday: int                  # 0 — понедельник … 6 — воскресенье
+    lesson_count: int
+    times: list[str]              # «10:00–12:00»
+    room_id: Optional[int] = None # у всех уроков дня одна аудитория; иначе None
+    mixed: bool = False           # у уроков дня разные аудитории / часть без аудитории
+    rooms: list[RoomChoiceOut]
+
+
+class RoomDaysOut(BaseModel):
+    group_size: int
+    days: list[RoomDayOut]
+
+
+class RoomDayIn(BaseModel):
+    weekday: int = Field(ge=0, le=6)
+    room_id: int
+
+
+async def _future_lessons_by_weekday(db: AsyncSession, group_id: int) -> dict[int, list[Lesson]]:
+    now = datetime.now(dt_timezone.utc)
+    lessons = (await db.execute(
+        select(Lesson).where(
+            Lesson.group_id == group_id,
+            Lesson.is_personal.is_(False),
+            Lesson.date > now,
+        ).order_by(Lesson.date)
+    )).scalars().all()
+    by_day: dict[int, list[Lesson]] = {}
+    for l in lessons:
+        by_day.setdefault(aware(l.date).astimezone(BAKU_TZ).weekday(), []).append(l)
+    return by_day
+
+
+def _lesson_span(l: Lesson) -> tuple[datetime, datetime]:
+    start = aware(l.date)
+    return start, start + timedelta(minutes=l.duration_min or 0)
+
+
+@router.get("/group/{group_id}/room-days", response_model=RoomDaysOut)
+async def get_group_room_days(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_teacher),
+):
+    await get_accessible_group(group_id, db, current_user)
+    by_day = await _future_lessons_by_weekday(db, group_id)
+    rooms = (await db.execute(select(Room).order_by(Room.number))).scalars().all()
+    group_size = (await db.execute(
+        select(func.count()).select_from(GroupMember)
+        .where(GroupMember.group_id == group_id, GroupMember.status == "active")
+    )).scalar() or 0
+
+    # Уроки других групп в аудиториях — для отметки «занята»
+    others: list[Lesson] = []
+    all_lessons = [l for ls in by_day.values() for l in ls]
+    if all_lessons:
+        first = _lesson_span(all_lessons[0])[0]
+        last = max(_lesson_span(l)[1] for l in all_lessons)
+        others = (await db.execute(
+            select(Lesson).where(
+                Lesson.group_id != group_id,
+                Lesson.room_id.is_not(None),
+                Lesson.date < last,
+                Lesson.date > first - timedelta(days=1),
+            )
+        )).scalars().all()
+
+    days = []
+    for weekday in sorted(by_day):
+        ls = by_day[weekday]
+        spans = [_lesson_span(l) for l in ls]
+        times = sorted({
+            f"{a.astimezone(BAKU_TZ):%H:%M}–{b.astimezone(BAKU_TZ):%H:%M}" for a, b in spans
+        })
+        room_ids = {l.room_id for l in ls}
+        choices = []
+        for r in rooms:
+            busy = 0
+            for a, b in spans:
+                if any(o.room_id == r.id and _lesson_span(o)[0] < b and a < _lesson_span(o)[1] for o in others):
+                    busy += 1
+            choices.append(RoomChoiceOut(id=r.id, number=r.number, capacity=r.capacity, busy_count=busy))
+        single = next(iter(room_ids)) if len(room_ids) == 1 else None
+        days.append(RoomDayOut(
+            weekday=weekday, lesson_count=len(ls), times=times,
+            room_id=single, mixed=len(room_ids) > 1, rooms=choices,
+        ))
+    return RoomDaysOut(group_size=group_size, days=days)
+
+
+@router.put("/group/{group_id}/room-days")
+async def set_group_room_day(
+    group_id: int,
+    data: RoomDayIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_teacher),
+):
+    await get_accessible_group(group_id, db, current_user)
+    if not await db.get(Room, data.room_id):
+        raise HTTPException(status_code=404, detail="Аудитория не найдена")
+    ls = (await _future_lessons_by_weekday(db, group_id)).get(data.weekday, [])
+    for l in ls:
+        l.room_id = data.room_id
+    await db.commit()
+    return {"ok": True, "updated": len(ls)}
 
 
 # Открыть / закрыть доступ сразу к нескольким урокам группы (по номерам

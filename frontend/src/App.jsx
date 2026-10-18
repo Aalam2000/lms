@@ -17,6 +17,7 @@ import TeachersDirectoryPage from './pages/TeachersDirectoryPage';
 import TeacherReportPage from './pages/TeacherReportPage';
 import StudentReportPage from './pages/StudentReportPage';
 import ActivityPage from './pages/ActivityPage';
+import RoomsPage from './pages/RoomsPage';
 import JoinGroupPage from './pages/JoinGroupPage';
 import ParentPage from './pages/ParentPage';
 import QuizLiveHostPage from './pages/QuizLiveHostPage';
@@ -84,6 +85,9 @@ function App() {
           } />
           <Route path="teachers/:teacherId/report" element={
             <RoleRoute roles={['admin']}><TeacherReportPage /></RoleRoute>
+          } />
+          <Route path="rooms" element={
+            <RoleRoute perm="rooms.edit"><RoomsPage /></RoleRoute>
           } />
           <Route path="activity" element={
             <RoleRoute roles={['admin']}><ActivityPage /></RoleRoute>

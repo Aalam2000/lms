@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from pydantic import BaseModel, Field, field_validator
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 from ..database import get_db
-from ..models import User, Course, Group, GroupMember, Lesson, LessonMark
+from ..models import User, Course, Group, GroupMember, Lesson, LessonMark, LessonStudent, Room
 from ..usages import ensure_not_used
 from ..attendance import attendance_slots, summarize, PRESENT
 from ..schemas import UserCreate, UserOut, CourseCreate, CourseOut, GroupCreate, GroupOut, clean_video_url, DURATION_MIN, DURATION_MAX, NewPasswordIn, DaysOffSettings
@@ -481,6 +481,156 @@ async def delete_curator(user_id: int, db: AsyncSession = Depends(get_db), admin
     await db.delete(user)
     await db.commit()
     return {"detail": "Удалён"}
+
+# ── АУДИТОРИИ ──
+
+# Справочник аудиторий ведут админ и куратор (право rooms.edit).
+# Номер — только число и не повторяется; мест — больше нуля.
+
+class RoomIn(BaseModel):
+    number: int = Field(gt=0)
+    capacity: int = Field(gt=0)
+
+
+class RoomOut(BaseModel):
+    id: int
+    number: int
+    capacity: int
+
+    model_config = {"from_attributes": True}
+
+
+async def _ensure_room_number_free(db: AsyncSession, number: int, exclude_id: Optional[int] = None) -> None:
+    q = select(Room.id).where(Room.number == number)
+    if exclude_id is not None:
+        q = q.where(Room.id != exclude_id)
+    if (await db.execute(q)).first():
+        raise HTTPException(status_code=409, detail="Аудитория с таким номером уже есть")
+
+
+@router.get("/rooms", response_model=list[RoomOut])
+async def get_rooms(db: AsyncSession = Depends(get_db), user: User = Depends(require("rooms.edit"))):
+    result = await db.execute(select(Room).order_by(Room.number))
+    return result.scalars().all()
+
+
+@router.post("/rooms", response_model=RoomOut)
+async def create_room(data: RoomIn, db: AsyncSession = Depends(get_db), user: User = Depends(require("rooms.edit"))):
+    await _ensure_room_number_free(db, data.number)
+    room = Room(number=data.number, capacity=data.capacity)
+    db.add(room)
+    await db.commit()
+    await db.refresh(room)
+    return room
+
+
+@router.patch("/rooms/{room_id}", response_model=RoomOut)
+async def update_room(room_id: int, data: RoomIn, db: AsyncSession = Depends(get_db), user: User = Depends(require("rooms.edit"))):
+    room = await db.get(Room, room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail="Аудитория не найдена")
+    await _ensure_room_number_free(db, data.number, exclude_id=room.id)
+    room.number = data.number
+    room.capacity = data.capacity
+    await db.commit()
+    await db.refresh(room)
+    return room
+
+
+class RoomLessonOut(BaseModel):
+    id: int
+    group_id: int
+    group_name: str
+    group_size: int      # активные ученики группы
+    title: str
+    date: Optional[datetime] = None
+    duration_min: int
+    is_open: bool
+
+
+# Календарь аудитории: все уроки, записанные в эту аудиторию
+@router.get("/rooms/{room_id}/lessons", response_model=list[RoomLessonOut])
+async def get_room_lessons(room_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(require("rooms.edit"))):
+    if not await db.get(Room, room_id):
+        raise HTTPException(status_code=404, detail="Аудитория не найдена")
+    rows = (await db.execute(
+        select(Lesson, Group.name)
+        .join(Group, Group.id == Lesson.group_id)
+        .where(Lesson.room_id == room_id, Lesson.date.is_not(None))
+        .order_by(Lesson.date)
+    )).all()
+    group_ids = {l.group_id for l, _ in rows}
+    sizes = dict((await db.execute(
+        select(GroupMember.group_id, func.count())
+        .where(GroupMember.group_id.in_(group_ids), GroupMember.status == "active")
+        .group_by(GroupMember.group_id)
+    )).all()) if group_ids else {}
+    return [
+        RoomLessonOut(id=l.id, group_id=l.group_id, group_name=name, group_size=sizes.get(l.group_id, 0),
+                      title=l.title, date=l.date, duration_min=l.duration_min, is_open=l.is_open)
+        for l, name in rows
+    ]
+
+
+class RoomReportLessonOut(BaseModel):
+    id: int
+    group_name: str
+    title: str
+    teacher_name: Optional[str] = None
+    date: datetime
+    duration_min: int
+    people: int                  # ученики урока: активные в группе, у персонального — его участники
+    room_id: Optional[int] = None
+
+
+# Отчёт «Аудитории»: все уроки за период (с аудиторией и без) — для сетки
+# «время × аудитории» и таблицы по дню на странице «Аудитории»
+@router.get("/rooms/report", response_model=list[RoomReportLessonOut])
+async def get_rooms_report(
+    date_from: datetime,
+    date_to: datetime,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require("rooms.edit")),
+):
+    rows = (await db.execute(
+        select(Lesson, Group.name, User.full_name, User.username)
+        .join(Group, Group.id == Lesson.group_id)
+        .join(User, User.id == Lesson.teacher_id)
+        .where(Lesson.date >= date_from, Lesson.date < date_to)
+        .order_by(Lesson.date)
+    )).all()
+    group_ids = {l.group_id for l, *_ in rows}
+    sizes = dict((await db.execute(
+        select(GroupMember.group_id, func.count())
+        .where(GroupMember.group_id.in_(group_ids), GroupMember.status == "active")
+        .group_by(GroupMember.group_id)
+    )).all()) if group_ids else {}
+    personal_ids = [l.id for l, *_ in rows if l.is_personal]
+    personal = dict((await db.execute(
+        select(LessonStudent.lesson_id, func.count())
+        .where(LessonStudent.lesson_id.in_(personal_ids))
+        .group_by(LessonStudent.lesson_id)
+    )).all()) if personal_ids else {}
+    return [
+        RoomReportLessonOut(
+            id=l.id, group_name=gname, title=l.title, teacher_name=full_name or username,
+            date=l.date, duration_min=l.duration_min,
+            people=personal.get(l.id, 0) if l.is_personal else sizes.get(l.group_id, 0),
+            room_id=l.room_id,
+        )
+        for l, gname, full_name, username in rows
+    ]
+
+
+@router.delete("/rooms/{room_id}")
+async def delete_room(room_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(require("rooms.edit"))):
+    room = await db.get(Room, room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail="Аудитория не найдена")
+    await ensure_not_used(db, "room", room_id)  # см. app/usages.py
+    await db.delete(room)
+    await db.commit()
+    return {"detail": "Удалена"}
 
 # ── КУРСЫ ──
 

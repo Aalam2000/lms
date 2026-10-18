@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON, Boolean, UniqueConstraint, Index
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON, Boolean, UniqueConstraint, Index, CheckConstraint
 from sqlalchemy.sql import func
 from .database import Base
 
@@ -104,6 +104,8 @@ class Lesson(Base):
     # Кто создал урок (у старых уроков пусто): куратор переносит и открывает только свои
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # Аудитория урока (rooms); пусто — аудитория не назначена
+    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=True, index=True)
 
 
 # Участники персонального урока (Lesson.is_personal). У обычного урока записей
@@ -401,3 +403,16 @@ class PushSubscription(Base):
     user_agent = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Room(Base):
+    """Аудитория: номер (только число, не повторяется) и количество мест для учеников.
+    Справочник ведут админ и куратор (право rooms.edit)."""
+    __tablename__ = "rooms"
+    __table_args__ = (
+        CheckConstraint("number > 0", name="ck_rooms_number_positive"),
+        CheckConstraint("capacity > 0", name="ck_rooms_capacity_positive"),
+    )
+    id = Column(Integer, primary_key=True)
+    number = Column(Integer, nullable=False, unique=True)
+    capacity = Column(Integer, nullable=False)

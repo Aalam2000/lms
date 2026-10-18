@@ -2880,3 +2880,87 @@ a.row-icon:hover {
   line-height: 18px;
   vertical-align: middle;
 }
+
+/* ===== Печатное расписание «Аудитории» (pages/RoomsPage.jsx, RoomsPrint) ===== */
+.rooms-print__week {
+  font-weight: 600;
+  min-width: 110px;
+  text-align: center;
+}
+.rooms-print {
+  max-width: 760px;
+}
+.rooms-print__title {
+  font-size: 20px;
+  margin: 8px 0 12px;
+}
+.rooms-print__day {
+  margin-bottom: 20px;
+  break-inside: avoid;
+}
+.rooms-print__day-title {
+  font-size: 16px;
+  margin: 0 0 6px;
+}
+.rooms-print__table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--color-primary-border);
+  font-size: 13px;
+}
+.rooms-print__table th {
+  background: var(--color-primary-border);
+  color: var(--color-white);
+  text-align: left;
+  padding: 6px 10px;
+}
+.rooms-print__table td {
+  padding: 5px 10px;
+  border-top: 1px solid var(--color-border-light);
+}
+.rooms-print__table td small {
+  display: block;
+  color: var(--color-muted);
+  font-size: 11px;
+}
+.rooms-print__table tfoot td {
+  text-align: right;
+  font-weight: 700;
+  background: var(--color-bg-soft);
+}
+.rooms-print__over {
+  color: var(--color-warning);
+  font-weight: 700;
+}
+.rooms-print__room {
+  font-weight: 700;
+  text-align: center;
+  width: 110px;
+  background: var(--room-bg);
+  color: var(--room-border);
+}
+.rooms-print__room--none,
+.rooms-print__row--none td {
+  background: var(--color-danger-bg-light);
+  color: var(--color-danger-text);
+}
+
+/* Цвета аудиторий: фон ячейки и цвет номера */
+.room-color-0 { --room-bg: #dbe9fb; --room-border: #2b62b0; }
+.room-color-1 { --room-bg: #e0f3e3; --room-border: #2c7a43; }
+.room-color-2 { --room-bg: #fde8d6; --room-border: #a85d16; }
+.room-color-3 { --room-bg: #efe3fb; --room-border: #6b3fb0; }
+.room-color-4 { --room-bg: #d9f3f3; --room-border: #1f7676; }
+.room-color-5 { --room-bg: #f7e0e8; --room-border: #a23462; }
+
+/* На печать — только лист (меню, шапка и .toolbar скрыты общим правилом в media.css);
+   цветные ячейки печатаются цветом */
+@media print {
+  .rooms-print__table th,
+  .rooms-print__room,
+  .rooms-print__table tfoot td,
+  .rooms-print__row--none td {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

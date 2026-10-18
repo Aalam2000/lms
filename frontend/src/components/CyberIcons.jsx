@@ -151,6 +151,17 @@ export function IconNetwork(props) {
   );
 }
 
+// Аудитории: дверь с ручкой в проёме (пункт «Аудитории»)
+export function IconRooms(props) {
+  return (
+    <svg {...baseProps} {...props}>
+      <line x1="3" y1="21" x2="21" y2="21" />
+      <rect x="6" y="3" width="12" height="18" />
+      <line x1="14.5" y1="11" x2="14.5" y2="13" />
+    </svg>
+  );
+}
+
 // На рабочий стол: монитор со стрелкой вниз (кнопка «На рабочий стол»)
 export function IconInstall(props) {
   return (

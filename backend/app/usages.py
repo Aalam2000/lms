@@ -190,6 +190,19 @@ def _template_title(title: str, lesson_no) -> str:
 
 
 # entity -> (кто может смотреть/удалять, функция поиска, как называть в сообщении)
+async def _room_usages(db: AsyncSession, room_id: int) -> list[Usage]:
+    """Аудитория: уроки, записанные в неё."""
+    usages: list[Usage] = []
+    for lesson_id, title, group_name in (await db.execute(
+        select(Lesson.id, Lesson.title, Group.name)
+        .join(Group, Group.id == Lesson.group_id)
+        .where(Lesson.room_id == room_id)
+        .order_by(Lesson.date)
+    )).all():
+        usages.append({"kind": "Уроки", "title": f"{group_name} — {title}", "url": f"/dashboard/lessons/{lesson_id}"})
+    return usages
+
+
 USAGE_FINDERS: dict[str, tuple[set[str], Callable[[AsyncSession, int], Awaitable[list[Usage]]], str]] = {
     "course": ({"admin"}, _course_usages, "Курс"),
     "user": ({"admin"}, _user_usages, "Пользователь"),
@@ -198,6 +211,7 @@ USAGE_FINDERS: dict[str, tuple[set[str], Callable[[AsyncSession, int], Awaitable
     "material": ({"admin"}, _resource_usages("material"), "Файл"),
     "link": ({"admin"}, _resource_usages("link"), "Ссылка"),
     "quiz": ({"teacher", "admin"}, _resource_usages("quiz"), "Квиз"),
+    "room": ({"admin", "curator"}, _room_usages, "Аудитория"),
 }
 
 

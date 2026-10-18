@@ -20,6 +20,7 @@ import { useHomeworkRefresh } from '../hooks/useHomeworkRefresh';
 import {
   getGroupLessons, createLesson, generateSchedule,
   fillGroupSchedule, deleteGroupLessons, markLessonHoliday, openGroupLessonsRange,
+  getGroupRoomDays, setGroupRoomDay,
 } from '../api/lessons';
 
 function GroupPage() {
@@ -74,6 +75,11 @@ function GroupPage() {
   // Диалог решения, если в группе уже есть уроки — см. handleOpenScheduleFlow
   const [isExistingLessonsDialogOpen, setIsExistingLessonsDialogOpen] = useState(false);
   const [isRecreating, setIsRecreating] = useState(false);
+
+  // «Аудитории по дням недели»: аудитория на каждый день недели — во все будущие уроки этого дня
+  const [roomDays, setRoomDays] = useState(null); // null — окно закрыто
+  const [roomDaysBusy, setRoomDaysBusy] = useState(false);
+  const [roomDaysError, setRoomDaysError] = useState('');
 
   // Дозаполнение/обновление материалов уже существующих уроков — и как
   // шаг после решения "уроки уже есть", и как отдельная кнопка
@@ -266,6 +272,31 @@ function GroupPage() {
       setError(err?.response?.data?.detail || 'Не удалось удалить уроки группы');
     } finally {
       setIsRecreating(false);
+    }
+  };
+
+  const loadRoomDays = () => getGroupRoomDays(gid)
+    .then(setRoomDays)
+    .catch(err => setRoomDaysError(err?.response?.data?.detail || 'Не удалось загрузить аудитории'));
+
+  const handleChooseRooms = () => {
+    setIsExistingLessonsDialogOpen(false);
+    setRoomDaysError('');
+    setRoomDays({ group_size: 0, days: [] });
+    loadRoomDays();
+  };
+
+  const handleSetRoomDay = async (weekday, roomId) => {
+    if (!roomId) return;
+    setRoomDaysBusy(true);
+    setRoomDaysError('');
+    try {
+      await setGroupRoomDay(gid, weekday, Number(roomId));
+      await loadRoomDays();
+    } catch (err) {
+      setRoomDaysError(err?.response?.data?.detail || 'Не удалось сохранить аудиторию');
+    } finally {
+      setRoomDaysBusy(false);
     }
   };
 
@@ -709,6 +740,9 @@ function GroupPage() {
             <button type="button" className="btn btn--outline" onClick={handleChooseFillInstead}>
               {'Оставить даты — дозаполнить материалами'}
             </button>
+            <button type="button" className="btn btn--outline" onClick={handleChooseRooms}>
+              {'Аудитории по дням недели'}
+            </button>
           </div>
         </Modal>
       )}
@@ -793,6 +827,49 @@ function GroupPage() {
       )}
 
       {/* Открыть / закрыть доступ к урокам с № по № */}
+      {roomDays && (
+        <Modal
+          title={'Аудитории по дням недели'}
+          onClose={() => setRoomDays(null)}
+          footer={(
+            <button type="button" className="btn btn--secondary" onClick={() => setRoomDays(null)}>
+              {'Закрыть'}
+            </button>
+          )}
+        >
+          <div className="form-stack">
+            <p className="text-muted">{'Аудитория записывается во все будущие уроки группы в этот день недели. Прошедшие уроки не меняются.'}</p>
+            {roomDaysError && <div className="error-text">{roomDaysError}</div>}
+            {roomDays.days.length === 0 && !roomDaysError && (
+              <p className="text-muted">{'У группы нет будущих уроков.'}</p>
+            )}
+            {roomDays.days.map(d => (
+              <label key={d.weekday} className="field-label">
+                <span>
+                  {`${WEEKDAY_LABELS[d.weekday]} · ${d.times.join(', ')} · уроков: ${d.lesson_count}`}
+                  {!d.room_id && <span className="error-text">{d.mixed ? ' — аудитории разные' : ' — аудитория не выбрана'}</span>}
+                </span>
+                <select
+                  className="input"
+                  value={d.room_id || ''}
+                  disabled={roomDaysBusy}
+                  onChange={e => handleSetRoomDay(d.weekday, e.target.value)}
+                >
+                  <option value="">{'— выберите аудиторию —'}</option>
+                  {d.rooms.map(r => (
+                    <option key={r.id} value={r.id}>
+                      {`${r.number} · мест ${r.capacity}`
+                        + (r.capacity < roomDays.group_size ? ` (в группе ${roomDays.group_size})` : '')
+                        + (r.busy_count > 0 ? ` · занята: ${r.busy_count} из ${d.lesson_count}` : ' · свободна')}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+        </Modal>
+      )}
+
       {isOpenRangeModalOpen && (
         <Modal
           title={'Открыть уроки'}

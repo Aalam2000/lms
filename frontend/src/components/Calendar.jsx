@@ -151,7 +151,8 @@ function Calendar({ lessons, onSelectLesson, getEventColor, defaultView = 'month
         id: l.id,
         // 👤 — персональный урок (у педагога — с именами участников перед названием);
         // в конце — кто ведёт урок, если это не основной педагог группы
-        title: `${highlight(l)}${l.is_personal ? '👤 ' : ''}${l.group_name ? `${l.group_name}: ` : ''}${personalNames(l)}${l.title}${l.teacher_name ? ` · ${l.teacher_name}` : ''}`,
+        // А2 — аудитория урока (номер), первым
+        title: `${l.room_number ? `А${l.room_number} ` : ''}${highlight(l)}${l.is_personal ? '👤 ' : ''}${l.group_name ? `${l.group_name}: ` : ''}${personalNames(l)}${l.title}${l.teacher_name ? ` · ${l.teacher_name}` : ''}`,
         start: new Date(l.date),
         end: lessonEnd(l), // реальная длительность — растягивается в «Неделе»/«Дне»
         resource: l,
