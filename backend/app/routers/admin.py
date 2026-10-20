@@ -581,6 +581,7 @@ class RoomReportLessonOut(BaseModel):
     duration_min: int
     people: int                  # ученики урока: активные в группе, у персонального — его участники
     room_id: Optional[int] = None
+    group_start: Optional[datetime] = None   # первый урок группы — для пометки «новая группа · с …»
 
 
 # Отчёт «Аудитории»: все уроки за период (с аудиторией и без) — для сетки
@@ -605,6 +606,11 @@ async def get_rooms_report(
         .where(GroupMember.group_id.in_(group_ids), GroupMember.status == "active")
         .group_by(GroupMember.group_id)
     )).all()) if group_ids else {}
+    starts = dict((await db.execute(
+        select(Lesson.group_id, func.min(Lesson.date))
+        .where(Lesson.group_id.in_(group_ids), Lesson.is_personal.is_(False))
+        .group_by(Lesson.group_id)
+    )).all()) if group_ids else {}
     personal_ids = [l.id for l, *_ in rows if l.is_personal]
     personal = dict((await db.execute(
         select(LessonStudent.lesson_id, func.count())
@@ -616,7 +622,7 @@ async def get_rooms_report(
             id=l.id, group_name=gname, title=l.title, teacher_name=full_name or username,
             date=l.date, duration_min=l.duration_min,
             people=personal.get(l.id, 0) if l.is_personal else sizes.get(l.group_id, 0),
-            room_id=l.room_id,
+            room_id=l.room_id, group_start=starts.get(l.group_id),
         )
         for l, gname, full_name, username in rows
     ]

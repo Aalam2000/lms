@@ -2957,6 +2957,7 @@ a.row-icon:hover {
 
 /* Блок дня: строки — аудитории, по горизонтали — часы */
 .rooms-tl {
+  --rooms-tl-line: #b9b5b5;   /* часовые линии — заметнее обычных разделителей */
   display: grid;
   grid-template-columns: 70px 1fr;
   border: 1px solid var(--color-border-light);
@@ -2966,13 +2967,14 @@ a.row-icon:hover {
   grid-column: 2;
   display: grid;
   grid-template-columns: repeat(var(--h), 1fr);
-  color: var(--color-muted);
-  font-size: 10px;
-  border-bottom: 1px solid var(--color-border-light);
+  color: var(--color-text);
+  font-size: 11px;
+  font-weight: 700;
+  border-bottom: 2px solid var(--rooms-tl-line);
 }
 .rooms-tl__axis div {
   padding: 2px 3px;
-  border-left: 1px solid var(--color-border-light);
+  border-left: 2px solid var(--rooms-tl-line);
 }
 .rooms-tl__room {
   padding: 4px 6px;
@@ -2996,8 +2998,8 @@ a.row-icon:hover {
   border-top: 1px solid var(--color-border-light);
   background: repeating-linear-gradient(
     90deg,
-    transparent 0 calc(100% / var(--h) - 1px),
-    var(--color-border-light) calc(100% / var(--h) - 1px) calc(100% / var(--h))
+    transparent 0 calc(100% / var(--h) - 2px),
+    var(--rooms-tl-line) calc(100% / var(--h) - 2px) calc(100% / var(--h))
   );
 }
 .rooms-tl__event {
@@ -3027,6 +3029,75 @@ a.row-icon:hover {
   color: var(--color-warning);
 }
 
+.rooms-print__sep {
+  width: 12px;
+}
+
+/* «По группам» — как бумажное расписание (скан) */
+.groups-print {
+  max-width: 760px;
+  --groups-ink: #1f3a5f;
+}
+.groups-print__title {
+  font-size: 24px;
+  color: var(--groups-ink);
+  margin: 8px 0 16px;
+}
+.groups-print__day {
+  margin-bottom: 24px;
+  break-inside: avoid;
+}
+.groups-print__day-title {
+  font-size: 17px;
+  color: var(--groups-ink);
+  margin: 0 0 6px;
+}
+.groups-print__table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--groups-ink);
+  font-size: 13px;
+}
+.groups-print__table th {
+  background: var(--groups-ink);
+  color: var(--color-white);
+  padding: 7px 10px;
+  text-align: center;
+}
+.groups-print__table th:first-child {
+  text-align: left;
+}
+.groups-print__table td {
+  padding: 6px 10px;
+  border-top: 1px solid var(--color-border-light);
+  text-align: center;
+}
+.groups-print__table td:first-child {
+  text-align: left;
+}
+.groups-print__table td small {
+  display: block;
+  font-size: 10px;
+  color: var(--color-muted);
+}
+.groups-print__table tfoot td {
+  text-align: right;
+  font-weight: 700;
+  background: #f1f4f9;
+}
+.groups-print__room {
+  width: 120px;
+  background: var(--room-bg);
+}
+.groups-print__room--none {
+  background: var(--color-danger-bg-light);
+  color: var(--color-danger-text);
+}
+.groups-print__note {
+  color: var(--groups-ink);
+  font-size: 12px;
+}
+
 /* Цвета аудиторий: фон ячейки и цвет номера */
 .room-color-0 { --room-bg: #dbe9fb; --room-border: #2b62b0; }
 .room-color-1 { --room-bg: #e0f3e3; --room-border: #2c7a43; }
@@ -3039,8 +3110,13 @@ a.row-icon:hover {
    цветные ячейки печатаются цветом */
 @media print {
   .rooms-tl__event,
+  .rooms-tl__axis,
+  .rooms-tl__lane,
   .rooms-kpi__bar i,
-  .rooms-kpi--bad {
+  .rooms-kpi--bad,
+  .groups-print__table th,
+  .groups-print__table tfoot td,
+  .groups-print__room {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }

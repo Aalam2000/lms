@@ -9,6 +9,8 @@ import DeleteButton from '../components/DeleteButton';
 import Calendar from '../components/Calendar';
 import { getRooms, createRoom, updateRoom, deleteRoom, getRoomLessons, getRoomsReport } from '../api/admin';
 import { extractErrorMessage } from '../utils/errors';
+import { useAcademyName } from '../utils/academyName';
+import { useLang } from '../hooks/useLang';
 
 const emptyRoom = { number: '', capacity: '' };
 
@@ -43,7 +45,84 @@ const fromIso = (v) => { const [y, m, d] = v.split('-').map(Number); return new 
 const hoursOf = (d) => d.getHours() + d.getMinutes() / 60;
 const DAY_NAMES = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
 
+// «По группам» — копия бумажного расписания: по таблице на день (Курс, Время,
+// Кол-во человек, Кабинет), «Всего: N чел.» и примечание внизу. Группа считается
+// новой, если её первый урок был не раньше чем за 30 дней до этого дня.
+const NEW_GROUP_DAYS = 30;
+
+function GroupsSheet({ days, roomById, longPeriod }) {
+  const academyName = useAcademyName();
+  const { lang } = useLang();
+  const longDate = (d) => d.toLocaleDateString(lang || 'ru', { day: 'numeric', month: 'long' });
+  const isNew = (l, day) => l.group_start && (day - new Date(l.group_start)) < NEW_GROUP_DAYS * 86400000;
+
+  // Примечание: с какого числа занимаются новые группы и одинаковы ли кабинеты во все дни
+  const newStarts = [...new Set(days.flatMap(d => d.items.filter(l => isNew(l, d.date))
+    .map(l => longDate(new Date(l.group_start)))))];
+  const roomsByGroup = {};
+  days.forEach(d => d.items.forEach(l => {
+    (roomsByGroup[l.group_name] = roomsByGroup[l.group_name] || new Set()).add(l.room_id || 0);
+  }));
+  const sameRooms = days.length > 1 && Object.values(roomsByGroup).every(set => set.size === 1);
+
+  return (
+    <div className="groups-print">
+      <h1 className="groups-print__title">{academyName}{' — '}{'Расписание занятий'}</h1>
+      {days.map(d => {
+        const total = d.items.reduce((s, l) => s + l.people, 0);
+        return (
+          <div key={dayKey(d.date)} className="groups-print__day">
+            <h2 className="groups-print__day-title">
+              {DAY_NAMES[(d.date.getDay() + 6) % 7]}{longPeriod ? `, ${dm(d.date)}` : ''}
+            </h2>
+            <table className="groups-print__table">
+              <thead>
+                <tr>
+                  <th>{'Курс'}</th>
+                  <th>{'Время'}</th>
+                  <th>{'Кол-во человек'}</th>
+                  <th>{'Кабинет'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {d.items.map(l => {
+                  const r = roomById[l.room_id];
+                  return (
+                    <tr key={l.id}>
+                      <td>
+                        <b>{l.group_name}</b>
+                        {isNew(l, d.date) && (
+                          <small>{'новая группа · с '}{longDate(new Date(l.group_start))}</small>
+                        )}
+                      </td>
+                      <td>{`${hm(l.start)}–${hm(l.end)}`}</td>
+                      <td>{l.people}</td>
+                      <td className={r ? `groups-print__room room-color-${r.color}` : 'groups-print__room groups-print__room--none'}>
+                        {r ? `Кабинет ${r.number}` : 'не назначен'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr><td colSpan={4}>{`Всего: ${total} чел.`}</td></tr>
+              </tfoot>
+            </table>
+          </div>
+        );
+      })}
+      {(newStarts.length > 0 || sameRooms) && (
+        <p className="groups-print__note">
+          {newStarts.length > 0 && <>{'Новые группы занимаются с '}{newStarts.join(', ')}{'. '}</>}
+          {sameRooms && (days.length === 2 ? 'Кабинеты одинаковы в оба дня.' : 'Кабинеты одинаковы во все дни.')}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function RoomsPrint({ rooms, onBack }) {
+  const [view, setView] = useState('groups');               // groups — «По группам» | rooms — «По залам»
   const [mode, setMode] = useState('week');                 // week | custom
   const [week, setWeek] = useState(() => mondayOf(new Date()));
   const [customFrom, setCustomFrom] = useState(() => isoDay(mondayOf(new Date())));
@@ -81,8 +160,11 @@ function RoomsPrint({ rooms, onBack }) {
       if (!map.has(k)) map.set(k, { date: new Date(l.start.getFullYear(), l.start.getMonth(), l.start.getDate()), items: [] });
       map.get(k).items.push(l);
     });
-    return [...map.values()].sort((a, b) => a.date - b.date);
-  }, [lessons]);
+    const roomNo = (l) => roomById[l.room_id]?.number ?? 1e9;
+    return [...map.values()]
+      .sort((a, b) => a.date - b.date)
+      .map(d => ({ ...d, items: d.items.sort((a, b) => a.start - b.start || roomNo(a) - roomNo(b)) }));
+  }, [lessons, roomById]);
 
   // Ось часов: 10–20, раздвигается под уроки периода
   const h0 = Math.min(10, ...lessons.map(l => Math.floor(hoursOf(l.start))));
@@ -114,6 +196,9 @@ function RoomsPrint({ rooms, onBack }) {
     <div className="page">
       <div className="toolbar toolbar--start rooms-print__controls">
         <button type="button" className="btn btn--secondary" onClick={onBack}>{'Назад'}</button>
+        <button type="button" className={`btn${view === 'groups' ? '' : ' btn--secondary'}`} onClick={() => setView('groups')}>{'По группам'}</button>
+        <button type="button" className={`btn${view === 'rooms' ? '' : ' btn--secondary'}`} onClick={() => setView('rooms')}>{'По залам'}</button>
+        <span className="rooms-print__sep" />
         <button type="button" className={`btn${mode === 'week' ? '' : ' btn--secondary'}`} onClick={() => setMode('week')}>{'Неделя'}</button>
         {mode === 'week' && (
           <>
@@ -134,7 +219,12 @@ function RoomsPrint({ rooms, onBack }) {
       </div>
       {error && <div className="error-text error-text--muted">{error}</div>}
 
-      <div className="rooms-print">
+      {view === 'groups' && days.length > 0 && (
+        <GroupsSheet days={days} roomById={roomById} longPeriod={(to - from) > 7 * 86400000} />
+      )}
+      {view === 'groups' && !error && days.length === 0 && <p className="text-muted">{'За этот период уроков нет'}</p>}
+
+      {view === 'rooms' && <div className="rooms-print">
         <h1 className="rooms-print__title">{'Расписание аудиторий'}</h1>
         <div className="text-muted">{`${periodLabel} · дней с уроками: ${days.length}`}</div>
         {!error && days.length === 0 && <p className="text-muted">{'За этот период уроков нет'}</p>}
@@ -189,7 +279,7 @@ function RoomsPrint({ rooms, onBack }) {
         {days.length > 0 && (
           <p className="text-muted">{'«9/14» — учеников / мест. Жёлтым — учеников больше, чем мест (часть занимается удалённо). Красная строка «Без ауд.» — уроки без аудитории.'}</p>
         )}
-      </div>
+      </div>}
     </div>
   );
 }
