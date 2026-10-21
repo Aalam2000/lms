@@ -2573,6 +2573,15 @@ a.row-icon:hover {
   align-items: center;
   gap: var(--space-2);
 }
+.ai-batch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.ai-batch__comment {
+  min-width: 320px;
+  width: 60%;
+}
 .review-panel__dialog .dialog__messages {
   max-height: 25vh;
 }

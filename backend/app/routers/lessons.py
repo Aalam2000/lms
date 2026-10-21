@@ -222,6 +222,8 @@ def is_lesson_locked(lesson: Lesson) -> bool:
 #  - нельзя удалить урок и перенести его (дата, «выходной»);
 #  - нельзя менять оценку за урок и присутствие (включая «опоздал»),
 #    КРОМЕ «уважительной причины» у отсутствовавшего — её можно ставить/снимать всегда;
+#  - оценку за урок ученику, сдавшему работу на уроке, можно ставить и менять
+#    и после полуночи (работы проверяются позже, в т.ч. через «Проверку ИИ»);
 #  - экзамен, звёзды, ДЗ, диалог, материалы — не блокируются.
 # Админ блокировку не видит.
 LOCK_DETAIL = "Прошла полночь по Баку — {what} менять нельзя"
@@ -232,10 +234,10 @@ def lesson_locked_for(lesson: Lesson, user: User) -> bool:
     return is_lesson_locked(lesson) and user.role != "admin"
 
 
-def _check_mark_lock(old: Optional["LessonMark"], data: "LessonMarkIn") -> None:
+def _check_mark_lock(old: Optional["LessonMark"], data: "LessonMarkIn", score_open: bool = False) -> None:
     old_status = (old.attendance_status if old else None) or None
     new_status = data.attendance_status or None
-    if (old.score if old else None) != data.score:
+    if not score_open and (old.score if old else None) != data.score:
         raise HTTPException(status_code=403, detail=LOCK_DETAIL.format(what="оценку за урок"))
     if bool(old.is_late if old else False) != bool(data.is_late):
         raise HTTPException(status_code=403, detail=LOCK_DETAIL.format(what="опоздание"))
@@ -1334,7 +1336,7 @@ async def _upsert_mark(
     )
     mark = result.scalar_one_or_none()
     if locked:
-        _check_mark_lock(mark, data)
+        _check_mark_lock(mark, data, score_open=await has_work_files(db, lesson_id, student_id))
     if not mark:
         mark = LessonMark(lesson_id=lesson_id, student_id=student_id)
         db.add(mark)

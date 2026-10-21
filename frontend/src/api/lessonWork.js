@@ -46,6 +46,22 @@ export function getWorkAiSource(lessonId, studentId) {
   return api.get(`${work(lessonId)}/${studentId}/ai-source`).then(res => res.data);
 }
 
+// «Проверка ИИ» пакетом: ZIP (промпт.md + материалы/ + ученики/<id>_<имя>/).
+// materialIds — отмеченные педагогом материалы урока (задание).
+// Отказ сервера (нет задания, файл не читается) приходит blob-ом — достаём detail.
+export async function downloadWorkAiPack(lessonId, materialIds, filename) {
+  const q = materialIds.map(id => `material_id=${encodeURIComponent(id)}`).join('&');
+  try {
+    await saveBlob(`${work(lessonId)}/ai-pack${q ? `?${q}` : ''}`, filename, 'application/zip');
+  } catch (err) {
+    const data = err?.response?.data;
+    if (data instanceof Blob) {
+      try { err.response.data = JSON.parse(await data.text()); } catch { /* не JSON — общий текст ошибки */ }
+    }
+    throw err;
+  }
+}
+
 // --- Файлы (ученик — свои, педагог — в своём уроке) ---
 
 // Для просмотра: картинка/PDF как есть, код/HTML/текст — текстом. Не забыть revokeObjectURL.

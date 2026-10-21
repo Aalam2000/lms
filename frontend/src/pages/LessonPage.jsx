@@ -12,7 +12,7 @@ import { TYPE_META, formatSize, subtypeLabel, resourceKey, needsPdfPreview, isPr
 import { extractErrorMessage } from '../utils/errors';
 import { StudentContactIcons, GroupContactIcons } from '../components/ContactIcons';
 import { subscribeLessonMarksUpdated } from '../utils/lessonMarksChannel';
-import { HomeworkAddModal, HomeworkFlags, HomeworkCheckView, ReviewPanel, personalOrCommonDeadline } from '../components/HomeworkTeacher';
+import { HomeworkAddModal, HomeworkFlags, HomeworkCheckView, ReviewPanel, AiBatchModal, personalOrCommonDeadline } from '../components/HomeworkTeacher';
 import { DialogCell } from '../components/LessonDialog';
 import { getHomeworkBoard } from '../api/homework';
 import { getWorkBoard } from '../api/lessonWork';
@@ -111,6 +111,9 @@ function LessonPage() {
   // Работа на уроке (api/lessonWork.js): файлы учеников и их проверка — колонка «Файлы с урока»
   const [workBoard, setWorkBoard] = useState({ students: [], to_review: 0 });
   const [workPanel, setWorkPanel] = useState(null); // { studentId, fileId } — окно проверки
+  // «Проверка ИИ» работ на уроке пакетом; черновики — здесь, чтобы закрытое окно их не теряло
+  const [aiBatchOpen, setAiBatchOpen] = useState(false);
+  const [aiDrafts, setAiDrafts] = useState({});
 
   useEffect(() => {
     marksRowsRef.current = marksRows;
@@ -122,6 +125,8 @@ function LessonPage() {
     // предыдущего урока, пока не потрогать их руками.
     setMarksLoaded(false);
     setItemsLoaded(false);
+    setAiDrafts({});
+    setAiBatchOpen(false);
 
     const load = async () => {
       setLoading(true);
@@ -947,7 +952,7 @@ function LessonPage() {
             <>
               {marksLocked && (
                 <p className="text-muted">
-                  {'Прошла полночь по Баку: присутствие и оценку за урок менять нельзя (отсутствующему можно отметить уважительную причину). Экзамен, звёзды, ДЗ и диалог — можно.'}
+                  {'Прошла полночь по Баку: присутствие и оценку за урок менять нельзя (отсутствующему можно отметить уважительную причину). Оценку за урок ученику, сдавшему работу на уроке, экзамен, звёзды, ДЗ и диалог — можно.'}
                 </p>
               )}
 
@@ -961,6 +966,11 @@ function LessonPage() {
                   <button type="button" className="btn btn--outline" onClick={() => setHwAddOpen(true)} data-tip="Добавить домашнее задание ВСЕМ">
                     {'+ ДЗ всем'}
                   </button>
+                  {!hwCheckMode && workBoard.students.some(w => w.work.files.length > 0) && (
+                    <button type="button" className="btn btn--outline" onClick={() => setAiBatchOpen(true)} data-tip="Проверить работы с урока через ИИ — пакетом на всю группу">
+                      {'Проверка ИИ'}
+                    </button>
+                  )}
                   {hwCheckMode ? (
                     <button type="button" className="btn" onClick={() => setHwCheckMode(false)}>
                       {'← Обычный вид'}
@@ -972,6 +982,19 @@ function LessonPage() {
                     </button>
                   )}
                 </div>
+              )}
+
+              {aiBatchOpen && (
+                <AiBatchModal
+                  lessonId={lessonId}
+                  lessonTitle={lesson.title}
+                  sector={lesson.group_sector}
+                  rows={workBoard.students}
+                  drafts={aiDrafts}
+                  setDrafts={setAiDrafts}
+                  onChanged={onWorkReviewed}
+                  onClose={() => setAiBatchOpen(false)}
+                />
               )}
 
               {hwCheckMode && (
@@ -1084,7 +1107,7 @@ function LessonPage() {
                                 max="100"
                                 className="input input--sm-num"
                                 value={row.score}
-                                disabled={marksLocked}
+                                disabled={marksLocked && !work?.files?.length}
                                 onChange={e => updateRowField(row.student_id, 'score', e.target.value)}
                                 onBlur={() => handleScoreBlur(row.student_id)}
                               />
@@ -1151,7 +1174,6 @@ function LessonPage() {
                   toReviewCount={workBoard.to_review}
                   studentId={workPanel.studentId}
                   fileId={workPanel.fileId}
-                  locked={marksLocked}
                   onNavigate={(studentId) => setWorkPanel({ studentId, fileId: null })}
                   onChanged={onWorkReviewed}
                   onClose={() => setWorkPanel(null)}

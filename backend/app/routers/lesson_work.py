@@ -6,10 +6,15 @@
 пока урок открыт, не прошла полночь по Баку и педагог ещё не проверил.
 Педагог (колонка «Файлы с урока» в журнале): права — как у журнала урока.
 """
+import asyncio
+import io
+import re
+import zipfile
 from datetime import datetime, timezone as dt_timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File as FastAPIFile, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,11 +23,14 @@ from .. import storage
 from ..database import get_db
 from ..dependencies import require_teacher, get_current_user
 from ..lesson_work import work_status
-from ..models import Lesson, LessonMark, LessonResource, LessonWorkFile, Material, User
-from .homework import AiSourceOut, _active_students, _ensure_active_student, _read_upload, build_ai_source, file_response
+from ..models import Course, Group, Lesson, LessonMark, LessonResource, LessonWorkFile, Material, Sector, User
+from .homework import (
+    AI_TEXT_LIMIT, AiSourceOut, _active_students, _ai_text, _ensure_active_student, _read_upload,
+    build_ai_source, file_response,
+)
+from .materials import _content_disposition
 from .lessons import (
-    LOCK_DETAIL, _safe_delete_object, get_lesson_for_student, get_lesson_for_teacher_or_admin,
-    is_lesson_locked, lesson_locked_for,
+    _safe_delete_object, get_lesson_for_student, get_lesson_for_teacher_or_admin, is_lesson_locked,
 )
 
 router = APIRouter(prefix="/lessons", tags=["lesson-work"])
@@ -209,9 +217,8 @@ async def review_work(
     files = await _files(db, lesson_id, student_id)
     if not files:
         raise HTTPException(status_code=400, detail="Ученик ещё ничего не сдал")
+    # Оценку за сданную работу можно ставить и после полуночи (правило — routers/lessons.py)
     mark = await _mark(db, lesson_id, student_id)
-    if data.grade is not None and data.grade != (mark.score if mark else None) and lesson_locked_for(lesson, current_user):
-        raise HTTPException(status_code=403, detail=LOCK_DETAIL.format(what="оценку за урок"))
     if mark is None:
         mark = LessonMark(lesson_id=lesson_id, student_id=student_id)
         db.add(mark)
@@ -246,6 +253,165 @@ async def work_ai_source(
     items = [("task", m.id, m.original_filename, m.content_type, m.object_key) for m in materials]
     items += [("answer", f.id, f.original_filename, f.content_type, f.object_key) for f in await _files(db, lesson_id, student_id)]
     return await build_ai_source(db, lesson, items, "work")
+
+
+# ---------- «Проверка ИИ»: пакет на всю группу ----------
+# Временный вариант до API: педагог отмечает материалы-задание, скачивает ZIP
+# (промпт.md + материалы/ + ученики/<id>_<имя>/), отдаёт его ИИ и вставляет
+# ответ — JSON-массив [{"id","good","bad","score"}] — в окно «Проверка ИИ».
+# Из данных ученика в пакет идут только id и имя (без фамилии и контактов).
+
+_LANG_NAMES = {"ru": "русский", "az": "азербайджанский", "en": "английский"}
+
+
+def _safe_name(name: str) -> str:
+    name = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "_", name).strip(" .")
+    return name or "file"
+
+
+def _ai_pack_prompt(lang: str, course: Optional[str], lesson: Lesson, materials: list[tuple[str, Optional[str], bool]],
+                    students: list[tuple[int, str, str]]) -> str:
+    """materials — (имя файла, текст | None, сокращён); students — (id, имя, папка)."""
+    lines = [
+        "# Проверка работ, сданных на уроке",
+        "",
+        "Ты — преподаватель детской IT-академии (ученики 8–14 лет). В этом архиве — задание урока и работы "
+        "учеников, которые они сделали и сдали на уроке. Проверь работу КАЖДОГО ученика.",
+        "",
+        *([f"Курс: {course}."] if course else []),
+        f"Урок: {lesson.title}.",
+        f"Язык комментариев: {lang}. Пиши \"good\" и \"bad\" только на этом языке.",
+        "",
+        "## Что в архиве",
+        "- `промпт.md` — этот файл; ниже — текст задания.",
+        "- `материалы/` — файлы задания как есть (если в задании есть картинки — они там).",
+        "- `ученики/<id>_<имя>/` — все файлы одного ученика; id — число в начале имени папки.",
+        "",
+        "## Как проверять",
+        "- Открой файлы каждого ученика и сравни с заданием: что выполнено, что нет, есть ли ошибки.",
+        "- Пиши коротко, доброжелательно и понятно ребёнку, обращайся к ученику по имени и на «ты».",
+        "- \"good\" — что получилось хорошо, 1–3 конкретные вещи.",
+        "- \"bad\" — что плохо или не сделано и как это исправить. Готовое решение за ученика не пиши. "
+        "Если замечаний нет — так и напиши.",
+        "- \"score\" — целое число от 0 до 100: насколько полно и правильно выполнено задание.",
+        "- Если работа не относится к заданию — \"score\": 0, причину напиши в \"bad\".",
+        "- Оценивай каждого независимо, не сравнивай учеников между собой.",
+        "",
+        "## Ученики",
+        *[f"- id {sid} — {name} (папка `ученики/{folder}/`)" for sid, name, folder in students],
+        "",
+        "## Задание",
+    ]
+    if lesson.comment and lesson.comment.strip():
+        lines += ["=== Комментарий педагога к уроку ===", lesson.comment.strip(), ""]
+    for name, text, truncated in materials:
+        if text:
+            lines += [f"=== {name}{' (текст сокращён)' if truncated else ''} ===", text, ""]
+        else:
+            lines += [f"=== {name} === (текста нет — смотри файл в папке `материалы/`)", ""]
+    if not materials and not (lesson.comment and lesson.comment.strip()):
+        lines += ["(задание не дано — оцени по работам и названию урока)", ""]
+    lines += [
+        "## Формат ответа",
+        "Ответь ТОЛЬКО одним JSON-массивом — по объекту на каждого ученика из списка, без пояснений, "
+        "без markdown и без ```. Строго в таком формате:",
+        '[{"id":35,"good":"что получилось хорошо","bad":"что плохо и как исправить","score":85}]',
+    ]
+    return "\n".join(lines)
+
+
+@router.get("/{lesson_id}/work/ai-pack")
+async def work_ai_pack(
+    lesson_id: int,
+    material_id: list[int] = Query(default=[]),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_teacher),
+):
+    lesson = await get_lesson_for_teacher_or_admin(lesson_id, db, current_user, write=False)
+    group = await db.get(Group, lesson.group_id)
+    course = await db.get(Course, group.course_id) if group else None
+    sector = None
+    if group and group.sector:
+        sector = (await db.execute(select(Sector).where(Sector.code == group.sector))).scalar_one_or_none()
+    code = group.sector if group else None
+    lang = _LANG_NAMES.get(code) or (sector.name if sector else None) or code or "русский"
+
+    # Отмеченные материалы — только из этого урока
+    materials = []
+    if material_id:
+        materials = list((await db.execute(
+            select(Material)
+            .join(LessonResource, (LessonResource.resource_id == Material.id) & (LessonResource.resource_type == "material"))
+            .where(LessonResource.lesson_id == lesson_id, Material.id.in_(material_id))
+            .order_by(LessonResource.id)
+        )).scalars().all())
+
+    names = dict(await _active_students(db, lesson))
+    files_by_student: dict[int, list[LessonWorkFile]] = {}
+    for f in await _files(db, lesson_id):
+        if f.student_id in names:
+            files_by_student.setdefault(f.student_id, []).append(f)
+    if not files_by_student:
+        raise HTTPException(status_code=400, detail="На уроке никто не сдал работу")
+    # Без задания ИИ оценит «вообще» — такой пакет не отдаём
+    if not materials and not (lesson.comment or "").strip():
+        raise HTTPException(status_code=400, detail="Задание не выбрано: отметьте материалы урока, которые были заданием")
+
+    def read(key: str) -> Optional[bytes]:
+        try:
+            return storage.read_object_or_none(key)
+        except Exception:
+            return None
+
+    mat_data = {m.id: await asyncio.to_thread(read, m.object_key) for m in materials}
+    lost = [m.original_filename for m in materials if mat_data[m.id] is None]
+    if lost:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Не удалось прочитать: {', '.join(lost)} — отметьте другой файл или снимите отметку",
+        )
+
+    def build() -> bytes:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            budget = AI_TEXT_LIMIT
+            mat_texts = []
+            used = set()
+            for m in materials:
+                data = mat_data[m.id]
+                name = _safe_name(m.original_filename)
+                arc = name if name not in used else f"{m.id}_{name}"
+                used.add(arc)
+                z.writestr(f"материалы/{arc}", data)
+                text = (_ai_text("task", m.original_filename, m.content_type, data) or "").strip()
+                truncated = len(text) > budget
+                text = text[:max(budget, 0)]
+                budget -= len(text)
+                mat_texts.append((m.original_filename, text or None, truncated))
+            students = []
+            for sid in sorted(files_by_student, key=lambda i: names[i]):
+                first = (names[sid] or "").split()[0] if (names[sid] or "").split() else str(sid)
+                folder = _safe_name(f"{sid}_{first}")
+                students.append((sid, first, folder))
+                seen = set()
+                for f in files_by_student[sid]:
+                    data = read(f.object_key)
+                    if data is None:
+                        continue
+                    name = _safe_name(f.original_filename)
+                    if name in seen:
+                        name = f"{f.id}_{name}"
+                    seen.add(name)
+                    z.writestr(f"ученики/{folder}/{name}", data)
+            z.writestr("промпт.md", _ai_pack_prompt(lang, course.title if course else None, lesson, mat_texts, students))
+        return buf.getvalue()
+
+    data = await asyncio.to_thread(build)
+    return StreamingResponse(
+        iter([data]),
+        media_type="application/zip",
+        headers={"Content-Disposition": _content_disposition(_safe_name(f"{lesson.title} — проверка ИИ.zip"))},
+    )
 
 
 # Файл работы: ученик — свой, педагог/админ — в доступном уроке.
