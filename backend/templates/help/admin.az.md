@@ -1,4 +1,4 @@
-<!-- autoi18n: source=admin.md lang=az sha1=c08ac1fb488291cec369bfe3fd06f9e76f683c71 -->
+<!-- autoi18n: source=admin.md lang=az sha1=d55756e8ef4581c4dc1bb11cd10137ac0603eb16 -->
 # Platformada necə işləmək olar
 
 Administrator müəllimlərin gördüyü hər şeyi görür — amma bütün qruplar və bütün müəllimlər üzrə — və əlavə olaraq istifadəçiləri, kursları və qrupları idarə edir.
@@ -13,13 +13,13 @@ Qrupa klikləyin — onun səhifəsi açılacaq: parametrlər, şagirdlərin qey
 
 Qrupun əsas müəllimi var, hər dərsin isə öz müəllimi: adətən eyni, amma bir və ya bir neçə dərs üçün başqa müəllim təyin etmək mümkündür. Qrup səhifəsində **Dərslərin müəllimi** düyməsini basın və dərsdən hansı müəllimi seçin.
 
-- **Dəyişmə** — bir və ya bir neçə dərsi seçin. Qrupun əsas müəllimi dəyişmir. Dəyişən yalnız bu dərsləri görür və hər birində dərs günü gecə yarısına qədər işləyir, sonra dərs ona baxmaq üçün qalır.
+- **Dəyişmə** — bir və ya bir neçə dərsi seçin. Qrupun əsas müəllimi dəyişmir. Dəyişən yalnız bu dərsləri görür və hər birində dərs günü gecə yarısına qədər işləyir, sonra dərs ona baxış üçün qalır.
 - **Qrupun ötürülməsi** — qrupun keçəcəyi dərsi seçin və "sonuna qədər". Müəllim əsas olur: bütün qrupu və onun bütün dərslərini alır, yeni dərslər onun adına yaradılır. Əvvəlki müəllim yalnız öz apardığı dərsləri görür və onlarda heç nəyi dəyişmir.
 - **Əvvəl kim aparıb** — əgər qrup artıq ötürülmüşsə, əvvəlki müəllimi onun apardığı dərslərə təyin edin.
 
-Dərsi silmək və ya köçürmək və iştirakçılarını dəyişmək yalnız qrupun əsas müəllimi tərəfindən mümkündür. Ev tapşırıqlarını da o yoxlayır, dərsdə təqdim olunan işi isə dərsi aparan müəllim yoxlayır. Dərsdəki iş, "Özüm üçün qeydlər" dərsə və şagirdlərin fayllarını yükləmək — müəllimlə eynidir (müəllim üçün kömək, "Dərs" bölməsi). Hesabatlarda və "Müəllimlər" bölməsində dərs, onun müəllimi kimi qeyd olunur.
+Dərsi silmək və ya köçürmək və iştirakçılarını dəyişmək yalnız qrupun əsas müəllimi tərəfindən mümkündür. Ev tapşırıqlarını da o yoxlayır, dərsdə təqdim olunan işi isə dərsi aparan müəllim yoxlayır. Dərsdəki iş, "Özünüz üçün qeydlər" və şagirdlərin fayllarını yükləmək — müəllimlə eynidir (müəllim üçün kömək, "Dərs" bölməsi). Hesabatlarda və "Müəllimlər" bölməsində dərs, onun müəllimi kimi qeyd olunur.
 
-QR vasitəsilə qeydiyyatdan keçən yeni şagirdlər qrupun müəllimi və ya administratorun təsdiqini gözləyir — bunun necə olduğu müəllim üçün köməkdə ("Yeni şagirdlər") təsvir olunub. Administrator tərəfindən yaradılan şagirdlər təsdiq gözləmir.
+QR vasitəsilə qeydiyyatdan keçən yeni şagirdlər qrupun müəllimi və ya administratorun təsdiqini gözləyir — bunun necə təşkil olunduğu müəllim üçün köməkdə ("Yeni şagirdlər") təsvir olunub. Administrator tərəfindən yaradılan şagirdlər təsdiq gözləmir.
 
 ## Admin
 
@@ -31,11 +31,11 @@ QR vasitəsilə qeydiyyatdan keçən yeni şagirdlər qrupun müəllimi və ya a
 
 - **+ Müəllim əlavə et** / **+ Administrator əlavə et** — yeni istifadəçi giriş və şifrə ilə; o, dərhal daxil ola bilər.
 - Sətirə klikləyin — məlumatları dəyişmək mümkündür.
-- Silmə: sistem istifadəçi ilə bağlı olanları göstərəcək və təsdiq istəyəcək.
+- Silinmə: sistem istifadəçi ilə bağlı olanları göstərəcək və təsdiq tələb edəcək.
 
 ### Kuratorlar
 
-Kurator şagirdləri gətirir və onları müəllimlərə təqdim edir (onun necə işlədiyi — kuratorun köməkçisi). O, bütün müəllimlərin və bütün şagirdlərin təqvimlərini "Tələbələr"də görür, şagird əlavə edə bilər və ona əlavə dərs təyin edə bilər.
+Kurator şagirdləri gətirir və onları müəllimlərə təqdim edir (o, necə işləyir — kuratorun köməkçisi). O, bütün müəllimlərin və bütün şagirdlərin təqvimlərini "Tələbələr"də görür, şagird əlavə edə bilər və ona əlavə dərs təyin edə bilər.
 
 - **+ Kurator əlavə et** — ad və soyad, telefon və əlaqə məlumatları. Giriş avtomatik yaradılır (ad, nöqtə, soyadın üç hərfi və rəqəmlər), şifrə girişə bərabərdir. Dərhal giriş və şifrə ilə pəncərə açılacaq və **Kopyala** və **WhatsApp-a göndər** düymələri olacaq.
 - Kurator sətirindəki açar eyni pəncərəni açır; əgər kurator şifrəni dəyişibsə — **Girişi sıfırla**.
@@ -45,9 +45,9 @@ Kurator şagirdləri gətirir və onları müəllimlərə təqdim edir (onun nec
 
 Müəllimin sətirindəki təqvim simvolu — onun istirahət günləri. Onları yalnız admin təyin edir, müəllim öz profilində onları görür.
 
-- Hər həftə müəllimin istirahət günləri olan günləri işarələyin. **+** əlavə bir həftə əlavə edir — bu zaman həftələr dövr edir (məsələn, bir həftədən bir həftəyə istirahət). Həftə 1 — istirahət günlərini saxladığınız həftədir.
+- Müəllimin hər həftə istirahət günləri olan günləri işarələyin. **+** əlavə bir həftə əlavə edir — bu zaman həftələr dövr edir (məsələn, bir həftədən bir həftəyə istirahət). Həftə 1 — istirahət günlərini saxladığınız həftədir.
 - **Təqvim** — ayrı günlər: bir günü istirahət günü etmək və ya əksinə, iş günü etmək üçün günə klikləyin (məsələn, bir həftədə daimi istirahət gününü ləğv etmək).
-- İstirahət günləri saxlanma günündən etibarən etibarlıdır; keçmiş günlər dəyişmir.
+- İstirahət günləri saxlanıldığı gündən etibarən qüvvədədir; keçmiş günlər dəyişmir.
 - İstirahət günündə dərs təqvimləri qırmızı ilə işarələnir. İstirahət günündə dərs təyin etmək (yaratmaq, köçürmək, müəllim təyin etmək, cədvəli doldurmaq) yalnız müəllim tərəfindən mümkündür — admin üçün sistem imtina edəcək və tarixləri göstərəcək.
 
 ### Kurslar
@@ -59,36 +59,37 @@ Kursun adı və təsviri. **+ Kurs əlavə et**, sətirə klikləməklə dəyiş
 Ad, kurs, sektor, müəllim, videokonfrans, Telegram.
 
 - **+ Qrup əlavə et** — yeni qrup kurs və müəllim ilə.
-- Sətirə klikləyin — məlumatları dəyişmək mümkündür. Müəllimin dəyişməsi sətirdə bu gündən etibarən qüvvədədir: keçmiş dərslər onları aparan müəllimdə qalır.
+- Sətirə klikləyin — məlumatları dəyişmək mümkündür. Sətirdə müəllimin dəyişməsi bu gündən etibarən qüvvəyə minir: keçmiş dərslər onları aparan müəllimdə qalır.
 - **Qrup cədvəli** — qrup səhifəsini açın.
 - **Arxivə göndər** — qrup artıq aktiv deyil; arxivdən onu **geri qaytarmaq** və ya **tamamilə silmək** mümkündür.
 
 ## Bilik bazası
 
-Materiallar qovluqlara yerləşdirilib — onları yaratmağa ehtiyac yoxdur, platforma özü yerləşdirir:
+Yuxarıda — axtarış sətiri: material adı ilə dərhal tapılır. Onun altında filtrler: **Sektor**, **Kurs**, **Dərs**, **Tip**, **Mənim** — seçilmiş filtr çarpaz işarəsi ilə silinir. Nəticələr qruplara görə düzülür, onları yaratmağa ehtiyac yoxdur, platforma özü düzür:
 
-- **Sektor › Kurs › Dərs N** — N dərsində olan material (materiallarda və ya Ev tapşırığı kimi). Sektor və kurs qrupdan götürülür. Əgər material bir qrupun 5-ci dərsində və digərinin 4-cü dərsindədirsə, o, hər iki qovluqda görünür.
-- **Sektor › Kurs › Ümumi** — yalnız əlavə dərslərdə istifadə olunan material, ya da hələ heç bir dərsdə olmayan sektor və kursa malik material.
-- **Hamı üçün** — sektor və kursu olmayan, heç yerdə istifadə olunmayan material.
+- **Dərs N** — material N dərsindədir hansısa qrupda (materiallarda və ya Ev tapşırığı kimi); sektor və kurs qrupdan götürülür.
+- **Ümumi** — material yalnız əlavə dərslərdə istifadə olunur və ya onun sektoru və kursu var, amma hələ heç bir dərsdə yoxdur.
+- **Hər kəs üçün** — sektoru və kursu olmayan, heç yerdə istifadə olunmayan material.
 
-Sektor və kurs materiala cədvəl sətirində qovluq simvolu qoyur — bunu materialın sahibi və ya administrator dəyişə bilər. Sektor və kurs bir yerdə qoyulur. Hər qovluqda materialların sayı göstərilir, yuxarıdakı yol geri aparır. Açıq qovluq profilə yaddaşda saxlanılır.
+Sağda — seçilmiş materialın baxışı və harada istifadə olunduğu (qrup, dərs, tarix). Materialın sektoru və kursunu onun sahibi və ya administrator dəyişir — baxışın altında **Dəyişdir** linki. Oxlar ↑ ↓ materialı seçir, Enter açır, Ctrl+K axtarışa keçir. Filtrlər profilə yaddaşda saxlanılır.
+
+Dərsdə **Bilik bazasından əlavə et** pəncərəsi də eyni cür təşkil olunub: o, qrupun kursunda açılır, bu dərsin materialları birinci sıradadır, Enter və ya **Dərsə əlavə et** düyməsi seçilmişi əlavə edir.
 
 Administrator üçün əlavə:
 
-- **Kurs yüklə** — dərs şablonu kimi kurs materialları ilə qovluğu yükləyin: hər fayl üçün kurs, istiqamət və dərs nömrəsi göstərilir.
-- Kurs və sektor üzrə filtr — kurs materialları paketini yoxlamaq üçün.
-- **Təsdiq et** / **Blokla** şablon materialını — bir-bir və ya dərhal bütün kurs paketini.
-- Faylları və bağlantıları yalnız administrator silə bilər; quiz — administrator və ya onun müəllifi. Dərslərdə istifadə olunan material əvvəlcə ayrılmalıdır.
+- **Kurs yüklə** — dərs şablonu kimi kurs materialları ilə qovluğu yükləmək: hər bir fayl üçün kurs, istiqamət və dərs nömrəsi göstərilir.
+- **Təsdiq et** / **Blokla** material şablonu — materialın baxışı altında; bütün kurs paketi bir anda — filtrlerde sektor və kurs seçildikdə.
+- Faylları və linkləri yalnız administrator silə bilər; quiz — administrator və ya onun müəllifi. Dərslərdə istifadə olunan material əvvəlcə ayrılmalıdır.
 
 ## Tələbələr
 
 [**Tələbələr**](/dashboard/students) bölməsində — platformanın bütün şagirdləri: qrup, müəllim, dərslər üzrə orta qiymətlər, Ev tapşırığı və imtahanlar, ulduzlar, davamiyyət, gecikmələr, son giriş tarixi, telefon, valideyn və əlaqə məlumatları. Müəllim, kurs və qrup üzrə filtrler, **Mənim** — yalnız sizin qruplarınız. Sütun adının üzərinə klikləyin — cədvəl ona görə sıralanacaq.
 
-Adın altında olan rəngli zolaq — son verilmiş Ev tapşırığı üzrə borc: narıncı — şagird hələ cavab göndərməyib və ya Ev tapşırığı düzəliş üçün geri qaytarılıb, qırmızı — təqdim etmə müddəti keçib. Zolaq, şagird cavab göndərdikdə yox olur.
+Adın altında olan rəngli zolaq — son verilmiş Ev tapşırığı üzrə borc: narıncı — şagird hələ cavab göndərməyib və ya Ev tapşırığı düzəliş üçün geri qaytarılıb, qırmızı — təqdim etmə müddəti keçib. Zolaq, şagird cavabı göndərdikdə yox olur.
 
-“Gecikmələr” sütununda — yalnız üzrlü səbəb olmadan bağlanmamış gecikmələr. Gecikmə sayının ətrafında qırmızı halqa — şagird son dərsi qaçırıb və ondan sonra fərdi dərsdə olmayıb. Halqa dərsdən sonraki gün görünür. O, fərdi dərs bitdikdə və şagird orada “Gəldi” və ya “Onlayn” qeyd edildikdə, ya da şagird növbəti dərsə gəldikdə yox olur; üzrlü səbəb ilə olan gecikmə halqa vermir.
+“Davamiyyət” sütununda — yalnız üzrlü səbəb olmadan bağlanmamış davamiyyətlər. Davamiyyət sayının ətrafında qırmızı halqa — şagird son dərsi qaçırıb və ondan sonra fərdi dərsdə olmayıb. Halqa dərsdən sonraki gün görünür. O, fərdi dərs bitdikdə və şagird orada “Gəldi” və ya “Onlayn” qeyd edildikdə, ya da şagird növbəti dərsə gəldikdə yox olur; üzrlü səbəb ilə qaçırılan davamiyyət halqa vermir.
 
-Fərdi dərs gecikmələri bağlayır: o bitdikdə və şagird orada “Gəldi” və ya “Onlayn” qeyd edildikdə, həmin günə qədər bu şagirdin adi dərslərdə olan bütün gecikmələri bağlanmış sayılır. Bağlanmış gecikmə şagirdin hesabatında qeyd ilə görünür, lakin gecikmələrin sayına və davamiyyət faizinə daxil edilmir.
+Fərdi dərs davamiyyətləri bağlayır: o bitdikdə və şagird orada “Gəldi” və ya “Onlayn” qeyd edildikdə, həmin günə qədər bu şagirdin adi dərslərdəki bütün davamiyyətləri bağlanmış sayılır. Bağlanmış davamiyyət şagirdin hesabatında qeyd ilə görünür, lakin davamiyyət sayına və iştirak faizinə daxil edilmir.
 
 ### Şagird necə əlavə olunur
 
@@ -111,7 +112,7 @@ Tələbə sırasındakı **qələm** ikonuna basın. Pəncərədə ad, telefon, 
 
 ### Valideyn üçün link
 
-Valideyn uşağının akademik göstəricilərini şəxsi link vasitəsilə görə bilər və ya öz istifadəçi adı ilə daxil ola bilər. Tələbənin məlumatlarını açın (qələm); müəllim bunu yalnız öz qruplarındakı tələbələr üçün edə bilər: "Valideyn" bölməsində linkin olduğu blok var. Linklə birlikdə valideynin girişi yaradılır: istifadəçi adı — `p.` və uşağın istifadəçi adı, parol əvvəlcə istifadəçi adına bərabərdir; düymələr valideynə dərhal link, ünvan, istifadəçi adı və parolu təqdim edir. Köhnə linklər üçün — **Valideyn üçün giriş yaradın**.
+Valideyn uşağının akademik göstəricilərini şəxsi link vasitəsilə görə bilər və ya öz istifadəçi adı ilə daxil ola bilər. Tələbənin məlumatlarını açın (qələm); müəllim bunu yalnız öz qruplarındakı tələbələr üçün edə bilər: "Valideyn" bölməsində linkin olduğu blok var. Linklə birlikdə valideynin girişi yaradılır: istifadəçi adı — `p.` və uşağın istifadəçi adı, şifrə əvvəlcə istifadəçi adına bərabərdir; düymələr valideynə dərhal link, ünvan, istifadəçi adı və şifrəni təqdim edir. Köhnə linklər üçün — **Valideyn üçün giriş yaradın**.
 
 - **Valideyn üçün link yaradın** — düymə valideynin telefonu doldurulduqda və kart saxlandıqda görünür.
 - **Kopyala** — link clipboard-a düşəcək, istənilən mesajlaşma tətbiqinə yapışdırıla bilər.
@@ -120,7 +121,7 @@ Valideyn uşağının akademik göstəricilərini şəxsi link vasitəsilə gör
 
 Link valideynin telefonuna aiddir: əgər qardaş və bacılarda kartda eyni valideyn telefonu varsa, bir link vasitəsilə bütün uşaqlar görünür — hər birinin öz tabı var. Linkin altında valideynin kimləri görəcəyi və linkin sonuncu dəfə nə vaxt açıldığı yazılıb.
 
-Link vasitəsilə valideyn yalnız akademik göstəriciləri görür: dərslər, Ev tapşırığı və imtahanlar üçün qiymətlər, davamiyyət və buraxmalar. Dərsə basdıqda, o, Ev tapşırığının tapşırığını, tələbənin cavabını və dərs dialoqunu görür. Heç nəyi dəyişdirmək olmaz.
+Link vasitəsilə valideyn yalnız akademik göstəriciləri görür: dərslər, Ev tapşırığı və imtahanlar üçün qiymətlər, davamiyyət və buraxmalar. Dərsə basdıqda, o, Ev tapşırığı, tələbənin cavabı və dərs dialoqunu görür. Heç nəyi dəyişdirmək olmaz.
 
 ### Digər əməliyyatlar
 
@@ -136,13 +137,13 @@ Link vasitəsilə valideyn yalnız akademik göstəriciləri görür: dərslər,
 - **Ay (dövr) rəqəmlərlə** — iştirak edilən dərslər, təqdim olunan ev tapşırıqları, ulduzlar və dərslər üzrə orta qiymət.
 - **İşlər necə gedir** — altı göstərici ilə: dərslərə gedir, vaxtında gəlir, dərsdə necə işləyir, ev tapşırıqlarını necə təqdim edir və necə yerinə yetirir, imtahanları necə verir.
 - **Dövrün əsasları** — nəyə görə qürur duya bilərik və nəyə diqqət yetirmək lazımdır.
-- **Dövr üzrə dərslər** — hər bir dərs üzrə: iştirak, qiymət, ev tapşırığı və ulduzlar.
+- **Dərslər üzrə dövr** — hər bir dərs üzrə: iştirak, qiymət, ev tapşırığı və ulduzlar.
 
 Yaşıl rəng — hər şey qaydasındadır, sarı — kiçik sapma, qırmızı — valideynlərin köməyinə ehtiyac var, boz — hələlik məlumat yoxdur.
 
 ## Müəllimlər
 
-[Müəllimlər](/dashboard/teachers) bölməsində — hər müəllim üzrə xülasə: neçə qrup və şagird, keçirilmiş dərslər, davamiyyət və orta bal. Qruplar və şagirdlər onun əsas müəllim olduğu qruplar üzrə hesablanır; dərslər, davamiyyət və bal — onun özü tərəfindən keçirilmiş dərslər üzrə, əvəz etmələr də daxil olmaqla.
+[ Müəllimlər ](/dashboard/teachers) bölməsində — hər müəllim üzrə xülasə: neçə qrup və şagird, keçirilmiş dərslər, davamiyyət və orta bal. Qruplar və şagirdlər onun əsas müəllim olduğu qruplar üzrə hesablanır; dərslər, davamiyyət və bal — onun özü tərəfindən keçirilən dərslər üzrə, əvəz etmələr daxil olmaqla.
 
 ### Müəllim üzrə Hesabat
 
@@ -171,4 +172,4 @@ Dərs üçün qiymətlər və ulduzlar hesabata daxil deyil: onları müəllim �
 
 ## Profil
 
-[Profil](/dashboard/profile) bölməsində şifrəni dəyişmək mümkündür.
+[Profil](/dashboard/profile) bölməsində parolu dəyişmək mümkündür.

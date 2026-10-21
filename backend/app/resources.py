@@ -49,40 +49,48 @@ async def count_attachments_map(db: AsyncSession) -> dict[tuple[str, int], int]:
 
 # Где ресурс используется — для ленты «Базы знаний»: число уроков, к
 # которым он привязан, курсы этих уроков (курс группы урока, по алфавиту без
-# повторов) и места для папок БЗ — сектор и курс группы урока и номер урока
-# (None — доп. урок). Файл, выданный как ДЗ, тоже считается используемым в
-# уроке. Двумя запросами сразу для всех ресурсов.
+# повторов) и места — по одному на урок: сектор и курс группы, номер урока
+# (None — доп. урок), группа, дата, выдан ли как ДЗ. Из мест страница строит
+# папки БЗ и блок «Где используется». Двумя запросами сразу для всех ресурсов.
 async def attachment_usage_map(db: AsyncSession) -> dict[tuple[str, int], dict]:
-    lesson_cols = (Lesson.id, Lesson.order, Lesson.is_personal, Group.sector, Group.course_id, Course.title)
+    lesson_cols = (Lesson.id, Lesson.order, Lesson.is_personal, Lesson.date,
+                   Group.sector, Group.course_id, Group.name, Course.title)
     attached = await db.execute(
-        select(LessonResource.resource_type, LessonResource.resource_id, *lesson_cols)
+        select(LessonResource.resource_type, LessonResource.resource_id, literal(False), *lesson_cols)
         .join(Lesson, Lesson.id == LessonResource.lesson_id)
         .join(Group, Group.id == Lesson.group_id)
         .join(Course, Course.id == Group.course_id)
     )
     homework = await db.execute(
-        select(literal("material"), HomeworkTask.material_id, *lesson_cols)
+        select(literal("material"), HomeworkTask.material_id, literal(True), *lesson_cols)
         .join(Lesson, Lesson.id == HomeworkTask.lesson_id)
         .join(Group, Group.id == Lesson.group_id)
         .join(Course, Course.id == Group.course_id)
         .distinct()
     )
     usage: dict[tuple[str, int], dict] = {}
-    for resource_type, resource_id, lesson_id, order, is_personal, sector, course_id, course_title in (
-        list(attached.all()) + list(homework.all())
-    ):
-        row = usage.setdefault((resource_type, resource_id), {"lessons": set(), "courses": set(), "places": set()})
-        row["lessons"].add(lesson_id)
+    for (resource_type, resource_id, is_homework, lesson_id, order, is_personal, date,
+         sector, course_id, group_name, course_title) in list(attached.all()) + list(homework.all()):
+        row = usage.setdefault((resource_type, resource_id), {"places": {}, "courses": set()})
         row["courses"].add(course_title)
-        lesson_no = order if (not is_personal and order and order > 0) else None
-        row["places"].add((sector, course_id, lesson_no))
+        place = row["places"].get(lesson_id)
+        if place is None:
+            row["places"][lesson_id] = {
+                "lesson_id": lesson_id,
+                "sector": sector,
+                "course_id": course_id,
+                "lesson_no": order if (not is_personal and order and order > 0) else None,
+                "group_name": group_name,
+                "date": date,
+                "homework": bool(is_homework),
+            }
+        elif is_homework:
+            place["homework"] = True
     for row in usage.values():
-        row["count"] = len(row.pop("lessons"))
+        places = sorted(row["places"].values(), key=lambda p: (p["group_name"] or "", p["lesson_no"] or 0, p["lesson_id"]))
+        row["count"] = len(places)
+        row["places"] = places
         row["courses"] = sorted(row["courses"], key=str.lower)
-        row["places"] = [
-            {"sector": sector, "course_id": course_id, "lesson_no": lesson_no}
-            for sector, course_id, lesson_no in sorted(row["places"], key=lambda p: (p[0] or "", p[1] or 0, p[2] or 0))
-        ]
     return usage
 
 

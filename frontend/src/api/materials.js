@@ -69,13 +69,19 @@ export function openPendingTab(converting) {
   return win;
 }
 
-// Показать файл Базы знаний в уже открытой вкладке: docx/xlsx/pptx — через
-// конвертацию в PDF, остальное как есть. Ничего не скачивается.
-export async function showMaterialInTab(win, materialId, contentType) {
+// Файл Базы знаний для показа: docx/xlsx/pptx — сконвертированным в PDF,
+// остальное как есть → { blob, type }
+export async function getMaterialFile(materialId, contentType) {
   const endpoint = needsPdfPreview(contentType) ? 'preview' : 'download';
   const res = await api.get(`/materials/${materialId}/${endpoint}`, { responseType: 'blob' });
   const type = res.headers?.['content-type'] || (endpoint === 'preview' ? 'application/pdf' : contentType || 'application/octet-stream');
-  const url = window.URL.createObjectURL(new Blob([res.data], { type }));
+  return { blob: new Blob([res.data], { type }), type };
+}
+
+// Показать файл Базы знаний в уже открытой вкладке. Ничего не скачивается.
+export async function showMaterialInTab(win, materialId, contentType) {
+  const { blob, type } = await getMaterialFile(materialId, contentType);
+  const url = window.URL.createObjectURL(blob);
   if (win) win.location.href = type === 'application/pdf' ? `${url}#navpanes=0` : url;
   setTimeout(() => window.URL.revokeObjectURL(url), 60000);
 }

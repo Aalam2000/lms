@@ -1,8 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import SortTh, { sortRows } from '../components/SortTh';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DeleteButton from '../components/DeleteButton';
-import IconButton from '../components/IconButton';
+import LibrarySearch, { EMPTY_FILTERS } from '../components/LibrarySearch';
 import { getCourses, getMyGroups } from '../api/groups';
 import { getSectors } from '../api/academy';
 import {
@@ -13,21 +12,15 @@ import { createLink, deleteLink } from '../api/links';
 import { getQuizHtml, deleteQuiz } from '../api/quizzes';
 import { useAuth } from '../context/AuthContext';
 import { usePref } from '../hooks/usePref';
-import {
-  TYPE_META, formatSize, subtypeLabel, resourceKey, needsPdfPreview, isPresentation, openSlides,
-  ALL_FOLDER, folderPaths, inFolder, courseTitleFromItems, leafLabel, leafOrder,
-} from '../utils/libraryItems';
-import { IconBadgeFile, IconBadgeQuiz, IconBadgeLink } from '../components/TypeBadgeIcons';
+import { resourceKey, needsPdfPreview, isPresentation, openSlides, ALL_FOLDER } from '../utils/libraryItems';
+
 function itemKey(item) {
   return resourceKey(item.resource_type, item.id);
 }
-// Иконка по типу ресурса — SVG в стиле бейджа (белая, 12×12).
-function BadgeIcon({ type }) {
-  if (type === 'material') return <IconBadgeFile className="type-badge__icon" />;
-  if (type === 'quiz') return <IconBadgeQuiz className="type-badge__icon" />;
-  if (type === 'link') return <IconBadgeLink className="type-badge__icon" />;
-  return null;
-}
+
+// «База знаний»: загрузка (файл, ссылка, квиз, курс — админ) и поиск по базе
+// (components/LibrarySearch.jsx). Фильтры поиска — в профиле (kb.filters);
+// педагог по умолчанию видит свои курсы.
 function KnowledgeBasePage() {
   const { user, hasRole } = useAuth();
   const navigate = useNavigate();
@@ -36,21 +29,13 @@ function KnowledgeBasePage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [typeFilter, setTypeFilter] = useState(''); // '' | material | quiz | link
-  // Открытая папка и «Мои курсы / Все курсы» (у педагога) — в профиле
-  const [folder, setFolder] = usePref('kb.folder', '');
-  const [scope, setScope] = usePref('kb.scope', 'mine'); // mine | all
+  const [filters, setFilters] = usePref('kb.filters', isAdmin ? EMPTY_FILTERS : { ...EMPTY_FILTERS, course: 'mine' });
   const [myPairs, setMyPairs] = useState(null); // Set('ru/3') — сектор/курс групп педагога
-  // Правка тегов папки (сектор и курс) — одна строка таблицы за раз
+  // Правка сектора и курса выбранного материала
   const [tagEditKey, setTagEditKey] = useState(null);
   const [tagCourseId, setTagCourseId] = useState('');
   const [tagSector, setTagSector] = useState('');
   const [tagSaving, setTagSaving] = useState(false);
-  const [onlyMine, setOnlyMine] = useState(false);
-  // Сортировка — в браузере, кликом по шапке столбца (SortTh). По умолчанию — свежие сверху.
-  const [sortKey, setSortKey] = useState('date');
-  const [sortDir, setSortDir] = useState('desc'); // asc | desc
-  const [openingKey, setOpeningKey] = useState(null);
 
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
@@ -60,8 +45,7 @@ function KnowledgeBasePage() {
   const [linkUrl, setLinkUrl] = useState('');
   const [isAddingLink, setIsAddingLink] = useState(false);
 
-  // "Загрузить курс" — массовая загрузка папки как шаблона курса (только
-  // admin). См. claude/course-templates-plan.md.
+  // "Загрузить курс" — массовая загрузка папки как шаблона курса (только admin)
   const [showCourseUpload, setShowCourseUpload] = useState(false);
   const [courses, setCourses] = useState([]);
   const [coursesLoaded, setCoursesLoaded] = useState(false);
@@ -77,19 +61,18 @@ function KnowledgeBasePage() {
   const [uploadNotice, setUploadNotice] = useState('');
   const courseFolderInputRef = useRef(null);
 
-  // Фильтры по курсу/сектору в базе знаний — только admin, для проверки/
-  // утверждения пакета шаблонных материалов. См. course-templates-plan.md.
-  const [filterCourseId, setFilterCourseId] = useState('');
-  const [filterSector, setFilterSector] = useState('');
+  // Решение по пакету шаблона курса — админ, когда в фильтрах выбраны сектор и курс
+  const packSector = filters.sector && filters.sector !== ALL_FOLDER ? filters.sector : '';
+  const packCourseId = filters.course && filters.course !== 'mine' ? filters.course : '';
   const [bulkTemplateSaving, setBulkTemplateSaving] = useState(false);
   const [savingTemplateKey, setSavingTemplateKey] = useState(null);
 
   useEffect(() => {
     loadItems();
     // eslint-disable-next-line
-  }, [typeFilter, onlyMine, filterCourseId, filterSector]);
+  }, []);
 
-  // Курсы и секторы — для имён папок и правки тегов; группы педагога — для «Мои курсы»
+  // Курсы и секторы — для имён и правки тегов; группы педагога — для «Мои курсы»
   useEffect(() => {
     ensureCoursesLoaded();
     if (!isAdmin) {
@@ -104,12 +87,7 @@ function KnowledgeBasePage() {
     setLoading(true);
     setError('');
     try {
-      const params = {};
-      if (typeFilter) params.type = typeFilter;
-      if (onlyMine && user) params.uploader = user.id;
-      if (isAdmin && filterCourseId) params.course_id = filterCourseId;
-      if (isAdmin && filterSector) params.sector = filterSector;
-      setItems(await getLibraryItems(params));
+      setItems(await getLibraryItems({}));
     } catch (err) {
       setError(err?.response?.data?.detail || 'Не удалось загрузить базу знаний');
     } finally {
@@ -287,8 +265,6 @@ function KnowledgeBasePage() {
       return;
     }
 
-    const key = itemKey(item);
-    setOpeningKey(key);
     const win = openPendingTab(item.resource_type === 'material' && needsPdfPreview(item.content_type));
     try {
       if (item.resource_type === 'material') {
@@ -303,19 +279,17 @@ function KnowledgeBasePage() {
     } catch (err) {
       if (win) win.close();
       setError(err?.response?.data?.detail || 'Не удалось открыть');
-    } finally {
-      setOpeningKey(null);
     }
   };
 
   // Массовое решение по всему пакету материалов курса+сектора (оба фильтра
   // должны быть выбраны) — см. course-templates-plan.md.
   const handleBulkTemplateStatus = async (status) => {
-    if (!filterCourseId || !filterSector) return;
+    if (!packCourseId || !packSector) return;
     setBulkTemplateSaving(true);
     setError('');
     try {
-      await bulkUpdateMaterialTemplate({ course_id: filterCourseId, sector: filterSector, template_status: status });
+      await bulkUpdateMaterialTemplate({ course_id: packCourseId, sector: packSector, template_status: status });
       loadItems();
     } catch (err) {
       setError(err?.response?.data?.detail || 'Не удалось обновить статус пакета');
@@ -339,98 +313,20 @@ function KnowledgeBasePage() {
     }
   };
 
-  // Право удалять (где используется — проверяет сама DeleteButton)
+  // Права на действия с материалом
   const canDelete = (item) => {
     if (item.resource_type === 'quiz') return isAdmin || item.uploaded_by === user?.id;
     return isAdmin; // файлы и ссылки — только admin
   };
+  const canTag = (item) => isAdmin || item.uploaded_by === user?.id;
 
   const DELETE_FN = { material: deleteMaterial, quiz: deleteQuiz, link: deleteLink };
   const DELETE_TIP = { material: 'Удалить файл', quiz: 'Удалить квиз', link: 'Удалить ссылку' };
 
-  const columnCount = 9;
+  const sectorName = (code) => sectors.find(sec => sec.code === code)?.name || code;
+  const courseTitle = (id) => courses.find(c => String(c.id) === String(id))?.title
+    || items.find(i => String(i.course_id) === String(id))?.course_title || `#${id}`;
 
-  // Сортировка кликом по шапке. Текстовые столбцы — от А до Я, дата и «В уроках» — сначала большие.
-  const TEXT_KEYS = ['type', 'course', 'title', 'uploader'];
-  const sortValue = (item, key) => {
-    if (key === 'type') return subtypeLabel(item);
-    if (key === 'course') return (item.attached_courses || []).join(', ');
-    if (key === 'title') return item.title || '';
-    if (key === 'uploader') return item.uploaded_by_name || '';
-    if (key === 'date') return new Date(item.created_at).getTime();
-    if (key === 'lessons') return item.attached_lessons_count > 0 ? item.attached_lessons_count : null;
-    return null;
-  };
-  const handleSort = (key) => {
-    if (key === sortKey) {
-      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortKey(key);
-      setSortDir(TEXT_KEYS.includes(key) ? 'asc' : 'desc');
-    }
-  };
-  // Папки: у педагога в режиме «Мои курсы» — только секторы и курсы его групп и «Для всех»
-  const onlyMyCourses = !isAdmin && scope === 'mine';
-  const pathsByKey = useMemo(() => {
-    const map = new Map();
-    for (const item of items) {
-      let paths = folderPaths(item);
-      if (onlyMyCourses && myPairs) {
-        paths = paths.filter(p => p === ALL_FOLDER || myPairs.has(p.split('/').slice(0, 2).join('/')));
-      }
-      map.set(itemKey(item), paths);
-    }
-    return map;
-  }, [items, onlyMyCourses, myPairs]);
-
-  const sectorName = (code) => sectors.find(sec => sec.code === code)?.name || code || 'Без сектора';
-  const courseTitle = (courseId) => {
-    const fromList = courses.find(c => String(c.id) === String(courseId));
-    return fromList ? fromList.title : courseTitleFromItems(items, courseId);
-  };
-  const folderLabel = (path) => {
-    if (path === ALL_FOLDER) return 'Для всех';
-    const [sector, course, leaf] = path.split('/');
-    if (leaf) return leafLabel(leaf);
-    if (course) return courseTitle(course);
-    return sectorName(sector);
-  };
-
-  // Вложенные папки открытой папки — с числом ресурсов в каждой
-  const childFolders = useMemo(() => {
-    const depth = folder ? folder.split('/').length : 0;
-    if (folder === ALL_FOLDER || depth >= 3) return [];
-    const counts = new Map();
-    for (const paths of pathsByKey.values()) {
-      const children = new Set();
-      for (const p of paths) {
-        if (!inFolder([p], folder)) continue;
-        if (p === ALL_FOLDER) { if (!folder) children.add(ALL_FOLDER); continue; }
-        children.add(p.split('/').slice(0, depth + 1).join('/'));
-      }
-      for (const child of children) counts.set(child, (counts.get(child) || 0) + 1);
-    }
-    return [...counts.entries()].sort(([a], [b]) => {
-      if (a === ALL_FOLDER) return -1;
-      if (b === ALL_FOLDER) return 1;
-      if (depth === 2) return leafOrder(a.split('/')[2]) - leafOrder(b.split('/')[2]);
-      return folderLabel(a).localeCompare(folderLabel(b));
-    });
-    // eslint-disable-next-line
-  }, [pathsByKey, folder, courses, sectors]);
-
-  // Путь сверху: «База знаний › Сектор › Курс › Урок N»
-  const crumbs = folder === ALL_FOLDER ? [ALL_FOLDER]
-    : folder ? folder.split('/').map((_, i, parts) => parts.slice(0, i + 1).join('/')) : [];
-
-  const folderItems = items.filter(item => {
-    const paths = pathsByKey.get(itemKey(item)) || [];
-    return paths.length > 0 && inFolder(paths, folder);
-  });
-  const sortedItems = sortRows(folderItems, sortKey, sortDir, sortValue, TEXT_KEYS, item => item.title);
-
-  // Теги папки ставят админ и владелец ресурса
-  const canTag = (item) => isAdmin || item.uploaded_by === user?.id;
   const startTagEdit = (item) => {
     setTagEditKey(itemKey(item));
     setTagCourseId(item.course_id ? String(item.course_id) : '');
@@ -451,70 +347,78 @@ function KnowledgeBasePage() {
       setTagSaving(false);
     }
   };
-  const sortTh = (key, label, tip) => (
-    <SortTh k={key} sortKey={sortKey} sortDir={sortDir} onSort={handleSort} tip={tip}>{label}</SortTh>
+
+  // Под просмотром: сектор и курс (с правкой) и статус шаблона (админ)
+  const renderExtra = (item) => (
+    <>
+      {tagEditKey === itemKey(item) ? (
+        <div className="kbs__tags">
+          <select className="input" value={tagSector} onChange={e => setTagSector(e.target.value)}>
+            <option value="">{'Сектор...'}</option>
+            {sectors.map(sec => <option key={sec.code} value={sec.code}>{sec.name}</option>)}
+          </select>
+          <select className="input" value={tagCourseId} onChange={e => setTagCourseId(e.target.value)}>
+            <option value="">{'Курс...'}</option>
+            {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+          </select>
+          <button type="button" className="btn btn--sm" onClick={() => saveTags(item)}
+            disabled={tagSaving || !tagSector !== !tagCourseId}>{'Сохранить'}</button>
+          <button type="button" className="btn btn--outline btn--sm" onClick={() => setTagEditKey(null)}>{'Отмена'}</button>
+        </div>
+      ) : (
+        <div className="kbs__tags">
+          <span>{'Сектор и курс:'}</span>
+          <b>{item.sector && item.course_id ? `${sectorName(item.sector)}, ${courseTitle(item.course_id)}` : 'не заданы'}</b>
+          {canTag(item) && (
+            <button type="button" className="link" onClick={() => startTagEdit(item)}>{'Изменить'}</button>
+          )}
+        </div>
+      )}
+      {isAdmin && item.resource_type === 'material' && item.template_lesson_no && (
+        <div className="kbs__tags">
+          <span>{`Шаблон, урок ${item.template_lesson_no}:`}</span>
+          <b>
+            {item.template_status === 'approved' ? 'Одобрено'
+              : item.template_status === 'rejected' ? 'Отклонено'
+              : 'На проверке'}
+          </b>
+          <button type="button" className="btn btn--outline btn--sm" onClick={() => handleSetMaterialTemplateStatus(item, 'approved')}
+            disabled={savingTemplateKey === itemKey(item) || item.template_status === 'approved'}>{'Одобрить'}</button>
+          <button type="button" className="btn btn--outline btn--sm" onClick={() => handleSetMaterialTemplateStatus(item, 'rejected')}
+            disabled={savingTemplateKey === itemKey(item) || item.template_status === 'rejected'}>{'Заблокировать'}</button>
+        </div>
+      )}
+    </>
   );
+
+  // Кнопки под просмотром — на странице «Добавить в урок» нет
+  const renderActions = (item) => {
+    const deletable = canDelete(item);
+    return (
+      <>
+        <button type="button" className="btn" onClick={() => handleOpen(item)}>{'Открыть'}</button>
+        {item.resource_type === 'quiz' && deletable && (
+          <button type="button" className="btn btn--outline" onClick={() => navigate(`/dashboard/add-quiz/${item.id}`)}>
+            {'Редактировать'}
+          </button>
+        )}
+        {deletable && (
+          <DeleteButton
+            entity={item.resource_type}
+            id={item.id}
+            name={item.title}
+            tip={DELETE_TIP[item.resource_type]}
+            onDelete={() => DELETE_FN[item.resource_type](item.id)}
+            onDeleted={() => setItems(prev => prev.filter(i => itemKey(i) !== itemKey(item)))}
+            onError={setError}
+          />
+        )}
+      </>
+    );
+  };
 
   return (
     <div className="page">
-      <div className="toolbar toolbar--underline-row">
-        <div className="toolbar__filters">
-          <button type="button" className={`tab tab--underline${typeFilter === '' ? ' tab--active' : ''}`} onClick={() => setTypeFilter('')}>
-            {'Все'}
-          </button>
-          <button type="button" className={`tab tab--underline${typeFilter === 'material' ? ' tab--active' : ''}`} onClick={() => setTypeFilter('material')}>
-            {'Файлы'}
-          </button>
-          <button type="button" className={`tab tab--underline${typeFilter === 'link' ? ' tab--active' : ''}`} onClick={() => setTypeFilter('link')}>
-            {'Ссылки'}
-          </button>
-          <button type="button" className={`tab tab--underline${typeFilter === 'quiz' ? ' tab--active' : ''}`} onClick={() => setTypeFilter('quiz')}>
-            {'Квизы'}
-          </button>
-        </div>
-        <div className="toolbar__filters">
-          <button type="button" className={`tab tab--underline${onlyMine ? ' tab--active' : ''}`} onClick={() => setOnlyMine(v => !v)}>
-            {'Моё'}
-          </button>
-          {!isAdmin && (
-            <>
-              <button type="button" className={`tab tab--underline${scope === 'mine' ? ' tab--active' : ''}`} onClick={() => setScope('mine')}>
-                {'Мои курсы'}
-              </button>
-              <button type="button" className={`tab tab--underline${scope === 'all' ? ' tab--active' : ''}`} onClick={() => setScope('all')}>
-                {'Все курсы'}
-              </button>
-            </>
-          )}
-          {isAdmin && (
-            <>
-              <select className="input input--min160" value={filterCourseId} onChange={e => setFilterCourseId(e.target.value)}>
-                <option value="">{'Курс: все'}</option>
-                {courses.map(c => (
-                  <option key={c.id} value={c.id}>{c.title}</option>
-                ))}
-              </select>
-              <select className="input input--min160" value={filterSector} onChange={e => setFilterSector(e.target.value)}>
-                <option value="">{'Сектор: все'}</option>
-                {sectors.map(s => <option key={s.code} value={s.code}>{s.name}</option>)}
-              </select>
-            </>
-          )}
-        </div>
-      </div>
-
-      {isAdmin && filterCourseId && filterSector && (
-        <div className="form-toolbar">
-          <span>{'Пакет материалов курса — решение разом:'}</span>
-          <button type="button" className="btn btn--outline btn--sm" onClick={() => handleBulkTemplateStatus('approved')} disabled={bulkTemplateSaving}>
-            {'Одобрить пакет'}
-          </button>
-          <button type="button" className="btn btn--outline btn--sm" onClick={() => handleBulkTemplateStatus('rejected')} disabled={bulkTemplateSaving}>
-            {'Заблокировать пакет'}
-          </button>
-        </div>
-      )}
-
       <div className="form-toolbar">
         <input
           type="file"
@@ -650,177 +554,33 @@ function KnowledgeBasePage() {
       {error && <div className="error-text error-text--muted">{error}</div>}
       {uploadNotice && <p className="text-muted">{uploadNotice}</p>}
 
-      {/* Папки: путь и вложенные папки с числом ресурсов */}
-      <div className="kb-path">
-        <button type="button" className="link" onClick={() => setFolder('')} disabled={!folder}>{'База знаний'}</button>
-        {crumbs.map(path => (
-          <React.Fragment key={path}>
-            <span className="kb-path__sep">{'›'}</span>
-            <button type="button" className="link" onClick={() => setFolder(path)} disabled={path === folder}>{folderLabel(path)}</button>
-          </React.Fragment>
-        ))}
-      </div>
-      {childFolders.length > 0 && (
-        <div className="kb-folders">
-          {childFolders.map(([path, count]) => (
-            <button key={path} type="button" className="tab kb-folder" onClick={() => setFolder(path)}>
-              {folderLabel(path)}
-              <span className="kb-folder__count">{count}</span>
-            </button>
-          ))}
+      {isAdmin && packSector && packCourseId && (
+        <div className="form-toolbar">
+          <span>{'Пакет материалов курса — решение разом:'}</span>
+          <button type="button" className="btn btn--outline btn--sm" onClick={() => handleBulkTemplateStatus('approved')} disabled={bulkTemplateSaving}>
+            {'Одобрить пакет'}
+          </button>
+          <button type="button" className="btn btn--outline btn--sm" onClick={() => handleBulkTemplateStatus('rejected')} disabled={bulkTemplateSaving}>
+            {'Заблокировать пакет'}
+          </button>
         </div>
       )}
 
-      <div className="table-scroll">
-        <table className="table">
-          <thead>
-            <tr>
-              {sortTh('type', 'Тип')}
-              {sortTh('course', 'Курс', 'Курсы, в уроках которых это используется')}
-              {sortTh('title', 'Название')}
-              <th>{'Детали'}</th>
-              {sortTh('uploader', 'Загрузил')}
-              {sortTh('date', 'Дата')}
-              {sortTh('lessons', 'В уроках')}
-              <th>{'Статус'}</th>
-              <th>{'Удалить'}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={columnCount} className="table__empty">{'Загрузка...'}</td></tr>
-            ) : items.length === 0 ? (
-              <tr><td colSpan={columnCount} className="table__empty">{'В базе знаний пока пусто'}</td></tr>
-            ) : sortedItems.length === 0 ? (
-              <tr><td colSpan={columnCount} className="table__empty">{'В этой папке пусто'}</td></tr>
-            ) : (
-              sortedItems.map(item => {
-                const meta = TYPE_META[item.resource_type];
-                const key = itemKey(item);
-                const deletable = canDelete(item);
-                return (
-                  <tr key={key} className={`table__row--${item.resource_type}`}>
-                    <td>
-                      <span className={`type-badge type-badge--${item.resource_type}`}>
-                        <BadgeIcon type={item.resource_type} />
-                        {subtypeLabel(item)}
-                      </span>
-                      {item.is_homework && (
-                        <span className="badge badge--homework badge--inline" data-tip={'Используется как ДЗ в уроке'}>{'ДЗ'}</span>
-                      )}
-                    </td>
-                    <td>
-                      {tagEditKey === key ? (
-                        <div className="icon-row">
-                          <select className="input" value={tagSector} onChange={e => setTagSector(e.target.value)}>
-                            <option value="">{'Сектор...'}</option>
-                            {sectors.map(sec => <option key={sec.code} value={sec.code}>{sec.name}</option>)}
-                          </select>
-                          <select className="input" value={tagCourseId} onChange={e => setTagCourseId(e.target.value)}>
-                            <option value="">{'Курс...'}</option>
-                            {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-                          </select>
-                          <button type="button" className="btn btn--sm" onClick={() => saveTags(item)}
-                            disabled={tagSaving || !tagSector !== !tagCourseId}>{'Сохранить'}</button>
-                          <button type="button" className="btn btn--outline btn--sm" onClick={() => setTagEditKey(null)}>{'Отмена'}</button>
-                        </div>
-                      ) : item.attached_courses?.length > 0 ? (
-                        <span className="table__cell--truncate" data-tip={item.attached_courses.join(', ')}>
-                          {item.attached_courses.join(', ')}
-                        </span>
-                      ) : '—'}
-                    </td>
-                    <td>
-                      <button type="button" className="link" onClick={() => handleOpen(item)} disabled={openingKey === key}>
-                        {openingKey === key ? `${item.title} — открываем...` : item.title}
-                      </button>
-                    </td>
-                    <td className="nowrap">
-                      {item.resource_type === 'material' && formatSize(item.size_bytes || 0)}
-                      {item.resource_type === 'quiz' && (item.topic || '—')}
-                      {item.resource_type === 'link' && (
-                        <span className="table__cell--truncate" data-tip={item.url}>{item.url}</span>
-                      )}
-                    </td>
-                    <td>{item.uploaded_by_name || '—'}</td>
-                    <td className="nowrap">{new Date(item.created_at).toLocaleDateString('ru-RU')}</td>
-                    <td className="nowrap">{item.attached_lessons_count > 0 ? item.attached_lessons_count : '—'}</td>
-                    <td className="nowrap">
-                      {isAdmin && item.resource_type === 'material' && item.template_lesson_no ? (
-                        <>
-                          {item.template_status === 'approved' ? 'Одобрено'
-                            : item.template_status === 'rejected' ? 'Отклонено'
-                            : 'На проверке'}
-                          {' '}
-                          <button
-                            type="button"
-                            className="btn btn--sm"
-                            data-tip={'Одобрить'}
-                            onClick={() => handleSetMaterialTemplateStatus(item, 'approved')}
-                            disabled={savingTemplateKey === key || item.template_status === 'approved'}
-                          >
-                            {'✅'}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn--sm"
-                            data-tip={'Заблокировать'}
-                            onClick={() => handleSetMaterialTemplateStatus(item, 'rejected')}
-                            disabled={savingTemplateKey === key || item.template_status === 'rejected'}
-                          >
-                            {'🚫'}
-                          </button>
-                        </>
-                      ) : '—'}
-                    </td>
-                    <td>
-                      <div className="icon-row">
-                      {/* Сектор и курс — куда ресурс попадает, пока не используется в уроках */}
-                      <IconButton
-                        icon="folder"
-                        disabled={!canTag(item)}
-                        tip={canTag(item)
-                          ? `Сектор и курс: ${item.sector && item.course_id ? `${sectorName(item.sector)}, ${courseTitle(item.course_id)}` : 'не заданы'}`
-                          : 'Сектор и курс ставят админ и владелец'}
-                        onClick={() => startTagEdit(item)}
-                      />
-                      {/* Редактор квиза (AddQuizPage): автор или admin — то же право, что на удаление */}
-                      {item.resource_type === 'quiz' && (
-                        <IconButton
-                          icon="edit"
-                          disabled={!deletable}
-                          tip={deletable ? 'Редактировать квиз' : 'Редактировать может только автор или администратор'}
-                          onClick={() => navigate(`/dashboard/add-quiz/${item.id}`)}
-                        />
-                      )}
-                      {deletable ? (
-                        <DeleteButton
-                          entity={item.resource_type}
-                          id={item.id}
-                          name={item.title}
-                          tip={DELETE_TIP[item.resource_type]}
-                          onDelete={() => DELETE_FN[item.resource_type](item.id)}
-                          onDeleted={() => setItems(prev => prev.filter(i => itemKey(i) !== key))}
-                          onError={setError}
-                        />
-                      ) : (
-                        <IconButton
-                          icon="delete"
-                          disabled
-                          tip={item.resource_type === 'quiz'
-                            ? 'Удалить может только автор или администратор'
-                            : 'Удалить может только администратор'}
-                        />
-                      )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+      <LibrarySearch
+        items={items}
+        loading={loading}
+        filters={{ ...EMPTY_FILTERS, ...filters }}
+        onFiltersChange={setFilters}
+        sectors={sectors}
+        courses={courses}
+        myPairs={myPairs}
+        userId={user?.id}
+        onActivate={handleOpen}
+        activateHint={'открыть'}
+        renderActions={renderActions}
+        renderExtra={renderExtra}
+        emptyText={items.length ? 'Ничего не найдено' : 'В базе знаний пока пусто'}
+      />
     </div>
   );
 }

@@ -25,7 +25,7 @@ import { extractErrorMessage } from '../utils/errors';
 
 // ---------- Окно «+ ДЗ» ----------
 
-export function HomeworkAddModal({ lessonId, student, deadline, sector, courseId, onChanged, onClose }) {
+export function HomeworkAddModal({ lessonId, student, deadline, sector, courseId, lessonNo, onChanged, onClose }) {
   const fileRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -108,6 +108,7 @@ export function HomeworkAddModal({ lessonId, student, deadline, sector, courseId
           title={'ДЗ из базы знаний'}
           sector={sector}
           courseId={courseId}
+          lessonNo={lessonNo}
           onPick={handlePick}
           onClose={() => setShowLibrary(false)}
         />

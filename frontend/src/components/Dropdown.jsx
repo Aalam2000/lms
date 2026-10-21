@@ -3,7 +3,9 @@ import React, { useState, useRef, useEffect } from 'react';
 // Кастомный дропдаун — триггер в стиле подчёркнутого текста (как .tab--underline),
 // панель показывает не больше ~7 строк, дальше появляется скролл.
 // Опция с muted — мелким серым (не подходит под фильтр), перед первой такой — черта.
-function Dropdown({ value, onChange, options, placeholder, disabled }) {
+// variant="chip" — триггер чипом (фильтры Базы знаний, LibrarySearch.jsx):
+// выбранное значение снимается ✕ на самом чипе.
+function Dropdown({ value, onChange, options, placeholder, disabled, variant }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -27,12 +29,25 @@ function Dropdown({ value, onChange, options, placeholder, disabled }) {
     <div className="dropdown" ref={ref}>
       <button
         type="button"
-        className={`tab tab--underline${value ? ' tab--active' : ''}${disabled ? ' dropdown__trigger--disabled' : ''}`}
+        className={`${variant === 'chip'
+          ? `dropdown__chip${value ? ' dropdown__chip--on' : ''}`
+          : `tab tab--underline${value ? ' tab--active' : ''}`}${disabled ? ' dropdown__trigger--disabled' : ''}`}
         onClick={() => !disabled && setOpen(v => !v)}
         disabled={disabled}
       >
         {label}
-        <span className="dropdown__caret">{'▾'}</span>
+        {variant === 'chip' && value ? (
+          <span
+            className="dropdown__clear"
+            role="button"
+            data-tip={'Снять'}
+            onClick={(e) => { e.stopPropagation(); handleSelect(''); }}
+          >
+            {'✕'}
+          </span>
+        ) : (
+          <span className="dropdown__caret">{'▾'}</span>
+        )}
       </button>
       {open && (
         <div className="dropdown__panel">

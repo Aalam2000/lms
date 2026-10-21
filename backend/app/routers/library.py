@@ -46,8 +46,9 @@ class LibraryItemOut(BaseModel):
     course_id: Optional[int] = None
     course_title: Optional[str] = None
     sector: Optional[str] = None
-    # Где используется — для папок БЗ: [{sector, course_id, course_title, lesson_no}],
-    # lesson_no None — доп. урок (resources.attachment_usage_map)
+    # Где используется — по уроку: [{lesson_id, sector, course_id, course_title,
+    # lesson_no (None — доп. урок), group_name, date, homework}]
+    # (resources.attachment_usage_map) — папки БЗ и блок «Где используется»
     places: list[dict] = []
     # Номер урока шаблона и статус — только admin, только у материалов
     template_lesson_no: Optional[str] = None

@@ -10,6 +10,14 @@
  */
 
 /* ===== Мобильный режим (≤768px) ===== */
+/* Поиск по Базе знаний: просмотр — под списком */
+@media (max-width: 900px) {
+  .kbs__body { grid-template-columns: minmax(0, 1fr); }
+  .kbs__preview { position: static; }
+  .kbs__list { max-height: none; }
+  .kbs__hint { display: none; }
+}
+
 @media (max-width: 768px) {
 
   /* --- Сайдбар уезжает за левый край --- */

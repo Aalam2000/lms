@@ -836,6 +836,7 @@ function LessonPage() {
               onClose={() => setShowLibraryModal(false)}
               sector={lesson.group_sector}
               courseId={lesson.group_course_id}
+              lessonNo={lesson.is_personal ? null : lesson.order}
             />
           )}
 
@@ -979,6 +980,7 @@ function LessonPage() {
                   deadline={hwBoard.tasks.find(t => !t.student_id && t.deadline)?.deadline || null}
                   sector={lesson.group_sector}
                   courseId={lesson.group_course_id}
+                  lessonNo={lesson.is_personal ? null : lesson.order}
                   onChanged={loadHomework}
                   onClose={() => setHwAddOpen(false)}
                 />
@@ -991,6 +993,7 @@ function LessonPage() {
                   deadline={personalOrCommonDeadline(hwBoard, hwAddFor.student_id)}
                   sector={lesson.group_sector}
                   courseId={lesson.group_course_id}
+                  lessonNo={lesson.is_personal ? null : lesson.order}
                   onChanged={loadHomework}
                   onClose={() => setHwAddFor(null)}
                 />

@@ -1,4 +1,4 @@
-<!-- autoi18n: source=admin.md lang=en sha1=c08ac1fb488291cec369bfe3fd06f9e76f683c71 -->
+<!-- autoi18n: source=admin.md lang=en sha1=d55756e8ef4581c4dc1bb11cd10137ac0603eb16 -->
 # How to Work on the Platform
 
 The administrator sees everything that the teacher sees — but for all groups and all teachers — and additionally manages users, courses, and groups.
@@ -37,7 +37,7 @@ User list: name, login, phone.
 
 The curator brings students and hands them over to teachers (how they work — curator's help). They see the calendars of all teachers and all students in "Students," can create a student and assign them an additional lesson.
 
-- **+ Add Curator** — first name and last name, phone and contacts. The login is created automatically (first name, dot, three letters of the last name, and numbers), the password is the same as the login. A window will open immediately with the login and password and buttons **Copy** and **Send via WhatsApp**.
+- **+ Add Curator** — first name and last name, phone and contacts. The login is created automatically (first name, dot, three letters of the last name, and numbers), the password is the same as the login. A window with the login and password will open immediately, along with buttons **Copy** and **Send via WhatsApp**.
 - The key in the curator's row opens the same window; if the curator has changed the password — **Reset to login**.
 - Click on the row — data can be changed.
 
@@ -52,32 +52,33 @@ The calendar icon in the teacher's row indicates their days off. Only the admin 
 
 ### Courses
 
-Course name and description. **+ Add course**, edit by clicking on the row, delete.
+Course title and description. **+ Add course**, edit by clicking on the row, delete.
 
 ### Groups
 
 Name, course, sector, teacher, video conference, Telegram.
 
-- **+ Add group** — new group with a course and teacher.
+- **+ Add group** — new group with course and teacher.
 - Click on the row — data can be edited. Changing the teacher in the row takes effect from today: past lessons remain with the one who taught them.
 - **Group schedule** — open the group page.
 - **Send to archive** — the group is no longer active; it can be **returned** or **deleted permanently** from the archive.
 
 ## Knowledge base
 
-Materials are organized into folders — they do not need to be created, the platform organizes them automatically:
+At the top — search bar: material is found by title immediately upon typing. Below it are filters: **Sector**, **Course**, **Lesson**, **Type**, **My** — the selected filter can be removed with a cross. Results are organized by groups, they do not need to be created, the platform organizes them itself:
 
-- **Sector › Course › Lesson N** — material that is in lesson N of some group (in materials or as Homework). Sector and course are taken from the group. If the material is in lesson 5 of one group and in lesson 4 of another, it is visible in both folders.
-- **Sector › Course › General** — material that is used only in additional lessons, or material with a sector and course that is not yet in any lesson.
-- **For everyone** — material without a sector and course that is not used anywhere.
+- **Lesson N** — material is in lesson N of some group (in materials or as Homework); sector and course are taken from the group.
+- **General** — material is used only in additional lessons or it has a sector and course, but it is not yet in any lesson.
+- **For everyone** — material without a sector and course, which is not used anywhere.
 
-The sector and course assign a folder icon to the material in the table row — it can be changed by the material owner or administrator. The sector and course are assigned together. Each folder shows the number of materials, the path at the top leads back. The opened folder is remembered in the profile.
+On the right — view of the selected material and where it is used (group, lesson, date). The sector and course of the material can be changed by its owner or administrator — link **Edit** below the view. Arrows ↑ ↓ select material, Enter opens it, Ctrl+K leads to search. Filters are saved in the profile.
+
+In the lesson, the **Add from base** window is arranged the same way: it opens on the course of the group, materials for this lesson are listed first, Enter or the **Add to lesson** button adds the selected one.
 
 For the administrator additionally:
 
-- **Upload course** — upload a folder with course materials as a lesson template: for each file, the course, direction, and lesson number are specified.
-- Filters by course and sector — for checking the course material package.
-- **Approve** / **Block** template material — one by one or the entire course package at once.
+- **Upload course** — upload a folder with course materials as a lesson template: for each file, course, direction, and lesson number are specified.
+- **Approve** / **Block** template material — under the material view; the entire course package at once — when sector and course are selected in the filters.
 - Only the administrator can delete files and links; quiz — administrator or its author. Material that is used in lessons must first be unlinked.
 
 ## Students
@@ -93,7 +94,7 @@ A personal lesson closes absences: when it is over and the student is marked as 
 ### How to add a student
 
 1. Click **+ Student**.
-2. Fill in the first name and last name (first name, then last name) and phone number. The login is created automatically — first name, dot, three letters of the last name, and numbers, for example `murad.ali47`; the password initially equals the login.
+2. Fill in the first name and last name (first name first, then last name) and phone number. The login is created automatically — first name, dot, three letters of the last name, and numbers, for example `murad.ali47`; the password initially equals the login.
 3. Enter the name and phone number of the parent.
 4. Choose a group — or just a course (and optionally, a teacher): then the student will appear with this teacher "without a group," and the teacher will assign them to a group themselves. The checkbox **Immediately add a lesson** creates a personal lesson in the selected group. Click **Save**. The student will immediately appear in the group, their card will open: in the **Student Access** block — address, login, and password with **Copy** and **Send via WhatsApp** buttons. As long as the student has not changed the password, it is visible in the card; if they changed it and forgot — **Reset to login**.
 
@@ -120,7 +121,7 @@ The parent can view the child's performance via a personal link or log in with t
 
 The link belongs to the parent's phone: if siblings have the same parent's phone in their card, all children can be seen through one link — each has their own tab. Below the link, it is written who the parent will see and when the link was last opened.
 
-Through the link, the parent sees only the performance: grades for lessons, Homework, and Exams, Attendance, and absences. By clicking on the lesson, they see the Homework assignment, the student's answer, and the lesson dialogue. Nothing can be changed.
+Through the link, the parent sees only the performance: grades for lessons, Homework, and Exams, Attendance, and absences. By clicking on the lesson, they see the Homework assignment, the student's response, and the lesson dialogue. Nothing can be changed.
 
 ### Other Actions
 
@@ -134,7 +135,7 @@ Click on the student's name — a report for parents will open. The period is se
 
 - **Summary in One Phrase** — how the period went and what to pay attention to.
 - **Month (Period) in Numbers** — attended lessons, submitted homework, stars, and average grade for lessons.
-- **How Things Are Going** — six indicators with color: attending lessons, arriving on time, how they perform in class, whether they submit and how they complete homework, how they pass exams.
+- **How Things Are Going** — six indicators with color: whether the student attends lessons, arrives on time, how they perform in class, whether they submit and how they complete homework, how they take exams.
 - **Main Points for the Period** — what can be proud of and what to pay attention to.
 - **Lessons for the Period** — for each lesson: attendance, grade, homework, and stars.
 
@@ -142,7 +143,7 @@ Green color — everything is fine, yellow — slight deviation, red — parents
 
 ## Teachers
 
-In the [Teachers](/dashboard/teachers) section — a summary for each teacher: how many groups and students, conducted lessons, attendance, and average score. Groups and students are counted based on the groups where they are the main teacher; lessons, attendance, and score are based on the lessons they taught themselves, including substitutions.
+In the [Teachers](/dashboard/teachers) section — a summary for each teacher: how many groups and students, conducted lessons, attendance, and average grade. Groups and students are counted based on the groups where they are the main teacher; lessons, attendance, and grades are based on the lessons they taught themselves, including substitutions.
 
 ### Teacher Report
 
@@ -151,8 +152,8 @@ Click on the teacher to open the report. The period is selected at the top of th
 - **Summary in one phrase** — how the period was worked and which indicators require attention.
 - **How much was worked** — lessons conducted according to the schedule, personal lessons, hours, and canceled lessons. A lesson is considered conducted if at least one student attended.
 - **How it was worked** — eight indicators with norms and colors: attendance, whether students remain, whether the journal is filled out on time, whether homework is assigned and checked quickly, whether exam results are improving, whether students use the platform, and how they rate the lessons with emojis.
-- **By groups** — the same main figures for each of the teacher's groups.
-- **What to pay attention to** — specific cases: ungraded assignments, students with three consecutive absences, students who have left and the reason, canceled lessons.
+- **By groups** — the same main figures for each group of the teacher.
+- **What to pay attention to** — specific cases: ungraded work, students with three consecutive absences, students who have left and the reason, canceled lessons.
 
 Green color — norm met, yellow — slight deviation, red — below norm, gray — no data yet.
 
