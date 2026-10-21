@@ -12,6 +12,7 @@ import Modal from '../components/Modal';
 import DateTimePicker from '../components/DateTimePicker';
 import { useAuth } from '../context/AuthContext';
 import { extractErrorMessage } from '../utils/errors';
+import Avatar from '../components/Avatar';
 import { getSectors } from '../api/academy';
 import { getCourses } from '../api/groups';
 import { getGroups } from '../api/admin';
@@ -134,7 +135,7 @@ function CuratorHome() {
   const allTeachers = useMemo(() => {
     const map = new Map();
     groups.forEach(g => {
-      if (!map.has(g.teacher_id)) map.set(g.teacher_id, { id: g.teacher_id, name: g.teacher_name || `#${g.teacher_id}`, sectors: new Set() });
+      if (!map.has(g.teacher_id)) map.set(g.teacher_id, { id: g.teacher_id, name: g.teacher_name || `#${g.teacher_id}`, photoUrl: g.teacher_photo_url, sectors: new Set() });
       map.get(g.teacher_id).sectors.add(g.sector);
     });
     return Array.from(map.values()).sort((x, y) => x.name.localeCompare(y.name));
@@ -182,6 +183,7 @@ function CuratorHome() {
     .map(t => ({ value: t.id, label: t.name, muted: !fits(t) }));
   const sectorTeachers = allTeachers.filter(t => !sector || t.sectors.has(sector));
   const shownTeacher = teacherId || '';
+  const shownTeacherInfo = allTeachers.find(t => t.id === teacherId);
 
   useEffect(() => {
     if (!shownTeacher) { setLessons([]); return; }
@@ -205,12 +207,18 @@ function CuratorHome() {
 
       <div className="toolbar">
         <ChoiceRow items={sectorCourses.map(c => ({ id: c.id, label: c.title }))} value={course} onChange={pickCourse} />
-        <Dropdown
-          value={shownTeacher || ''}
-          onChange={v => pickTeacher(Number(v))}
-          placeholder={allTeachers.length ? 'Педагог' : 'Нет педагогов'}
-          options={teacherOptions}
-        />
+        <span className="person">
+          {/* Фото выбранного педагога */}
+          {shownTeacherInfo && (
+            <Avatar userId={shownTeacherInfo.id} photoUrl={shownTeacherInfo.photoUrl} name={shownTeacherInfo.name} size="sm" />
+          )}
+          <Dropdown
+            value={shownTeacher || ''}
+            onChange={v => pickTeacher(Number(v))}
+            placeholder={allTeachers.length ? 'Педагог' : 'Нет педагогов'}
+            options={teacherOptions}
+          />
+        </span>
       </div>
 
       {shownTeacher && (

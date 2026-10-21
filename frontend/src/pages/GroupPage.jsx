@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Modal from '../components/Modal';
+import Avatar from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
 import { usePref } from '../hooks/usePref';
 import IconButton from '../components/IconButton';
@@ -620,7 +621,10 @@ function GroupPage() {
                       <PersonalBadge lesson={l} />
                       {/* Урок ведёт не основной педагог группы: замена или прежний педагог */}
                       {l.teacher_name && (
-                        <span className="badge badge--teacher badge--inline" data-tip={'Урок ведёт этот педагог'}>{l.teacher_name}</span>
+                        <span className="badge badge--teacher badge--inline badge--photo" data-tip={'Урок ведёт этот педагог'}>
+                          <Avatar userId={l.teacher_id} photoUrl={l.teacher_photo_url} name={l.teacher_name} size="xs" />
+                          {l.teacher_name}
+                        </span>
                       )}
                       {l.has_unreviewed_homework && (
                         <span className="badge badge--homework-pending badge--inline" data-tip={'Есть непроверенные решения ДЗ'}>

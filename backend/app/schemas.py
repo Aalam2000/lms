@@ -108,6 +108,7 @@ class GroupOut(BaseModel):
     created_at: datetime
     student_count: int = 0
     teacher_name: Optional[str] = None
+    teacher_photo_url: Optional[str] = None  # фото педагога группы — только в GET /admin/groups (главная куратора)
     homework_to_review: int = 0   # ответов на ДЗ ждут проверки (подсветка группы у педагога)
     work_to_review: int = 0       # учеников с непроверенной работой на уроке (app/lesson_work.py)
     pending_count: int = 0        # записались по QR и ждут подтверждения педагога (метка «Новые»)

@@ -5,6 +5,7 @@
 import React, { useEffect, useState } from 'react';
 import { PersonalBadge } from '../components/PersonalLesson';
 import LessonFeedback from '../components/LessonFeedback';
+import Avatar from '../components/Avatar';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { TYPE_META, formatSize, subtypeLabel, resourceKey, needsPdfPreview, isPresentation, openSlides } from '../utils/libraryItems';
 import { extractErrorMessage } from '../utils/errors';
@@ -158,6 +159,13 @@ function StudentLessonPage() {
             {lesson.date ? ` — ${new Date(lesson.date).toLocaleString('ru-RU')}` : ''}
             <PersonalBadge lesson={lesson} />
           </span>
+          {/* Педагог, который ведёт урок (GET /lessons/{id} отдаёт его ученику) */}
+          {lesson.teacher_name && (
+            <span className="person" data-tip={'Урок ведёт этот педагог'}>
+              <Avatar userId={lesson.teacher_id} photoUrl={lesson.teacher_photo_url} name={lesson.teacher_name} size="sm" />
+              {lesson.teacher_name}
+            </span>
+          )}
         </div>
         {/* «Как тебе урок?» — три смайлика в строке с «Назад», появляются после начала урока */}
         <LessonFeedback lessonId={lessonId} />

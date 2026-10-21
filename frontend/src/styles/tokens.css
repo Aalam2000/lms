@@ -55,6 +55,19 @@
 
   --overlay-backdrop: rgba(0, 0, 0, 0.4);
 
+  /* --- Фото пользователя (components/Avatar.jsx, ProfilePage.jsx) --- */
+  --avatar-badge: 18px;            /* внутри бейджа «Урок ведёт…» */
+  --avatar-xs: 24px;               /* строки таблиц */
+  --avatar-sm: 32px;               /* шапка */
+  --avatar-md: 48px;               /* карточки */
+  --avatar-lg: 160px;              /* профиль */
+  --color-avatar-bg: #E6EDF7;      /* фон кружка с инициалами */
+  --color-avatar-text: var(--color-info);
+  --overlay-photo: rgba(32, 30, 29, 0.45);       /* «Изменить» поверх фото */
+  --overlay-camera: rgba(255, 255, 255, 0.55);   /* светлая вуаль вокруг круга камеры */
+  --camera-frame: 320px;           /* окно камеры */
+  --camera-shoot: 44px;            /* круглая кнопка снимка */
+
   /* --- Отступы (не меняются) --- */
   --space-1: 4px;
   --space-2: 8px;

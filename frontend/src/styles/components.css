@@ -3445,3 +3445,179 @@ a.row-icon:hover {
   color: var(--color-warning);
   font-weight: 700;
 }
+
+/* ===== Фото пользователя (components/Avatar.jsx) ===== */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--avatar-md);
+  height: var(--avatar-md);
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+  vertical-align: middle;
+  background: var(--color-bg-muted);
+}
+.avatar--initials {
+  background: var(--color-avatar-bg);
+  color: var(--color-avatar-text);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-bold);
+  line-height: 1;
+  user-select: none;
+}
+.avatar--xs { width: var(--avatar-xs); height: var(--avatar-xs); }
+.avatar--sm { width: var(--avatar-sm); height: var(--avatar-sm); }
+.avatar--lg { width: var(--avatar-lg); height: var(--avatar-lg); }
+.avatar--xs.avatar--initials,
+.avatar--sm.avatar--initials { font-size: var(--font-xs); }
+.avatar--lg.avatar--initials { font-size: var(--font-xl); }
+/* Фото + имя в строке таблицы или списка */
+.person {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  vertical-align: middle;
+}
+/* Бейдж педагога с фото: «Урок ведёт этот педагог» */
+.badge--photo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-left: 2px;
+}
+.badge--photo .avatar {
+  width: var(--avatar-badge);
+  height: var(--avatar-badge);
+}
+/* Фото в шапке — ссылка на профиль */
+.dashboard-header__avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  cursor: pointer;
+}
+
+/* ===== Профиль: фото слева от полей (ProfilePage.jsx) ===== */
+.profile {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-7);
+}
+.profile__form {
+  flex: 1;
+  min-width: 0;
+}
+.profile-photo {
+  position: relative;
+  flex-shrink: 0;
+}
+.profile-photo__btn {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
+.profile-photo__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--overlay-photo);
+  color: var(--color-white);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-medium);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.profile-photo__btn:hover .profile-photo__overlay,
+.profile-photo__btn:focus-visible .profile-photo__overlay,
+.profile-photo__btn--busy .profile-photo__overlay {
+  opacity: 1;
+}
+/* Телефон и планшет: наведения нет — «Изменить» видно всегда */
+@media (hover: none) {
+  .profile-photo__overlay { opacity: 1; }
+}
+.profile-photo__menu {
+  min-width: 200px;
+}
+.profile-photo__delete {
+  color: var(--color-danger-text);
+}
+
+/* ===== Окно «Сфотографировать» (ProfilePage.jsx, CameraModal) ===== */
+.camera {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+.camera__select {
+  width: var(--camera-frame);
+  max-width: 100%;
+}
+.camera__frame {
+  position: relative;
+  width: var(--camera-frame);
+  max-width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--color-bg-muted);
+}
+/* Вуаль вокруг круга: в фото попадёт то, что внутри */
+.camera__frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle closest-side, transparent calc(100% - 1px), var(--overlay-camera) 100%);
+}
+.camera__frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 2px dashed var(--color-white);
+  border-radius: var(--radius-pill);
+}
+.camera__frame--shot::before {
+  border: 3px solid var(--color-role-student);
+}
+.camera__video,
+.camera__still {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.camera__video {
+  transform: scaleX(-1);  /* зеркально, как в зеркале; снимок отражается так же */
+}
+.camera__video--hidden {
+  display: none;
+}
+.camera__shoot {
+  width: var(--camera-shoot);
+  height: var(--camera-shoot);
+  padding: 0;
+  border: 4px solid var(--color-white);
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary);
+  cursor: pointer;
+}
+.camera__shoot:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+

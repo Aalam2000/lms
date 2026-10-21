@@ -165,6 +165,7 @@ async def delete_teacher(user_id: int, db: AsyncSession = Depends(get_db), admin
 class TeacherStatsOut(BaseModel):
     id: int
     full_name: str
+    photo_url: Optional[str] = None  # фото профиля (есть — значит GET /auth/photo/{id})
     group_count: int
     student_count: int
     attendance_pct: Optional[float] = None
@@ -198,9 +199,12 @@ async def get_teachers_directory(db: AsyncSession = Depends(get_db), admin: User
     )).all())
     teacher_ids = list(set(groups_by_teacher) | set(lesson_teacher.values()))
     users_result = await db.execute(
-        select(User.id, User.full_name, User.username).where(User.id.in_(teacher_ids))
+        select(User.id, User.full_name, User.username, User.photo_url).where(User.id.in_(teacher_ids))
     )
-    names = {uid: (full_name or username) for uid, full_name, username in users_result.all()}
+    names, photos = {}, {}
+    for uid, full_name, username, photo_url in users_result.all():
+        names[uid] = full_name or username
+        photos[uid] = photo_url
 
     members_result = await db.execute(
         select(GroupMember.group_id, GroupMember.student_id)
@@ -251,6 +255,7 @@ async def get_teachers_directory(db: AsyncSession = Depends(get_db), admin: User
         out.append(TeacherStatsOut(
             id=tid,
             full_name=names.get(tid, f"#{tid}"),
+            photo_url=photos.get(tid),
             group_count=len(gids),
             student_count=len(student_ids),
             attendance_pct=summarize(slots_by_teacher.get(tid, [])).pct,
@@ -707,15 +712,19 @@ async def get_groups(db: AsyncSession = Depends(get_db), admin: User = Depends(r
     # «#<id>» вместо имени.
     teacher_ids = list({g.teacher_id for g in groups})
     teachers_result = await db.execute(
-        select(User.id, User.full_name, User.username).where(User.id.in_(teacher_ids))
+        select(User.id, User.full_name, User.username, User.photo_url).where(User.id.in_(teacher_ids))
     )
-    teachers = {uid: (full_name or username) for uid, full_name, username in teachers_result.all()}
+    teachers, teacher_photos = {}, {}
+    for uid, full_name, username, photo_url in teachers_result.all():
+        teachers[uid] = full_name or username
+        teacher_photos[uid] = photo_url
 
     out = []
     for g in groups:
         item = GroupOut.model_validate(g)
         item.student_count = counts.get(g.id, 0)
         item.teacher_name = teachers.get(g.teacher_id)
+        item.teacher_photo_url = teacher_photos.get(g.teacher_id)
         out.append(item)
     return out
 

@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getTeacherReport } from '../api/admin';
 import { extractErrorMessage } from '../utils/errors';
+import Avatar from '../components/Avatar';
 import {
   ReportPeriod, ReportToolbar, Status, defaultPeriod, formatDate, periodParams, withSign,
 } from '../components/ReportParts';
@@ -123,7 +124,10 @@ function TeacherReportPage() {
         <div className="report">
           <div className="report__head">
             <div>
-              <div className="report__name">{report.teacher.full_name}</div>
+              <div className="report__name person">
+                <Avatar userId={report.teacher.id} photoUrl={report.teacher.photo_url} name={report.teacher.full_name} size="md" />
+                {report.teacher.full_name}
+              </div>
               {!report.empty && (
                 <div className="report__meta">
                   {'Группы'}: {report.groups.join(', ') || '—'} · {'учеников'}: {report.students}

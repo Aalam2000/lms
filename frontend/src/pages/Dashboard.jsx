@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import Avatar from '../components/Avatar';
 import StudentStars from '../components/StudentStars';
 import StudentHomeworkStrip from '../components/StudentHomeworkStrip';
 import { usePresencePing } from '../hooks/usePresencePing';
@@ -104,6 +105,11 @@ function Dashboard() {
               </button>
             )}
             <LanguageSwitcher />
+            {user && (
+              <button type="button" className="dashboard-header__avatar" onClick={() => navigate('/dashboard/profile')} data-tip={'Профиль'}>
+                <Avatar userId={user.id} photoUrl={user.photo_url} name={user.full_name || user.username} size="sm" />
+              </button>
+            )}
             <button onClick={() => { logout(); navigate('/login'); }} className="btn btn--danger btn--pill">
               {'Выйти'}
             </button>

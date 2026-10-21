@@ -10,6 +10,7 @@
 import React, { useEffect, useState } from 'react';
 import Modal from './Modal';
 import FormField from './FormField';
+import Avatar from './Avatar';
 import DateTimePicker, { nextHour } from './DateTimePicker';
 import { getStudentProfile, updateStudentProfile, createStudent } from '../api/students';
 import { PHONE_PLACEHOLDER } from '../utils/phone';
@@ -30,6 +31,7 @@ function StudentCardModal({ studentId, groups = [], defaultGroupId = '', courses
     teacher_id: defaults.teacher_id ? String(defaults.teacher_id) : '',
   } : null); // null — загрузка
   const [groupNames, setGroupNames] = useState([]);
+  const [photoUrl, setPhotoUrl] = useState(null);
   const [passwordIsLogin, setPasswordIsLogin] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -41,6 +43,7 @@ function StudentCardModal({ studentId, groups = [], defaultGroupId = '', courses
       .then(p => {
         if (!alive) return;
         setGroupNames(p.groups || []);
+        setPhotoUrl(p.photo_url || null);
         setPasswordIsLogin(!!p.password_is_login);
         setDraft({
           ...EMPTY,
@@ -124,6 +127,12 @@ function StudentCardModal({ studentId, groups = [], defaultGroupId = '', courses
       {draft && (
         <form id="student-card-form" onSubmit={submit} className="form-stack">
           <h4 className="form-section">{'Ученик'}</h4>
+          {!isNew && (
+            <div className="person">
+              <Avatar userId={studentId} photoUrl={photoUrl} name={draft.full_name || draft.username} size="md" />
+              <span className="text-muted">{draft.username}</span>
+            </div>
+          )}
           <div className="form-grid">
             <FormField label={'Имя и фамилия'} value={draft.full_name} onChange={set('full_name')} autoFocus />
             <FormField label={'Телефон ученика'} type="tel" placeholder={PHONE_PLACEHOLDER} value={draft.phone} onChange={set('phone')} />

@@ -20,7 +20,7 @@ class User(Base):
     # Родитель ученика — заполняет педагог/админ; телефон родителя может повторяться (братья и сёстры)
     parent_name = Column(String, nullable=True)
     parent_phone = Column(String, nullable=True)
-    photo_url = Column(String, nullable=True)  # путь к фото — этап 2
+    photo_url = Column(String, nullable=True)  # фото профиля: путь в хранилище «photos/<uuid>» (routers/auth.py)
     theme = Column(String, nullable=True)  # brand | playful | dark — выбор пользователя, NULL = brand по умолчанию
     # Выходные педагога: недельные полоски по версиям и отдельные даты (app/days_off.py)
     days_off = Column(JSON, nullable=True)

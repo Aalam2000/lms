@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getTeacherDirectory } from '../api/admin';
+import Avatar from '../components/Avatar';
 
 function TeachersDirectoryPage() {
   const navigate = useNavigate();
@@ -50,7 +51,12 @@ function TeachersDirectoryPage() {
                   data-tip="Открыть отчёт по педагогу"
                   onClick={() => navigate(`/dashboard/teachers/${t.id}/report`)}
                 >
-                  <td><span className="link">{t.full_name}</span></td>
+                  <td>
+                    <span className="person">
+                      <Avatar userId={t.id} photoUrl={t.photo_url} name={t.full_name} size="xs" />
+                      <span className="link">{t.full_name}</span>
+                    </span>
+                  </td>
                   <td>{t.group_count}</td>
                   <td>{t.student_count}</td>
                   <td>{t.lessons_held ?? 0}</td>

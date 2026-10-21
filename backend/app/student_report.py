@@ -63,7 +63,7 @@ async def build_student_report(
             select(User).where(User.id.in_({g["teacher_id"] for g in groups}))
         )).scalars().all()}
     base = {
-        "student": {"id": student.id, "full_name": student.full_name or student.username},
+        "student": {"id": student.id, "full_name": student.full_name or student.username, "photo_url": student.photo_url},
         "month": period.month,
         "period": period.out(),
         "is_current_month": period.kind == "month" and end > now,

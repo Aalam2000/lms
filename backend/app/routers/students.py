@@ -36,6 +36,7 @@ class StudentGroupOut(BaseModel):
 class StudentStatsOut(BaseModel):
     id: int
     full_name: str
+    photo_url: Optional[str] = None  # фото профиля (GET /auth/photo/{id})
     telegram_username: Optional[str] = None
     whatsapp: Optional[str] = None
     # Три вида оценок, у каждой своя средняя (claude/homework-plan.md, «Оценки»)
@@ -225,7 +226,7 @@ async def _waiting_students(
     )).all()} if teacher_ids else {}
     empty = {"scores": [], "exam_scores": [], "hw_scores": [], "stars": 0, "unexcused": 0, "late": 0}
     return [StudentStatsOut(
-        id=s.id, full_name=s.full_name or s.username, telegram_username=s.telegram_username,
+        id=s.id, full_name=s.full_name or s.username, photo_url=s.photo_url, telegram_username=s.telegram_username,
         whatsapp=s.whatsapp, phone=s.phone, parent_name=s.parent_name, parent_phone=s.parent_phone,
         course_id=s.course_id, sector=s.sector, teacher_id=s.teacher_id, teacher_name=names.get(s.teacher_id),
         **_stats_summary(empty),
@@ -287,16 +288,16 @@ async def list_students(
     users_result = await db.execute(
         select(
             User.id, User.full_name, User.username, User.telegram_username, User.whatsapp,
-            User.phone, User.parent_name, User.parent_phone,
+            User.phone, User.parent_name, User.parent_phone, User.photo_url,
         )
         .where(User.id.in_(student_ids))
     )
     users = {
         uid: {
             "full_name": full_name or username, "telegram_username": telegram_username, "whatsapp": whatsapp,
-            "phone": phone, "parent_name": parent_name, "parent_phone": parent_phone,
+            "phone": phone, "parent_name": parent_name, "parent_phone": parent_phone, "photo_url": photo_url,
         }
-        for uid, full_name, username, telegram_username, whatsapp, phone, parent_name, parent_phone in users_result.all()
+        for uid, full_name, username, telegram_username, whatsapp, phone, parent_name, parent_phone, photo_url in users_result.all()
     }
 
     stats = await _compute_stats(db, student_ids, group_ids)
@@ -317,6 +318,7 @@ async def list_students(
         out.append(StudentStatsOut(
             id=sid,
             full_name=u["full_name"],
+            photo_url=u.get("photo_url"),
             telegram_username=u.get("telegram_username"),
             whatsapp=u.get("whatsapp"),
             phone=u.get("phone"),
@@ -454,6 +456,7 @@ class StudentProfileOut(StudentProfile):
     # Пароль всё ещё равен логину (пароль по умолчанию) — тогда его можно
     # показать и отправить; сменил ученик — только «Сбросить на логин».
     password_is_login: bool = False
+    photo_url: Optional[str] = None  # фото профиля (GET /auth/photo/{id})
 
 
 # Логин и пароль необязательны: не заданы — логин из ФИО (security.make_login),
@@ -501,6 +504,7 @@ async def _profile_out(db: AsyncSession, student: User) -> StudentProfileOut:
         parent_name=student.parent_name, parent_phone=student.parent_phone,
         groups=group_names,
         password_is_login=verify_password(student.username, student.hashed_password),
+        photo_url=student.photo_url,
     )
 
 

@@ -14,6 +14,7 @@ import StudentCardModal from '../components/StudentCardModal';
 import Modal from '../components/Modal';
 import DateTimePicker, { nextHour } from '../components/DateTimePicker';
 import { setStudentPassword, getStudents, deleteStudent, createStudentLesson } from '../api/students';
+import Avatar from '../components/Avatar';
 import { extractErrorMessage } from '../utils/errors';
 import PushMark from '../components/PushMark';
 import { usePushUsers } from '../hooks/usePushUsers';
@@ -274,15 +275,18 @@ function StudentsPage() {
               sortedStudents.map(s => (
                 <tr key={s.id}>
                   <td>
-                    {/* Отчёт по ученику за месяц — для родителей (StudentReportPage.jsx) */}
-                    <Link
-                      className={`link${s.homework_debt ? ` hw-debt hw-debt--${s.homework_debt}` : ''}`}
-                      to={`/dashboard/students/${s.id}/report`}
-                      data-tip={s.homework_debt === 'overdue' ? 'Не сдал последнее ДЗ — срок прошёл'
-                        : s.homework_debt === 'pending' ? 'Ещё не сдал последнее ДЗ' : 'Отчёт по ученику'}
-                    >
-                      {s.full_name}
-                    </Link>
+                    <span className="person">
+                      <Avatar userId={s.id} photoUrl={s.photo_url} name={s.full_name} size="xs" />
+                      {/* Отчёт по ученику за месяц — для родителей (StudentReportPage.jsx) */}
+                      <Link
+                        className={`link${s.homework_debt ? ` hw-debt hw-debt--${s.homework_debt}` : ''}`}
+                        to={`/dashboard/students/${s.id}/report`}
+                        data-tip={s.homework_debt === 'overdue' ? 'Не сдал последнее ДЗ — срок прошёл'
+                          : s.homework_debt === 'pending' ? 'Ещё не сдал последнее ДЗ' : 'Отчёт по ученику'}
+                      >
+                        {s.full_name}
+                      </Link>
+                    </span>
                     {pushUsers.has(s.id) && <PushMark />}
                     {s.is_new && <span className="new-badge" data-tip="Ещё не был на уроке — поставьте доп. урок">{'NEW'}</span>}
                   </td>

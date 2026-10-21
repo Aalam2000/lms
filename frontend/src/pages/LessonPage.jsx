@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import DateTimePicker, { formatDateTime } from '../components/DateTimePicker';
 import { formatDuration, DEFAULT_DURATION_MIN } from '../utils/lessonTime';
 import LibraryPickerModal from '../components/LibraryPickerModal';
+import Avatar from '../components/Avatar';
 import LessonSourcesModal from '../components/LessonSourcesModal';
 import TrashIcon from '../components/TrashIcon';
 import IconButton from '../components/IconButton';
@@ -176,6 +177,7 @@ function LessonPage() {
       setMarksRows(marks.students.map(s => ({
         student_id: s.student_id,
         full_name: s.full_name,
+        photo_url: s.photo_url,
         telegram_username: s.telegram_username,
         whatsapp: s.whatsapp,
         phone: s.phone,
@@ -680,7 +682,10 @@ function LessonPage() {
           {/* Персональный урок: метка с участниками, по клику — смена состава */}
           <PersonalBadge lesson={lesson} onClick={canManage ? () => setParticipantsOpen(true) : undefined} />
           {lesson.teacher_name && (
-            <span className="badge badge--teacher badge--inline" data-tip={'Урок ведёт этот педагог'}>{lesson.teacher_name}</span>
+            <span className="badge badge--teacher badge--inline badge--photo" data-tip={'Урок ведёт этот педагог'}>
+              <Avatar userId={lesson.teacher_id} photoUrl={lesson.teacher_photo_url} name={lesson.teacher_name} size="xs" />
+              {lesson.teacher_name}
+            </span>
           )}
           {participantsOpen && (
             <ParticipantsModal
@@ -1026,10 +1031,13 @@ function LessonPage() {
                         return (
                           <tr key={row.student_id} className={hwRow?.answer.status === 'submitted' ? 'table__row--homework-pending' : undefined}>
                             <td>
-                              {/* Отчёт по ученику; «Назад» из него вернёт в этот урок */}
-                              <Link className="link" to={`/dashboard/students/${row.student_id}/report`} state={{ from: `/dashboard/lessons/${lessonId}` }} data-tip="Отчёт по ученику">
-                                {row.full_name}
-                              </Link>
+                              <span className="person">
+                                <Avatar userId={row.student_id} photoUrl={row.photo_url} name={row.full_name} size="xs" />
+                                {/* Отчёт по ученику; «Назад» из него вернёт в этот урок */}
+                                <Link className="link" to={`/dashboard/students/${row.student_id}/report`} state={{ from: `/dashboard/lessons/${lessonId}` }} data-tip="Отчёт по ученику">
+                                  {row.full_name}
+                                </Link>
+                              </span>
                             </td>
                             <td>
                               <div className="attendance-group">

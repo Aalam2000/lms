@@ -1,11 +1,16 @@
+import asyncio
+import io
 import json
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File as FastAPIFile
+from fastapi.responses import Response
+from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from .. import storage
 from ..database import get_db
 from ..models import User, Group, GroupMember
 from ..schemas import UserLogin, Token, UserOut, UserCreate, StudentRegister, UserUpdate, DaysOffSettings
@@ -200,3 +205,88 @@ async def update_me(
     await db.commit()
     await db.refresh(current_user)
     return current_user
+
+
+# ---------- Фото профиля ----------
+# Каждый меняет только своё фото (PUT/DELETE /auth/me/photo). Файл любого
+# формата, который понимает Pillow, приводится к квадрату 256×256 по центру
+# и сохраняется лёгким WebP без EXIF; в users.photo_url — путь в хранилище
+# («photos/<uuid>»). Новый снимок = новый путь, старый файл удаляется.
+# Смотреть фото может любой вошедший: GET /auth/photo/{user_id}.
+PHOTO_MAX_UPLOAD = 15 * 1024 * 1024   # исходник до обработки
+PHOTO_SIZE = 256
+PHOTO_MAX_PIXELS = 50_000_000         # защита от «картинок-бомб»
+
+
+def _make_photo(data: bytes) -> bytes:
+    """Синхронная обработка (гоняется через asyncio.to_thread)."""
+    try:
+        img = Image.open(io.BytesIO(data))
+        if img.width * img.height > PHOTO_MAX_PIXELS:
+            raise ValueError("too big")
+        img.draft("RGB", (PHOTO_SIZE * 2, PHOTO_SIZE * 2))  # JPEG: декодируем сразу уменьшенным
+        img = ImageOps.exif_transpose(img)
+        if img.mode in ("RGBA", "LA", "P"):
+            img = img.convert("RGBA")
+            bg = Image.new("RGB", img.size, (255, 255, 255))
+            bg.paste(img, mask=img.split()[-1])
+            img = bg
+        else:
+            img = img.convert("RGB")
+        img = ImageOps.fit(img, (PHOTO_SIZE, PHOTO_SIZE), Image.LANCZOS, centering=(0.5, 0.5))
+        out = io.BytesIO()
+        img.save(out, "WEBP", quality=82, method=6)
+        return out.getvalue()
+    except (UnidentifiedImageError, ValueError, OSError, Image.DecompressionBombError):
+        raise HTTPException(status_code=400, detail="Не удалось прочитать фото — выберите JPG или PNG")
+
+
+@router.put("/me/photo", response_model=UserOut)
+async def upload_my_photo(
+    file: UploadFile = FastAPIFile(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    data = await file.read(PHOTO_MAX_UPLOAD + 1)
+    if not data:
+        raise HTTPException(status_code=400, detail="Пустой файл")
+    if len(data) > PHOTO_MAX_UPLOAD:
+        raise HTTPException(status_code=413, detail="Фото слишком большое (максимум 15 МБ)")
+    webp = await asyncio.to_thread(_make_photo, data)
+    key = storage.new_key("photos")
+    await asyncio.to_thread(storage.upload_bytes, key, webp, "image/webp")
+    old = current_user.photo_url
+    current_user.photo_url = key
+    await db.commit()
+    await db.refresh(current_user)
+    if old:
+        await asyncio.to_thread(storage.delete_object, old)
+    return current_user
+
+
+@router.delete("/me/photo", response_model=UserOut)
+async def delete_my_photo(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    old = current_user.photo_url
+    current_user.photo_url = None
+    await db.commit()
+    await db.refresh(current_user)
+    if old:
+        await asyncio.to_thread(storage.delete_object, old)
+    return current_user
+
+
+@router.get("/photo/{user_id}")
+async def get_photo(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    key = (await db.execute(select(User.photo_url).where(User.id == user_id))).scalar_one_or_none()
+    data = await asyncio.to_thread(storage.read_object_or_none, key) if key else None
+    if data is None:
+        raise HTTPException(status_code=404, detail="Фото нет")
+    return Response(content=data, media_type="image/webp",
+                    headers={"Cache-Control": "private, max-age=86400"})

@@ -77,7 +77,7 @@ async def build_teacher_report(db: AsyncSession, teacher: User, period: Period) 
     }
     gids = [gid for gid, g in groups.items() if g.teacher_id == teacher.id]
     base = {
-        "teacher": {"id": teacher.id, "full_name": teacher.full_name or teacher.username},
+        "teacher": {"id": teacher.id, "full_name": teacher.full_name or teacher.username, "photo_url": teacher.photo_url},
         "month": period.month,
         "period": period.out(start),
         "norms": {k: v[0] for k, v in NORMS.items()},

@@ -10,3 +10,4 @@ Markdown==3.10.3
 alembic==1.20.0
 pypdf==6.19.0
 phonenumbers==9.0.41
+Pillow==11.3.0

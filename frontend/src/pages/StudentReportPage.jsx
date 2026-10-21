@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getStudentReport } from '../api/students';
 import { extractErrorMessage } from '../utils/errors';
+import Avatar from '../components/Avatar';
 import { ReportPeriod, ReportToolbar, Status, defaultPeriod, periodParams, withSign } from '../components/ReportParts';
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -161,7 +162,10 @@ function StudentReportPage() {
         <div className="report">
           <div className="report__head">
             <div>
-              <div className="report__name">{report.student.full_name}</div>
+              <div className="report__name person">
+                <Avatar userId={report.student.id} photoUrl={report.student.photo_url} name={report.student.full_name} size="md" />
+                {report.student.full_name}
+              </div>
               {report.groups.map(g => (
                 <div key={g.name} className="report__meta">
                   {'Группа'}: {g.name}{g.course && <> · {'Курс'}: {g.course}</>}{g.teacher && <> · {'Педагог'}: {g.teacher}</>}

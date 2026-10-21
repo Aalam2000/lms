@@ -45,6 +45,34 @@ export function updateMe(data) {
   return api.put('/auth/me', data).then(res => res.data);
 }
 
+// --- Фото профиля (routers/auth.py) ---
+// Своё фото: файл или снимок с камеры (Blob). Сервер сам обрезает в квадрат
+// и облегчает. Возвращает обновлённого пользователя (новый photo_url).
+export function uploadMyPhoto(file) {
+  const formData = new FormData();
+  formData.append('file', file, file.name || 'photo.jpg');
+  return api.put('/auth/me/photo', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then(res => res.data);
+}
+
+export function deleteMyPhoto() {
+  return api.delete('/auth/me/photo').then(res => res.data);
+}
+
+// Адрес фото для <img> (components/Avatar.jsx). Кэш по photo_url — он новый
+// при каждой загрузке, поэтому устаревшее фото из кэша не покажется.
+const photoCache = new Map();
+export function getPhotoSrc(userId, photoUrl) {
+  if (!photoCache.has(photoUrl)) {
+    const p = api.get(`/auth/photo/${userId}`, { responseType: 'blob' })
+      .then(res => window.URL.createObjectURL(res.data))
+      .catch(err => { photoCache.delete(photoUrl); throw err; });
+    photoCache.set(photoUrl, p);
+  }
+  return photoCache.get(photoUrl);
+}
+
 export function registerStudent(data) {
   return api.post('/auth/register/student', data).then(res => res.data);
 }

@@ -103,6 +103,15 @@
     flex-shrink: 0;
   }
 
+  /* --- Профиль: фото над полями --- */
+  .profile {
+    flex-direction: column;
+    align-items: center;
+  }
+  .profile__form {
+    width: 100%;
+  }
+
   /* --- Контент страницы — отступы поменьше --- */
   .page {
     padding: var(--space-4);

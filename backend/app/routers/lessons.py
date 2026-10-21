@@ -104,6 +104,9 @@ class LessonOut(BaseModel):
     # Педагог урока (app/lesson_teacher.py) — только педагогу/админу.
     teacher_id: Optional[int] = None
     teacher_name: Optional[str] = None   # заполняется, если урок ведёт не основной педагог группы
+    teacher_photo_url: Optional[str] = None  # фото этого педагога (GET /auth/photo/{teacher_id})
+    # Ученику в GET /lessons/{id} — всегда педагог, который ведёт урок: teacher_id,
+    # teacher_name и teacher_photo_url (фото в шапке открытого урока)
     can_edit: bool = True                # False — урок доступен только для просмотра
     can_manage: bool = True              # расписание и состав урока: основной педагог группы и админ
     # Аудитория урока: id и номер («А2» в календарях и в уроке) — только педагогу/админу/куратору
@@ -129,6 +132,7 @@ class LessonMarkBulkItem(LessonMarkIn):
 class LessonMarkOut(BaseModel):
     student_id: int
     full_name: Optional[str]
+    photo_url: Optional[str] = None  # фото ученика (GET /auth/photo/{student_id})
     telegram_username: Optional[str] = None
     whatsapp: Optional[str] = None
     phone: Optional[str] = None   # значок WhatsApp ученика открывается по телефону
@@ -510,13 +514,13 @@ async def _fill_teacher_info(db: AsyncSession, out: list[LessonOut], lessons: li
         select(Group.id, Group.teacher_id).where(Group.id.in_({l.group_id for l in lessons}))
     )).all())
     other_ids = {l.teacher_id for l in lessons if l.teacher_id != group_teachers.get(l.group_id)}
-    names = {}
+    names, photos = {}, {}
     if other_ids:
-        names = {
-            uid: (full_name or username) for uid, full_name, username in (await db.execute(
-                select(User.id, User.full_name, User.username).where(User.id.in_(other_ids))
-            )).all()
-        }
+        for uid, full_name, username, photo_url in (await db.execute(
+            select(User.id, User.full_name, User.username, User.photo_url).where(User.id.in_(other_ids))
+        )).all():
+            names[uid] = full_name or username
+            photos[uid] = photo_url
     room_ids = {l.room_id for l in lessons if l.room_id}
     room_numbers = dict((await db.execute(
         select(Room.id, Room.number).where(Room.id.in_(room_ids))
@@ -525,6 +529,7 @@ async def _fill_teacher_info(db: AsyncSession, out: list[LessonOut], lessons: li
         item.room_number = room_numbers.get(lesson.room_id)
         group_teacher_id = group_teachers.get(lesson.group_id)
         item.teacher_name = names.get(lesson.teacher_id) if lesson.teacher_id != group_teacher_id else None
+        item.teacher_photo_url = photos.get(lesson.teacher_id) if item.teacher_name else None
         item.can_edit = can_edit_lesson(lesson, group_teacher_id, user)
         item.can_manage = is_group_teacher(group_teacher_id, user)
         if not is_group_teacher(group_teacher_id, user):
@@ -1392,6 +1397,7 @@ async def get_lesson_marks(
         students.append(LessonMarkOut(
             student_id=user.id,
             full_name=user.full_name or user.username,
+            photo_url=user.photo_url,
             # контакты учеников — только тому, кто сейчас работает в уроке
             telegram_username=user.telegram_username if can_edit else None,
             whatsapp=user.whatsapp if can_edit else None,
@@ -1810,6 +1816,14 @@ async def get_lesson(
         if not out.can_edit:
             # только просмотр — без входа в конференцию и чатов группы
             out.group_video_url = out.group_telegram = out.group_whatsapp = None
+    elif lesson.teacher_id:
+        row = (await db.execute(
+            select(User.full_name, User.username, User.photo_url).where(User.id == lesson.teacher_id)
+        )).first()
+        if row:
+            out.teacher_id = lesson.teacher_id
+            out.teacher_name = row[0] or row[1]
+            out.teacher_photo_url = row[2]
     return out
 
 

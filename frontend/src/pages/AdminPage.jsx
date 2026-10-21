@@ -8,6 +8,7 @@ import DeleteButton from '../components/DeleteButton';
 import PasswordModal from '../components/PasswordModal';
 import DaysOffEditor from '../components/DaysOffEditor';
 import * as adminApi from '../api/admin';
+import Avatar from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
 import AcademyTab from '../components/AcademyTab';
 import { AccessBlock } from '../components/ParentLinkBlock';
@@ -448,7 +449,15 @@ function AdminPage() {
                   <input className="input input--min160" value={editingDraft.full_name}
                     onChange={e => setEditingDraft({ ...editingDraft, full_name: e.target.value })}
                   />
-                ) : <>{u.full_name}{pushUsers.has(u.id) && <PushMark />}</>}
+                ) : (
+                  <>
+                    <span className="person">
+                      <Avatar userId={u.id} photoUrl={u.photo_url} name={u.full_name || u.username} size="xs" />
+                      {u.full_name}
+                    </span>
+                    {pushUsers.has(u.id) && <PushMark />}
+                  </>
+                )}
               </td>
               <td>{u.username}</td>
               <td>
