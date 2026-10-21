@@ -9,10 +9,11 @@ library.py и контроле дублей. Запрет удаления пр�
 """
 from typing import Optional
 
-from sqlalchemy import func, select
+from fastapi import HTTPException
+from sqlalchemy import func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import Course, Group, Lesson, Link, LessonResource, Material, Quiz, User
+from .models import Course, Group, HomeworkTask, Lesson, Link, LessonResource, Material, Quiz, Sector, User
 
 RESOURCE_MODELS = {
     "material": Material,
@@ -47,23 +48,60 @@ async def count_attachments_map(db: AsyncSession) -> dict[tuple[str, int], int]:
 
 
 # Где ресурс используется — для ленты «Базы знаний»: число уроков, к
-# которым он привязан, и курсы этих уроков (курс группы урока), по алфавиту
-# без повторов. Одним запросом сразу для всех ресурсов.
+# которым он привязан, курсы этих уроков (курс группы урока, по алфавиту без
+# повторов) и места для папок БЗ — сектор и курс группы урока и номер урока
+# (None — доп. урок). Файл, выданный как ДЗ, тоже считается используемым в
+# уроке. Двумя запросами сразу для всех ресурсов.
 async def attachment_usage_map(db: AsyncSession) -> dict[tuple[str, int], dict]:
-    result = await db.execute(
-        select(LessonResource.resource_type, LessonResource.resource_id, Course.title)
+    lesson_cols = (Lesson.id, Lesson.order, Lesson.is_personal, Group.sector, Group.course_id, Course.title)
+    attached = await db.execute(
+        select(LessonResource.resource_type, LessonResource.resource_id, *lesson_cols)
         .join(Lesson, Lesson.id == LessonResource.lesson_id)
         .join(Group, Group.id == Lesson.group_id)
         .join(Course, Course.id == Group.course_id)
     )
+    homework = await db.execute(
+        select(literal("material"), HomeworkTask.material_id, *lesson_cols)
+        .join(Lesson, Lesson.id == HomeworkTask.lesson_id)
+        .join(Group, Group.id == Lesson.group_id)
+        .join(Course, Course.id == Group.course_id)
+        .distinct()
+    )
     usage: dict[tuple[str, int], dict] = {}
-    for resource_type, resource_id, course_title in result.all():
-        row = usage.setdefault((resource_type, resource_id), {"count": 0, "courses": set()})
-        row["count"] += 1
+    for resource_type, resource_id, lesson_id, order, is_personal, sector, course_id, course_title in (
+        list(attached.all()) + list(homework.all())
+    ):
+        row = usage.setdefault((resource_type, resource_id), {"lessons": set(), "courses": set(), "places": set()})
+        row["lessons"].add(lesson_id)
         row["courses"].add(course_title)
+        lesson_no = order if (not is_personal and order and order > 0) else None
+        row["places"].add((sector, course_id, lesson_no))
     for row in usage.values():
+        row["count"] = len(row.pop("lessons"))
         row["courses"] = sorted(row["courses"], key=str.lower)
+        row["places"] = [
+            {"sector": sector, "course_id": course_id, "lesson_no": lesson_no}
+            for sector, course_id, lesson_no in sorted(row["places"], key=lambda p: (p[0] or "", p[1] or 0, p[2] or 0))
+        ]
     return usage
+
+
+# Теги папки Базы знаний — сектор и курс файла, ссылки или квиза. Ставят
+# админ и владелец ресурса (тот, кто загрузил/создал). Пустое значение —
+# тег снят. Сектор и курс ставятся вместе: оба или ни одного.
+async def set_folder_tags(db: AsyncSession, resource, owner_id: int, user: User,
+                          course_id: Optional[int], sector: Optional[str]) -> None:
+    if user.role != "admin" and owner_id != user.id:
+        raise HTTPException(status_code=403, detail="Теги ставят админ и владелец")
+    sector = (sector or "").strip() or None
+    if bool(course_id) != bool(sector):
+        raise HTTPException(status_code=400, detail="Сектор и курс ставятся вместе")
+    if course_id and (await db.execute(select(Course.id).where(Course.id == course_id))).scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="Курс не найден")
+    if sector and (await db.execute(select(Sector.id).where(Sector.code == sector))).scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="Сектор не найден")
+    resource.course_id = course_id or None
+    resource.sector = sector
 
 
 # Единая форма "деталей ресурса" вне зависимости от таблицы-источника —

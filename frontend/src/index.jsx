@@ -28,6 +28,7 @@ root.render(
   // каждый раз новым, ранее не виденным — кэшу просто неоткуда взять
   // старую копию, независимо от того, какой edge-узел обслуживает запрос.
   script.src = `${apiUrl}/i18n/runtime.js?lang=${encodeURIComponent(lang)}&_=${Date.now()}`;
+  script.id = 'autoi18n-runtime'; // по нему AuthContext ждёт загрузки, чтобы применить язык из профиля
   script.async = true;
   document.head.appendChild(script);
 })();

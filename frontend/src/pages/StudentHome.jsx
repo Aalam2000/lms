@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePref } from '../hooks/usePref';
 import { PersonalBadge } from '../components/PersonalLesson';
 import { useNavigate } from 'react-router-dom';
 import { getStudentLessons } from '../api/lessons';
@@ -25,21 +26,13 @@ const studentHighlight = (l) => {
   return '';
 };
 
-function readViewMode() {
-  try {
-    return localStorage.getItem('la_student_viewmode') || 'table';
-  } catch {
-    return 'table';
-  }
-}
-
 function StudentHome() {
   const navigate = useNavigate();
   const isDayOff = useDaysOff({ student: true }); // выходные педагога (педагогов) ученика
   const [lessons, setLessons] = useState([]);
   const [groups, setGroups] = useState([]);
   const [pendingGroups, setPendingGroups] = useState([]); // записался по QR, педагог ещё не принял
-  const [viewMode, setViewMode] = useState(readViewMode); // table | calendar
+  const [viewMode, setViewMode] = usePref('student.view', 'table'); // table | calendar — в профиле
 
   useEffect(() => {
     // Все уроки (и закрытые) — для календаря; таблица показывает только открытые
@@ -47,10 +40,6 @@ function StudentHome() {
     getStudentGroups().then(setGroups).catch(() => setGroups([]));
     getMyPendingGroups().then(setPendingGroups).catch(() => setPendingGroups([]));
   }, []);
-
-  useEffect(() => {
-    try { localStorage.setItem('la_student_viewmode', viewMode); } catch { /* нет хранилища — не страшно */ }
-  }, [viewMode]);
 
   const open = (l) => navigate(`/dashboard/student-lessons/${l.id}`);
   const openLessons = lessons.filter(l => l.is_open);

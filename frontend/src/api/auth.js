@@ -35,6 +35,12 @@ export function getMyDaysOffSettings() {
   return api.get('/auth/me/days-off').then(res => res.data);
 }
 
+// Настройки пользователя (users.ui_prefs): меняются только переданные ключи,
+// null — удалить ключ. Возвращает все настройки.
+export function updatePrefs(patch) {
+  return api.patch('/auth/me/prefs', patch).then(res => res.data);
+}
+
 export function updateMe(data) {
   return api.put('/auth/me', data).then(res => res.data);
 }

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getCourses, getMyGroups } from '../api/groups';
 import { getGroups } from '../api/admin';
 import { useAuth } from '../context/AuthContext';
+import { usePref } from '../hooks/usePref';
 import { StudentContactIcons } from '../components/ContactIcons';
 import Dropdown from '../components/Dropdown';
 import DeleteButton from '../components/DeleteButton';
@@ -93,18 +94,9 @@ function StudentsPage() {
 
   const [courseId, setCourseId] = useState('');
   const [groupId, setGroupId] = useState('');
-  // Выбор «Препод/Мои» запоминаем в localStorage — чтобы не сбрасывался
-  // при возврате на страницу (тот же приём, что и в GroupsPage).
-  const [teacherId, setTeacherId] = useState(() => localStorage.getItem('la_students_teacherId') || '');
-  const [mine, setMine] = useState(() => localStorage.getItem('la_students_mine') === 'true');
-
-  useEffect(() => {
-    localStorage.setItem('la_students_teacherId', teacherId);
-  }, [teacherId]);
-
-  useEffect(() => {
-    localStorage.setItem('la_students_mine', String(mine));
-  }, [mine]);
+  // Выбор «Препод/Мои» — в профиле (hooks/usePref.js)
+  const [teacherId, setTeacherId] = usePref('students.teacher_id', '');
+  const [mine, setMine] = usePref('students.mine', false);
 
   // Сортировка — в браузере, кликом по шапке столбца: таблица приходит
   // целиком, без постраничной загрузки. Повторный клик меняет направление.

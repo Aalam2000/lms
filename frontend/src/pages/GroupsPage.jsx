@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { usePref } from '../hooks/usePref';
 import { StudentContactIcons } from '../components/ContactIcons';
 import Dropdown from '../components/Dropdown';
 import Calendar, { GROUP_COLORS } from '../components/Calendar';
@@ -32,28 +33,11 @@ function GroupsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Таблица/Календарь — по умолчанию таблица, выбор запоминается отдельно
-  // от того же переключателя на странице группы (GroupPage.jsx).
-  const [viewMode, setViewMode] = useState(() => localStorage.getItem('la_groups_viewmode') || 'table'); // table | calendar
-  useEffect(() => {
-    localStorage.setItem('la_groups_viewmode', viewMode);
-  }, [viewMode]);
-
-  // Выбор «Препод/Мои» запоминаем в localStorage — чтобы не сбрасывался
-  // при возврате на страницу (уходишь в группу и назад — фильтр на месте).
-  const [teacherId, setTeacherId] = useState(() => localStorage.getItem('la_groups_teacherId') || '');
-  const [mine, setMine] = useState(() => {
-    const stored = localStorage.getItem('la_groups_mine');
-    return stored === null ? true : stored === 'true'; // у admin по умолчанию — только свои группы
-  });
-
-  useEffect(() => {
-    localStorage.setItem('la_groups_teacherId', teacherId);
-  }, [teacherId]);
-
-  useEffect(() => {
-    localStorage.setItem('la_groups_mine', String(mine));
-  }, [mine]);
+  // Таблица/Календарь и «Препод/Мои» — выбор хранится в профиле
+  // (hooks/usePref.js), отдельно от переключателя на странице группы.
+  const [viewMode, setViewMode] = usePref('groups.view', 'table'); // table | calendar
+  const [teacherId, setTeacherId] = usePref('groups.teacher_id', '');
+  const [mine, setMine] = usePref('groups.mine', true); // у admin по умолчанию — только свои группы
 
   // Выходные в календаре: у педагога — свои, у админа — выбранного учителя
   const isDayOff = useDaysOff({ teacherId: isAdmin ? (!mine && teacherId ? Number(teacherId) : null) : user?.id });

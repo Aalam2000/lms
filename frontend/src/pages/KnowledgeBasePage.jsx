@@ -1,18 +1,22 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import SortTh, { sortRows } from '../components/SortTh';
 import { useNavigate } from 'react-router-dom';
 import DeleteButton from '../components/DeleteButton';
 import IconButton from '../components/IconButton';
-import { getCourses } from '../api/admin';
+import { getCourses, getMyGroups } from '../api/groups';
 import { getSectors } from '../api/academy';
 import {
   uploadMaterial, updateMaterialTemplate, bulkUpdateMaterialTemplate, deleteMaterial, openPendingTab, showMaterialInTab,
 } from '../api/materials';
-import { getLibraryItems } from '../api/library';
+import { getLibraryItems, setFolderTags } from '../api/library';
 import { createLink, deleteLink } from '../api/links';
 import { getQuizHtml, deleteQuiz } from '../api/quizzes';
 import { useAuth } from '../context/AuthContext';
-import { TYPE_META, formatSize, subtypeLabel, resourceKey, needsPdfPreview, isPresentation, openSlides } from '../utils/libraryItems';
+import { usePref } from '../hooks/usePref';
+import {
+  TYPE_META, formatSize, subtypeLabel, resourceKey, needsPdfPreview, isPresentation, openSlides,
+  ALL_FOLDER, folderPaths, inFolder, courseTitleFromItems, leafLabel, leafOrder,
+} from '../utils/libraryItems';
 import { IconBadgeFile, IconBadgeQuiz, IconBadgeLink } from '../components/TypeBadgeIcons';
 function itemKey(item) {
   return resourceKey(item.resource_type, item.id);
@@ -33,6 +37,15 @@ function KnowledgeBasePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [typeFilter, setTypeFilter] = useState(''); // '' | material | quiz | link
+  // Открытая папка и «Мои курсы / Все курсы» (у педагога) — в профиле
+  const [folder, setFolder] = usePref('kb.folder', '');
+  const [scope, setScope] = usePref('kb.scope', 'mine'); // mine | all
+  const [myPairs, setMyPairs] = useState(null); // Set('ru/3') — сектор/курс групп педагога
+  // Правка тегов папки (сектор и курс) — одна строка таблицы за раз
+  const [tagEditKey, setTagEditKey] = useState(null);
+  const [tagCourseId, setTagCourseId] = useState('');
+  const [tagSector, setTagSector] = useState('');
+  const [tagSaving, setTagSaving] = useState(false);
   const [onlyMine, setOnlyMine] = useState(false);
   // Сортировка — в браузере, кликом по шапке столбца (SortTh). По умолчанию — свежие сверху.
   const [sortKey, setSortKey] = useState('date');
@@ -71,17 +84,19 @@ function KnowledgeBasePage() {
   const [bulkTemplateSaving, setBulkTemplateSaving] = useState(false);
   const [savingTemplateKey, setSavingTemplateKey] = useState(null);
 
-  // Материалы шаблонов уроков курса по умолчанию скрыты — мешают в
-  // обычной работе с БЗ; этот флажок их показывает (см. library.py).
-  const [showTemplates, setShowTemplates] = useState(false);
-
   useEffect(() => {
     loadItems();
     // eslint-disable-next-line
-  }, [typeFilter, onlyMine, filterCourseId, filterSector, showTemplates]);
+  }, [typeFilter, onlyMine, filterCourseId, filterSector]);
 
+  // Курсы и секторы — для имён папок и правки тегов; группы педагога — для «Мои курсы»
   useEffect(() => {
-    if (isAdmin) ensureCoursesLoaded();
+    ensureCoursesLoaded();
+    if (!isAdmin) {
+      getMyGroups()
+        .then(groups => setMyPairs(new Set(groups.map(g => `${g.sector || ''}/${g.course_id}`))))
+        .catch(() => setMyPairs(new Set()));
+    }
     // eslint-disable-next-line
   }, [isAdmin]);
 
@@ -94,7 +109,6 @@ function KnowledgeBasePage() {
       if (onlyMine && user) params.uploader = user.id;
       if (isAdmin && filterCourseId) params.course_id = filterCourseId;
       if (isAdmin && filterSector) params.sector = filterSector;
-      if (showTemplates) params.include_templates = true;
       setItems(await getLibraryItems(params));
     } catch (err) {
       setError(err?.response?.data?.detail || 'Не удалось загрузить базу знаний');
@@ -355,7 +369,88 @@ function KnowledgeBasePage() {
       setSortDir(TEXT_KEYS.includes(key) ? 'asc' : 'desc');
     }
   };
-  const sortedItems = sortRows(items, sortKey, sortDir, sortValue, TEXT_KEYS, item => item.title);
+  // Папки: у педагога в режиме «Мои курсы» — только секторы и курсы его групп и «Для всех»
+  const onlyMyCourses = !isAdmin && scope === 'mine';
+  const pathsByKey = useMemo(() => {
+    const map = new Map();
+    for (const item of items) {
+      let paths = folderPaths(item);
+      if (onlyMyCourses && myPairs) {
+        paths = paths.filter(p => p === ALL_FOLDER || myPairs.has(p.split('/').slice(0, 2).join('/')));
+      }
+      map.set(itemKey(item), paths);
+    }
+    return map;
+  }, [items, onlyMyCourses, myPairs]);
+
+  const sectorName = (code) => sectors.find(sec => sec.code === code)?.name || code || 'Без сектора';
+  const courseTitle = (courseId) => {
+    const fromList = courses.find(c => String(c.id) === String(courseId));
+    return fromList ? fromList.title : courseTitleFromItems(items, courseId);
+  };
+  const folderLabel = (path) => {
+    if (path === ALL_FOLDER) return 'Для всех';
+    const [sector, course, leaf] = path.split('/');
+    if (leaf) return leafLabel(leaf);
+    if (course) return courseTitle(course);
+    return sectorName(sector);
+  };
+
+  // Вложенные папки открытой папки — с числом ресурсов в каждой
+  const childFolders = useMemo(() => {
+    const depth = folder ? folder.split('/').length : 0;
+    if (folder === ALL_FOLDER || depth >= 3) return [];
+    const counts = new Map();
+    for (const paths of pathsByKey.values()) {
+      const children = new Set();
+      for (const p of paths) {
+        if (!inFolder([p], folder)) continue;
+        if (p === ALL_FOLDER) { if (!folder) children.add(ALL_FOLDER); continue; }
+        children.add(p.split('/').slice(0, depth + 1).join('/'));
+      }
+      for (const child of children) counts.set(child, (counts.get(child) || 0) + 1);
+    }
+    return [...counts.entries()].sort(([a], [b]) => {
+      if (a === ALL_FOLDER) return -1;
+      if (b === ALL_FOLDER) return 1;
+      if (depth === 2) return leafOrder(a.split('/')[2]) - leafOrder(b.split('/')[2]);
+      return folderLabel(a).localeCompare(folderLabel(b));
+    });
+    // eslint-disable-next-line
+  }, [pathsByKey, folder, courses, sectors]);
+
+  // Путь сверху: «База знаний › Сектор › Курс › Урок N»
+  const crumbs = folder === ALL_FOLDER ? [ALL_FOLDER]
+    : folder ? folder.split('/').map((_, i, parts) => parts.slice(0, i + 1).join('/')) : [];
+
+  const folderItems = items.filter(item => {
+    const paths = pathsByKey.get(itemKey(item)) || [];
+    return paths.length > 0 && inFolder(paths, folder);
+  });
+  const sortedItems = sortRows(folderItems, sortKey, sortDir, sortValue, TEXT_KEYS, item => item.title);
+
+  // Теги папки ставят админ и владелец ресурса
+  const canTag = (item) => isAdmin || item.uploaded_by === user?.id;
+  const startTagEdit = (item) => {
+    setTagEditKey(itemKey(item));
+    setTagCourseId(item.course_id ? String(item.course_id) : '');
+    setTagSector(item.sector || '');
+  };
+  const saveTags = async (item) => {
+    setTagSaving(true);
+    setError('');
+    try {
+      const saved = await setFolderTags(item.resource_type, item.id, { course_id: tagCourseId ? Number(tagCourseId) : null, sector: tagSector });
+      setItems(prev => prev.map(i => (itemKey(i) === itemKey(item)
+        ? { ...i, course_id: saved.course_id, sector: saved.sector, course_title: saved.course_id ? courseTitle(saved.course_id) : null }
+        : i)));
+      setTagEditKey(null);
+    } catch (err) {
+      setError(err?.response?.data?.detail || 'Не удалось сохранить сектор и курс');
+    } finally {
+      setTagSaving(false);
+    }
+  };
   const sortTh = (key, label, tip) => (
     <SortTh k={key} sortKey={sortKey} sortDir={sortDir} onSort={handleSort} tip={tip}>{label}</SortTh>
   );
@@ -381,10 +476,16 @@ function KnowledgeBasePage() {
           <button type="button" className={`tab tab--underline${onlyMine ? ' tab--active' : ''}`} onClick={() => setOnlyMine(v => !v)}>
             {'Моё'}
           </button>
-          <label className="checkbox-row">
-            <input type="checkbox" checked={showTemplates} onChange={e => setShowTemplates(e.target.checked)} />
-            {'Показывать материалы из шаблонов уроков'}
-          </label>
+          {!isAdmin && (
+            <>
+              <button type="button" className={`tab tab--underline${scope === 'mine' ? ' tab--active' : ''}`} onClick={() => setScope('mine')}>
+                {'Мои курсы'}
+              </button>
+              <button type="button" className={`tab tab--underline${scope === 'all' ? ' tab--active' : ''}`} onClick={() => setScope('all')}>
+                {'Все курсы'}
+              </button>
+            </>
+          )}
           {isAdmin && (
             <>
               <select className="input input--min160" value={filterCourseId} onChange={e => setFilterCourseId(e.target.value)}>
@@ -549,6 +650,27 @@ function KnowledgeBasePage() {
       {error && <div className="error-text error-text--muted">{error}</div>}
       {uploadNotice && <p className="text-muted">{uploadNotice}</p>}
 
+      {/* Папки: путь и вложенные папки с числом ресурсов */}
+      <div className="kb-path">
+        <button type="button" className="link" onClick={() => setFolder('')} disabled={!folder}>{'База знаний'}</button>
+        {crumbs.map(path => (
+          <React.Fragment key={path}>
+            <span className="kb-path__sep">{'›'}</span>
+            <button type="button" className="link" onClick={() => setFolder(path)} disabled={path === folder}>{folderLabel(path)}</button>
+          </React.Fragment>
+        ))}
+      </div>
+      {childFolders.length > 0 && (
+        <div className="kb-folders">
+          {childFolders.map(([path, count]) => (
+            <button key={path} type="button" className="tab kb-folder" onClick={() => setFolder(path)}>
+              {folderLabel(path)}
+              <span className="kb-folder__count">{count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="table-scroll">
         <table className="table">
           <thead>
@@ -569,6 +691,8 @@ function KnowledgeBasePage() {
               <tr><td colSpan={columnCount} className="table__empty">{'Загрузка...'}</td></tr>
             ) : items.length === 0 ? (
               <tr><td colSpan={columnCount} className="table__empty">{'В базе знаний пока пусто'}</td></tr>
+            ) : sortedItems.length === 0 ? (
+              <tr><td colSpan={columnCount} className="table__empty">{'В этой папке пусто'}</td></tr>
             ) : (
               sortedItems.map(item => {
                 const meta = TYPE_META[item.resource_type];
@@ -586,8 +710,21 @@ function KnowledgeBasePage() {
                       )}
                     </td>
                     <td>
-                      {/* Курсы, в уроках которых ресурс используется — чтобы понимать, где он может понадобиться */}
-                      {item.attached_courses?.length > 0 ? (
+                      {tagEditKey === key ? (
+                        <div className="icon-row">
+                          <select className="input" value={tagSector} onChange={e => setTagSector(e.target.value)}>
+                            <option value="">{'Сектор...'}</option>
+                            {sectors.map(sec => <option key={sec.code} value={sec.code}>{sec.name}</option>)}
+                          </select>
+                          <select className="input" value={tagCourseId} onChange={e => setTagCourseId(e.target.value)}>
+                            <option value="">{'Курс...'}</option>
+                            {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+                          </select>
+                          <button type="button" className="btn btn--sm" onClick={() => saveTags(item)}
+                            disabled={tagSaving || !tagSector !== !tagCourseId}>{'Сохранить'}</button>
+                          <button type="button" className="btn btn--outline btn--sm" onClick={() => setTagEditKey(null)}>{'Отмена'}</button>
+                        </div>
+                      ) : item.attached_courses?.length > 0 ? (
                         <span className="table__cell--truncate" data-tip={item.attached_courses.join(', ')}>
                           {item.attached_courses.join(', ')}
                         </span>
@@ -638,6 +775,15 @@ function KnowledgeBasePage() {
                     </td>
                     <td>
                       <div className="icon-row">
+                      {/* Сектор и курс — куда ресурс попадает, пока не используется в уроках */}
+                      <IconButton
+                        icon="folder"
+                        disabled={!canTag(item)}
+                        tip={canTag(item)
+                          ? `Сектор и курс: ${item.sector && item.course_id ? `${sectorName(item.sector)}, ${courseTitle(item.course_id)}` : 'не заданы'}`
+                          : 'Сектор и курс ставят админ и владелец'}
+                        onClick={() => startTagEdit(item)}
+                      />
                       {/* Редактор квиза (AddQuizPage): автор или admin — то же право, что на удаление */}
                       {item.resource_type === 'quiz' && (
                         <IconButton

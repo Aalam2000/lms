@@ -26,10 +26,11 @@ export function useLang() {
 
     const changeLanguage = useCallback((newLang) => {
         setLang(newLang);
+        // Копия в браузере — для страницы входа; в профиль язык сохраняет
+        // AuthContext по событию autoi18nlangchange
+        localStorage.setItem('autoI18nLang', newLang);
         if (window.autoI18n && typeof window.autoI18n.setLanguage === 'function') {
             window.autoI18n.setLanguage(newLang);
-        } else {
-            localStorage.setItem('autoI18nLang', newLang);
         }
     }, []);
 

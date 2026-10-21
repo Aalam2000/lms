@@ -1,3 +1,5 @@
+import json
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -68,13 +70,44 @@ async def login(user_data: UserLogin, db: AsyncSession = Depends(get_db)):
 # показывает меню и кнопки
 class UserMeOut(UserOut):
     permissions: list[str] = []
+    ui_prefs: Optional[dict] = None  # у нового пользователя в базе NULL — отдаём {}
 
 
 @router.get("/me", response_model=UserMeOut)
 async def get_me(current_user: User = Depends(get_current_user)):
     out = UserMeOut.model_validate(current_user)
     out.permissions = sorted(ROLE_PERMISSIONS.get(current_user.role, ()))
+    out.ui_prefs = current_user.ui_prefs or {}
     return out
+
+
+# Настройки пользователя (users.ui_prefs) — всё, что он выбирает в интерфейсе.
+# Приходят вместе с /auth/me; PATCH меняет только переданные ключи (null —
+# удалить ключ), поэтому две вкладки не затирают друг другу настройки.
+# Ключ — «страница.настройка» (groups.view, kb.folder, lang).
+UI_PREF_KEY = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$|^lang$")
+UI_PREFS_MAX_BYTES = 8 * 1024
+
+
+@router.patch("/me/prefs")
+async def update_my_prefs(
+    data: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    prefs = dict(current_user.ui_prefs or {})
+    for key, value in data.items():
+        if not isinstance(key, str) or not UI_PREF_KEY.match(key):
+            raise HTTPException(status_code=400, detail=f"Неверный ключ настройки: {key}")
+        if value is None:
+            prefs.pop(key, None)
+        else:
+            prefs[key] = value
+    if len(json.dumps(prefs, ensure_ascii=False).encode("utf-8")) > UI_PREFS_MAX_BYTES:
+        raise HTTPException(status_code=400, detail="Слишком много настроек")
+    current_user.ui_prefs = prefs
+    await db.commit()
+    return prefs
 
 
 # Регистрация ученика по коду группы (QR). Сам ученик попадает в группу со

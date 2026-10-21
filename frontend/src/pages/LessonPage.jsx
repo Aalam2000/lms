@@ -834,6 +834,8 @@ function LessonPage() {
               attachedKeys={new Set(lessonItems.map(i => resourceKey(i.resource_type, i.resource_id)))}
               onAttached={loadItems}
               onClose={() => setShowLibraryModal(false)}
+              sector={lesson.group_sector}
+              courseId={lesson.group_course_id}
             />
           )}
 
@@ -975,6 +977,8 @@ function LessonPage() {
                   lessonId={lessonId}
                   student={null}
                   deadline={hwBoard.tasks.find(t => !t.student_id && t.deadline)?.deadline || null}
+                  sector={lesson.group_sector}
+                  courseId={lesson.group_course_id}
                   onChanged={loadHomework}
                   onClose={() => setHwAddOpen(false)}
                 />
@@ -985,6 +989,8 @@ function LessonPage() {
                   lessonId={lessonId}
                   student={hwAddFor}
                   deadline={personalOrCommonDeadline(hwBoard, hwAddFor.student_id)}
+                  sector={lesson.group_sector}
+                  courseId={lesson.group_course_id}
                   onChanged={loadHomework}
                   onClose={() => setHwAddFor(null)}
                 />

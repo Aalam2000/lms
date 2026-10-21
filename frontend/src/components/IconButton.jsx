@@ -125,6 +125,12 @@ const ICONS = {
       <path d="M17.5 14.3A4 4 0 0 1 21 18v2" />
     </svg>
   ),
+  // Папка Базы знаний — теги «сектор и курс»
+  folder: (
+    <svg {...svgProps}>
+      <path d="M3 6h7l2 2h9v12H3z" />
+    </svg>
+  ),
   // Удалить навсегда — корзина
   delete: (
     <svg {...svgProps}>

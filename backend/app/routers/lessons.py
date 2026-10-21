@@ -95,6 +95,9 @@ class LessonOut(BaseModel):
     new_messages: int = 0          # новые реплики педагога в диалоге
     # Только для GET /lessons/{id}: группа урока и вход в видеоконференцию
     group_name: Optional[str] = None
+    # Сектор и курс группы — окно «Добавить из базы знаний» открывается на них
+    group_sector: Optional[str] = None
+    group_course_id: Optional[int] = None
     group_video_url: Optional[str] = None
     group_telegram: Optional[str] = None
     group_whatsapp: Optional[str] = None
@@ -1793,11 +1796,12 @@ async def get_lesson(
     out = LessonOut.model_validate(lesson)
     out.is_locked = lesson_locked_for(lesson, current_user)
     group_row = (await db.execute(
-        select(Group.name, Group.video_url, Group.telegram_chat_id, Group.whatsapp)
+        select(Group.name, Group.video_url, Group.telegram_chat_id, Group.whatsapp, Group.sector, Group.course_id)
         .where(Group.id == lesson.group_id)
     )).first()
     if group_row:
-        out.group_name, out.group_video_url, out.group_telegram, out.group_whatsapp = group_row
+        (out.group_name, out.group_video_url, out.group_telegram, out.group_whatsapp,
+         out.group_sector, out.group_course_id) = group_row
     if current_user.role != "student":
         if lesson.is_personal:
             out.participants = (await participant_names(db, [lesson.id])).get(lesson.id, [])

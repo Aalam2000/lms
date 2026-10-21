@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Modal from '../components/Modal';
 import { useAuth } from '../context/AuthContext';
+import { usePref } from '../hooks/usePref';
 import IconButton from '../components/IconButton';
 import QRModal from '../components/QRModal';
 import StudentsModal from '../components/StudentsModal';
@@ -50,12 +51,8 @@ function GroupPage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [rangeFilter, setRangeFilter] = useState('upcoming'); // upcoming | week | month | all
 
-  // Таблица/Календарь — выбор запоминается в localStorage, как и фильтры
-  // на /dashboard/groups (см. GroupsPage.jsx).
-  const [viewMode, setViewMode] = useState(() => localStorage.getItem('la_group_viewmode') || 'table'); // table | calendar
-  useEffect(() => {
-    localStorage.setItem('la_group_viewmode', viewMode);
-  }, [viewMode]);
+  // Таблица/Календарь — выбор хранится в профиле (hooks/usePref.js)
+  const [viewMode, setViewMode] = usePref('group.view', 'table'); // table | calendar
 
   // Генератор расписания (claude/group-schedule-plan.md, задача 1)
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);

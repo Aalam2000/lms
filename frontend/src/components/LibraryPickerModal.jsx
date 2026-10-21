@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { getLibraryItems } from '../api/library';
+import { getSectors } from '../api/academy';
 import { attachLessonItem } from '../api/lessons';
 import { useAuth } from '../context/AuthContext';
-import { TYPE_META, subtypeLabel, resourceKey } from '../utils/libraryItems';
+import {
+  TYPE_META, subtypeLabel, resourceKey, ALL_FOLDER, folderPaths, inFolder, courseTitleFromItems, leafOrder,
+} from '../utils/libraryItems';
 import Modal from './Modal';
 
 // Модалка выбора файла/квиза/ссылки из «Базы знаний» для привязки к
@@ -13,7 +16,9 @@ import Modal from './Modal';
 // onPick(item) — вместо привязки к материалам урока отдать выбранный
 // элемент вызывающему (так ДЗ берёт файл из БЗ); onlyType — показывать
 // только один тип (для ДЗ — только файлы, без вкладок типов).
-function LibraryPickerModal({ lessonId, attachedKeys, onAttached, onClose, onPick, onlyType, title }) {
+// Папки БЗ — три списка «Сектор / Курс / Урок» (utils/libraryItems.js);
+// sector и courseId — группы урока: окно открывается на них.
+function LibraryPickerModal({ lessonId, attachedKeys, onAttached, onClose, onPick, onlyType, title, sector, courseId }) {
   const { user } = useAuth();
 
   const [items, setItems] = useState([]);
@@ -24,6 +29,14 @@ function LibraryPickerModal({ lessonId, attachedKeys, onAttached, onClose, onPic
   const [sort, setSort] = useState('date');
   const [attachingKey, setAttachingKey] = useState(null);
   const [justAttached, setJustAttached] = useState(() => new Set());
+  const [sectors, setSectors] = useState([]);
+  const [fSector, setFSector] = useState(sector || '');
+  const [fCourse, setFCourse] = useState(sector && courseId ? String(courseId) : '');
+  const [fLesson, setFLesson] = useState('');
+
+  useEffect(() => {
+    getSectors().then(setSectors).catch(() => setSectors([]));
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -62,10 +75,42 @@ function LibraryPickerModal({ lessonId, attachedKeys, onAttached, onClose, onPic
     }
   };
 
-  const visibleItems = items.filter(item => {
+  const notAttached = items.filter(item => {
     const key = resourceKey(item.resource_type, item.id);
     return !(attachedKeys && attachedKeys.has(key)) && !justAttached.has(key);
   });
+  const pathsOf = useMemo(() => new Map(items.map(item => [item, folderPaths(item)])), [items]);
+
+  // Пункты списка уровня depth внутри папки parent — с числом ресурсов;
+  // выбранное значение остаётся в списке, даже если там пусто
+  const folderOptions = (parent, depth, selected) => {
+    const counts = new Map();
+    for (const item of notAttached) {
+      const values = new Set();
+      for (const p of pathsOf.get(item) || []) {
+        if (p === ALL_FOLDER) { if (depth === 0) values.add(ALL_FOLDER); continue; }
+        if (inFolder([p], parent)) values.add(p.split('/')[depth]);
+      }
+      for (const v of values) counts.set(v, (counts.get(v) || 0) + 1);
+    }
+    if (selected && !counts.has(selected)) counts.set(selected, 0);
+    return [...counts.entries()];
+  };
+  const sectorName = (code) => sectors.find(sec => sec.code === code)?.name || code || 'Без сектора';
+  const sectorOptions = folderOptions('', 0, fSector)
+    .sort(([a], [b]) => (a === ALL_FOLDER ? -1 : b === ALL_FOLDER ? 1 : sectorName(a).localeCompare(sectorName(b))));
+  const courseOptions = fSector && fSector !== ALL_FOLDER
+    ? folderOptions(fSector, 1, fCourse)
+      .map(([id, count]) => [id, count, courseTitleFromItems(items, id)])
+      .sort((a, b) => a[2].localeCompare(b[2]))
+    : [];
+  const lessonOptions = fCourse
+    ? folderOptions(`${fSector}/${fCourse}`, 2, fLesson).sort(([a], [b]) => leafOrder(a) - leafOrder(b))
+    : [];
+
+  const folder = fSector === ALL_FOLDER ? ALL_FOLDER : [fSector, fCourse, fLesson].filter(Boolean).join('/');
+  const visibleItems = notAttached.filter(item => inFolder(pathsOf.get(item) || [], folder));
+  const totalCount = notAttached.length;
 
   return (
     <Modal title={title || 'Добавить из базы знаний'} onClose={onClose} size="xwide">
@@ -87,6 +132,24 @@ function LibraryPickerModal({ lessonId, attachedKeys, onAttached, onClose, onPic
           </div>
         ) : <div />}
         <div className="toolbar__filters">
+          <select className="input" value={fSector} onChange={e => { setFSector(e.target.value); setFCourse(''); setFLesson(''); }}>
+            <option value="">{`Сектор: все (${totalCount})`}</option>
+            {sectorOptions.map(([code, count]) => (
+              <option key={code} value={code}>{code === ALL_FOLDER ? `Для всех (${count})` : `${sectorName(code)} (${count})`}</option>
+            ))}
+          </select>
+          <select className="input" value={fCourse} disabled={!courseOptions.length} onChange={e => { setFCourse(e.target.value); setFLesson(''); }}>
+            <option value="">{'Курс: все'}</option>
+            {courseOptions.map(([id, count, label]) => (
+              <option key={id} value={id}>{`${label} (${count})`}</option>
+            ))}
+          </select>
+          <select className="input" value={fLesson} disabled={!lessonOptions.length} onChange={e => setFLesson(e.target.value)}>
+            <option value="">{'Урок: все'}</option>
+            {lessonOptions.map(([leaf, count]) => (
+              <option key={leaf} value={leaf}>{leaf === 'common' ? `Общее (${count})` : `Урок ${leaf.slice(1)} (${count})`}</option>
+            ))}
+          </select>
           <button type="button" className={`tab${onlyMine ? ' tab--active' : ''}`} onClick={() => setOnlyMine(v => !v)}>
             {'Моё'}
           </button>

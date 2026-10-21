@@ -58,3 +58,47 @@ export function needsPdfPreview(contentType) {
 export function resourceKey(resourceType, resourceId) {
   return `${resourceType}:${resourceId}`;
 }
+
+// ===== Папки Базы знаний =====
+// Папки не хранятся — считаются из тегов ресурса и мест, где он используется
+// (library.py: course_id, sector, places). Путь папки — строка:
+// 'all' — «Для всех»; 'ru' — сектор; 'ru/3' — курс; 'ru/3/L5' — «Урок 5»;
+// 'ru/3/common' — «Общее». '' — вся база. Используют страница «База знаний»
+// и окно выбора из базы в уроке (LibraryPickerModal.jsx).
+export const ALL_FOLDER = 'all';
+
+export function folderPaths(item) {
+  const places = item.places || [];
+  const numbered = places.filter(p => p.lesson_no);
+  if (numbered.length) return [...new Set(numbered.map(p => `${p.sector || ''}/${p.course_id}/L${p.lesson_no}`))];
+  if (places.length) return [...new Set(places.map(p => `${p.sector || ''}/${p.course_id}/common`))];
+  if (item.sector && item.course_id) return [`${item.sector}/${item.course_id}/common`];
+  return [ALL_FOLDER];
+}
+
+// Лежит ли ресурс в папке (с вложенными)
+export function inFolder(paths, folder) {
+  if (!folder) return true;
+  return paths.some(p => p === folder || p.startsWith(`${folder}/`));
+}
+
+// Название курса по ленте БЗ (у ресурса и в местах использования оно есть) —
+// когда курса нет в списке курсов пользователя
+export function courseTitleFromItems(items, courseId) {
+  for (const item of items) {
+    if (String(item.course_id) === String(courseId) && item.course_title) return item.course_title;
+    const place = (item.places || []).find(pl => String(pl.course_id) === String(courseId) && pl.course_title);
+    if (place) return place.course_title;
+  }
+  return `#${courseId}`;
+}
+
+// Подпись последней части пути: «Общее» или «Урок N»
+export function leafLabel(leaf) {
+  return leaf === 'common' ? 'Общее' : `Урок ${leaf.slice(1)}`;
+}
+
+// Порядок папок урока: «Общее», затем уроки по номеру
+export function leafOrder(leaf) {
+  return leaf === 'common' ? 0 : Number(leaf.slice(1));
+}
