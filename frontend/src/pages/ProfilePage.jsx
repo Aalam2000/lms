@@ -145,7 +145,10 @@ function CameraModal({ onClose, onShot, saving }) {
         if (!alive) return;
         let state = '';
         try { state = (await navigator.permissions?.query({ name: 'camera' }))?.state || ''; } catch { /* не везде есть */ }
-        if (alive) setErrorCode([err?.name, err?.message, state && `permission: ${state}`].filter(Boolean).join(' · '));
+        // Разрешает ли камеру заголовок сервера Permissions-Policy (nginx, prod.conf)
+        const policy = document.permissionsPolicy || document.featurePolicy;
+        const allowed = policy?.allowsFeature ? (policy.allowsFeature('camera') ? 'allowed' : 'blocked') : '';
+        if (alive) setErrorCode([err?.name, err?.message, state && `permission: ${state}`, allowed && `policy: ${allowed}`].filter(Boolean).join(' · '));
         setError(err?.name === 'NotFoundError'
           ? 'Камера не найдена. Выберите «Загрузить».'
           : 'Нет доступа к камере. Разрешите доступ в браузере или выберите «Загрузить».');
