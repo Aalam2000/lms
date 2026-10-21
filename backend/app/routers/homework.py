@@ -19,6 +19,8 @@
 добавление; править можно лишь своё последнее сообщение, пока на него
 не ответили.
 """
+import asyncio
+import logging
 from datetime import datetime, timezone as dt_timezone
 from pathlib import Path
 from typing import Optional
@@ -33,8 +35,10 @@ from .. import storage
 from ..database import get_db
 from ..dependencies import require_teacher, get_current_user
 from ..models import (
-    GroupMember, HomeworkAnswer, HomeworkAnswerFile, HomeworkTask, Lesson, LessonMessage, Material, User,
+    Course, Group, GroupMember, HomeworkAnswer, HomeworkAnswerFile, HomeworkTask, Lesson, LessonMessage, Material,
+    Sector, User,
 )
+from ..text_extract import extract_text
 from ..resources import clean_filename, content_hash, find_duplicate_material, find_materials_by_name, conflict
 from ..personal import is_participant, lesson_students_condition
 from ..homework_status import (
@@ -46,6 +50,7 @@ from .lessons import (
 from .materials import MAX_FILE_SIZE, _content_disposition, _stored_hash
 
 router = APIRouter(prefix="/lessons", tags=["homework"])
+logger = logging.getLogger(__name__)
 
 
 # ---------- Схемы ----------
@@ -654,6 +659,121 @@ async def download_answer_file(
     else:
         await get_lesson_for_teacher_or_admin(lesson_id, db, current_user, write=False)
     return file_response(f.object_key, f.original_filename, f.content_type, inline)
+
+
+# ---------- Педагог: данные для промпта «Проверка с ИИ» ----------
+# Одно на ДЗ и на работу на уроке (routers/lesson_work.py — build_ai_source).
+# Без трат на API (как Помощник квиза): фронт собирает из этих данных промпт,
+# педагог сам отдаёт его любому ИИ и вставляет ответ-JSON обратно. Имя
+# студента в промпт не идёт. Картинки и PDF ответа текста не дают — их
+# педагог скачивает и прикладывает к запросу сам (text = None).
+
+AI_TEXT_LIMIT = 40000  # всего символов текста в промпте: бесплатные ИИ не примут больше
+
+
+class AiFileOut(BaseModel):
+    kind: str                     # task — файл задания (id = material_id) | answer — файл ответа (id файла)
+    id: int
+    filename: str
+    content_type: Optional[str] = None
+    text: Optional[str] = None    # None — текст не достать, файл прикладывается к запросу вручную
+    truncated: bool = False
+
+
+class AiSourceOut(BaseModel):
+    mode: str = "homework"        # homework — ответ на ДЗ | work — работа на уроке (задание — материалы урока)
+    lang: Optional[str] = None    # код сектора группы — на этом языке пишется комментарий
+    sector_name: Optional[str] = None
+    course: Optional[str] = None
+    lesson_title: str
+    lesson_comment: Optional[str] = None  # комментарий педагога к уроку (работа на уроке)
+    files: list[AiFileOut]
+
+
+def _ai_text(kind: str, filename: str, content_type: Optional[str], data: bytes) -> Optional[str]:
+    ext = Path(filename).suffix.lower()
+    ctype = content_type or ""
+    if ctype.startswith("image/"):
+        return None
+    if ext == ".pdf" and kind == "answer":
+        return None  # PDF ответа (часто скан) — приложить к запросу
+    # HTML задания — только суть (text_extract); HTML ответа — код целиком, его и проверяем
+    if ext in (".docx", ".pptx", ".pdf") or (kind == "task" and ext in (".html", ".htm")):
+        try:
+            return extract_text(filename, data)
+        except Exception:
+            return None
+    if ext in _TEXT_EXT or ctype.startswith("text/"):
+        return data.decode("utf-8", errors="replace")
+    return None
+
+
+# items — (kind, id, имя, content_type, object_key): задания и ответ. Лимит
+# текста тратится сначала на ответ ученика, остаток — на задание.
+async def build_ai_source(db: AsyncSession, lesson: Lesson, items: list[tuple], mode: str) -> AiSourceOut:
+    group = await db.get(Group, lesson.group_id)
+    course = await db.get(Course, group.course_id) if group else None
+    sector = None
+    if group and group.sector:
+        sector = (await db.execute(select(Sector).where(Sector.code == group.sector))).scalar_one_or_none()
+
+    budget = AI_TEXT_LIMIT
+    by_index: dict[int, AiFileOut] = {}
+    order = sorted(range(len(items)), key=lambda i: items[i][0] != "answer")
+    for i in order:
+        kind, fid, name, ctype, key = items[i]
+        # Файл не читается (нет на диске, путь старого формата) — промпт всё
+        # равно собирается, файл просто попадает в список «приложить вручную»
+        try:
+            data = await asyncio.to_thread(storage.read_object_or_none, key)
+            text = (await asyncio.to_thread(_ai_text, kind, name, ctype, data) or "").strip() if data else ""
+        except Exception:
+            logger.warning("ai-source: файл %s (%s) не прочитан", name, key, exc_info=True)
+            text = ""
+        truncated = False
+        if text and len(text) > budget:
+            text, truncated = text[:max(budget, 0)], True
+        budget -= len(text)
+        by_index[i] = AiFileOut(kind=kind, id=fid, filename=name, content_type=ctype, text=text or None, truncated=truncated)
+    return AiSourceOut(
+        mode=mode,
+        lang=group.sector if group else None,
+        sector_name=sector.name if sector else None,
+        course=course.title if course else None,
+        lesson_title=lesson.title,
+        lesson_comment=(lesson.comment or "").strip() or None if mode == "work" else None,
+        files=[by_index[i] for i in range(len(items))],
+    )
+
+
+@router.get("/{lesson_id}/homework/answers/{student_id}/ai-source", response_model=AiSourceOut)
+async def ai_source(
+    lesson_id: int,
+    student_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_teacher),
+):
+    lesson = await get_lesson_for_teacher_or_admin(lesson_id, db, current_user, write=False)
+    await _ensure_active_student(db, lesson, student_id)
+    tasks = [t for t in await _lesson_tasks(db, lesson_id) if _task_is_for(t, student_id)]
+    materials = {m.id: m for m in (await db.execute(
+        select(Material).where(Material.id.in_({t.material_id for t in tasks}))
+    )).scalars().all()} if tasks else {}
+    items = []
+    seen = set()
+    for t in tasks:
+        m = materials.get(t.material_id)
+        if m and m.id not in seen:
+            seen.add(m.id)
+            items.append(("task", m.id, m.original_filename, m.content_type, m.object_key))
+    answer = await _get_answer(db, lesson_id, student_id)
+    if answer:
+        for f in (await db.execute(
+            select(HomeworkAnswerFile).where(HomeworkAnswerFile.answer_id == answer.id)
+            .order_by(HomeworkAnswerFile.uploaded_at, HomeworkAnswerFile.id)
+        )).scalars().all():
+            items.append(("answer", f.id, f.original_filename, f.content_type, f.object_key))
+    return await build_ai_source(db, lesson, items, "homework")
 
 
 # ---------- Диалог педагог ↔ студент в строке студента ----------

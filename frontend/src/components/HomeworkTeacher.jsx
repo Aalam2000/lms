@@ -8,6 +8,10 @@
 //    «Принять», «Вернуть», «Скачать», диалог, «← Предыдущий / Следующий →».
 //    Та же панель проверяет и работу на уроке (mode="work", api/lessonWork.js):
 //    там оценка — это оценка за урок, «Вернуть» нет.
+//  - AiReviewBlock     — «Проверка с ИИ» в панели (ДЗ и работа на уроке): промпт в буфер,
+//    файлы без текста — скачать и приложить к ИИ, ответ ИИ (JSON) → оценка в
+//    поле оценки и «Хорошо / Плохо» в поле сообщения диалога. Ничего не
+//    сохраняется и не отправляется само — педагог правит и подтверждает.
 // Оценка одна на всё ДЗ студента; «принято» или оценка = проверено.
 // Файлов в ДЗ сколько угодно — ограничение только размер файла (бэкенд).
 import React, { useEffect, useRef, useState } from 'react';
@@ -18,9 +22,10 @@ import { DialogCell, DialogThread } from './LessonDialog';
 import { formatDeadline } from './DeadlinePicker';
 import {
   createHomeworkTask, setScopeDeadline, reviewHomework,
-  openTaskFile, openAnswerFile, answerFileViewUrl, downloadAnswerFile,
+  openTaskFile, openAnswerFile, answerFileViewUrl, downloadAnswerFile, getAiSource,
 } from '../api/homework';
-import { reviewWork, workFileViewUrl, openWorkFile, downloadWorkFile } from '../api/lessonWork';
+import { LANG_NAMES, copyText } from './QuizHelper';
+import { reviewWork, workFileViewUrl, openWorkFile, downloadWorkFile, getWorkAiSource } from '../api/lessonWork';
 import { extractErrorMessage } from '../utils/errors';
 
 // ---------- Окно «+ ДЗ» ----------
@@ -315,12 +320,14 @@ function DeadlineCell({ lessonId, row, tasksById, onChanged, onError }) {
 }
 
 // Итог ДЗ в строке: оценка (сохраняется при уходе из поля или по Enter), ✓ принять без оценки, ↺ вернуть
-function ReviewControls({ lessonId, row, onChanged, onError }) {
+// suggested — { grade } от ИИ: подставляется в поле, сохраняется кнопкой «Сохранить» (или Enter)
+function ReviewControls({ lessonId, row, onChanged, onError, suggested }) {
   const { answer } = row;
   const [grade, setGrade] = useState(answer.grade ?? '');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { setGrade(answer.grade ?? ''); }, [answer.grade]);
+  useEffect(() => { if (suggested) setGrade(suggested.grade); }, [suggested]);
 
   if (answer.status === 'none') return <span className="text-muted">{'ДЗ не выдано'}</span>;
   if (answer.status === 'pending') return <span className="text-muted">{'ждём ответ'}</span>;
@@ -348,6 +355,7 @@ function ReviewControls({ lessonId, row, onChanged, onError }) {
     if (!valid) { onError('Оценка — целое число от 0 до 100'); setGrade(answer.grade ?? ''); return; }
     if (num !== answer.grade) send({ grade: num });
   };
+  const unsaved = valid && num !== answer.grade;
 
   return (
     <div className="hw-review">
@@ -355,7 +363,7 @@ function ReviewControls({ lessonId, row, onChanged, onError }) {
         type="number"
         min="0"
         max="100"
-        className={`input input--sm-num hw-review__grade${answer.status === 'submitted' ? ' hw-review__grade--todo' : ''}`}
+        className={`input input--sm-num hw-review__grade${answer.status === 'submitted' || unsaved ? ' hw-review__grade--todo' : ''}`}
         value={grade}
         disabled={busy}
         data-tip="Оценка за ДЗ (0–100) — сохраняется сразу"
@@ -381,18 +389,211 @@ function ReviewControls({ lessonId, row, onChanged, onError }) {
       >
         {'↺'}
       </button>
+      {suggested && unsaved && (
+        <button
+          type="button"
+          className="btn btn--sm"
+          data-tip="Сохранить оценку"
+          disabled={busy}
+          onMouseDown={e => e.preventDefault()}
+          onClick={saveGrade}
+        >
+          {'Сохранить'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ---------- «Проверка с ИИ» ----------
+
+// Подписи частей комментария — на языке сектора группы (комментарий читает ученик)
+const AI_LABELS = {
+  ru: ['Хорошо', 'Плохо'],
+  az: ['Yaxşı', 'Pis'],
+  en: ['Good', 'Bad'],
+};
+
+export function buildReviewPrompt(src) {
+  const lang = LANG_NAMES[src.lang] || src.sector_name || src.lang || 'русский';
+  const block = (f) => `=== ${f.filename}${f.truncated ? ' (текст сокращён)' : ''} ===\n${f.text}`;
+  const taskText = src.files.filter(f => f.kind === 'task' && f.text !== null);
+  const answerText = src.files.filter(f => f.kind === 'answer' && f.text !== null);
+  const attached = src.files.filter(f => f.text === null);
+  const work = src.mode === 'work';
+  return [
+    `Ты — преподаватель детской IT-академии (ученики 8–14 лет). Проверь ${work ? 'работу, которую ученик сделал и сдал на уроке' : 'домашнее задание ученика'}.`,
+    '',
+    ...(src.course ? [`Курс: ${src.course}.`] : []),
+    `Урок: ${src.lesson_title}.`,
+    `Язык комментария: ${lang}. Пиши "good" и "bad" только на этом языке.`,
+    '',
+    'Как проверять:',
+    work
+      ? '- Задание — в материалах урока и комментарии педагога ниже. Найди там, что ученик должен был сделать, и сравни с его работой: что выполнено, что нет, есть ли ошибки.'
+      : '- Сравни ответ ученика с заданием: что выполнено, что нет, есть ли ошибки.',
+    '- Пиши коротко, доброжелательно и понятно ребёнку, обращайся к ученику на «ты».',
+    '- "good" — что получилось хорошо, 1–3 конкретные вещи.',
+    '- "bad" — что плохо или не сделано и как это исправить. Готовое решение за ученика не пиши. Если замечаний нет — так и напиши.',
+    '- "score" — целое число от 0 до 100: насколько полно и правильно выполнено задание.',
+    '- Если ответа нет или он не относится к заданию — "score": 0, причину напиши в "bad".',
+    ...(attached.length ? [`- К этому сообщению приложены файлы: ${attached.map(f => f.filename).join(', ')}. Это ${attached.every(f => f.kind === 'answer') ? 'файлы ответа ученика' : (work ? 'материалы урока и/или файлы работы ученика' : 'файлы задания и/или ответа ученика')} — учти их при проверке.`] : []),
+    '',
+    work ? 'МАТЕРИАЛЫ УРОКА:' : 'ЗАДАНИЕ:',
+    ...(work && src.lesson_comment ? [`=== Комментарий педагога к уроку ===\n${src.lesson_comment}`] : []),
+    ...(taskText.length ? taskText.map(block) : (work && src.lesson_comment ? [] : [attached.some(f => f.kind === 'task') ? '(в приложенных файлах)' : '(текст задания не дан — оцени по ответу и названию урока)'])),
+    '',
+    work ? 'РАБОТА УЧЕНИКА:' : 'ОТВЕТ УЧЕНИКА:',
+    ...(answerText.length ? answerText.map(block) : [attached.some(f => f.kind === 'answer') ? '(в приложенных файлах)' : '(ученик ничего не прислал)']),
+    '=== конец ===',
+    '',
+    'Ответь ТОЛЬКО одним JSON-объектом — без пояснений, без markdown и без ```. Строго в таком формате:',
+    '{"good":"что получилось хорошо","bad":"что плохо и как исправить","score":85}',
+  ].join('\n');
+}
+
+// Ответ ИИ → { good, bad, score } или { error }. ``` обёртку и текст вокруг JSON прощаем.
+export function parseReviewJson(text) {
+  let raw = (text || '').trim().replace(/^```[a-zA-Z]*\s*/, '').replace(/```\s*$/, '');
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start < 0 || end < start) return { error: 'В тексте не найден JSON' };
+  let data;
+  try {
+    data = JSON.parse(raw.slice(start, end + 1));
+  } catch (e) {
+    return { error: `JSON не читается: ${e.message}` };
+  }
+  const good = String(data?.good ?? '').trim();
+  const bad = String(data?.bad ?? '').trim();
+  const score = Math.round(Number(data?.score));
+  if (!good && !bad) return { error: 'В JSON нет "good" и "bad"' };
+  if (!Number.isFinite(score) || score < 0 || score > 100) return { error: '"score" — нужно число от 0 до 100' };
+  return { good, bad, score };
+}
+
+// onFill({ grade, text }) — оценка в поле оценки, текст в поле сообщения диалога
+// mode: homework — ответ на ДЗ | work — работа на уроке
+function AiReviewBlock({ lessonId, studentId, onFill, mode = 'homework' }) {
+  const [src, setSrc] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [aiText, setAiText] = useState('');
+  const [error, setError] = useState('');
+  const [done, setDone] = useState('');
+
+  // Окно копирования должно открываться по клику: данные собираем заранее
+  useEffect(() => {
+    let cancelled = false;
+    setSrc(null);
+    (mode === 'work' ? getWorkAiSource : getAiSource)(lessonId, studentId)
+      .then(data => { if (!cancelled) setSrc(data); })
+      .catch(err => { if (!cancelled) setError(extractErrorMessage(err, 'Не удалось собрать данные для промпта')); });
+    return () => { cancelled = true; };
+  }, [lessonId, studentId, mode]);
+
+  const copyPrompt = async () => {
+    if (!src) return;
+    setError('');
+    try {
+      await copyText(buildReviewPrompt(src));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError('Не удалось скопировать промпт');
+    }
+  };
+
+  const getFile = async (f) => {
+    setError('');
+    setBusy(true);
+    try {
+      if (f.kind === 'answer') {
+        const file = { id: f.id, original_filename: f.filename, content_type: f.content_type };
+        await (mode === 'work' ? downloadWorkFile : downloadAnswerFile)(lessonId, file);
+      } else {
+        await openTaskFile({ material_id: f.id, title: f.filename, content_type: f.content_type });
+      }
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Не удалось получить файл'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const fill = () => {
+    setError('');
+    setDone('');
+    const res = parseReviewJson(aiText);
+    if (res.error) { setError(res.error); return; }
+    const [goodLabel, badLabel] = AI_LABELS[src?.lang] || AI_LABELS.ru;
+    const text = [res.good && `${goodLabel}: ${res.good}`, res.bad && `${badLabel}: ${res.bad}`].filter(Boolean).join('\n\n');
+    onFill({ grade: res.score, text });
+    setDone('Заполнено: проверьте оценку и сообщение, затем «Сохранить» и «Отправить».');
+    setAiText('');
+    setPasteOpen(false);
+  };
+
+  const attached = src ? src.files.filter(f => f.text === null) : [];
+
+  return (
+    <div className="review-panel__ai">
+      <div className="review-panel__ai-row">
+        <button type="button" className="btn btn--sm btn--outline" onClick={copyPrompt} disabled={!src} data-tip="Скопировать промпт для проверки — вставьте его в любой ИИ">
+          {copied ? 'Скопировано' : (src ? 'Промпт для ИИ' : 'Собираем промпт...')}
+        </button>
+        <button type="button" className="btn btn--sm btn--outline" onClick={() => setPasteOpen(v => !v)} data-tip="Вставить ответ ИИ (JSON) — заполнит оценку и сообщение">
+          {'Вставить ответ ИИ'}
+        </button>
+      </div>
+      {attached.length > 0 && (
+        <div className="review-panel__ai-row">
+          <span className="text-muted">{'Приложите к запросу в ИИ:'}</span>
+          {attached.map(f => (
+            <button
+              key={`${f.kind}-${f.id}`}
+              type="button"
+              className="review-panel__tab"
+              disabled={busy}
+              data-tip={f.kind === 'answer' ? 'Файл ответа — скачать' : (mode === 'work' ? 'Материал урока — открыть (сохранить из вкладки)' : 'Файл задания — открыть (сохранить из вкладки)')}
+              onClick={() => getFile(f)}
+            >
+              {f.kind === 'answer' ? `⬇ ${f.filename}` : `↗ ${f.filename}`}
+            </button>
+          ))}
+        </div>
+      )}
+      {pasteOpen && (
+        <>
+          <textarea
+            className="input quiz-helper__area"
+            rows={5}
+            value={aiText}
+            onChange={e => setAiText(e.target.value)}
+            placeholder={'Ответ ИИ (JSON)'}
+          />
+          <div className="review-panel__ai-row">
+            <button type="button" className="btn btn--sm" onClick={fill} disabled={!aiText.trim() || !src}>{'Заполнить'}</button>
+          </div>
+        </>
+      )}
+      {error && <div className="error-text error-text--muted">{error}</div>}
+      {done && <div className="hint-text">{done}</div>}
     </div>
   );
 }
 
 // Работа на уроке в панели проверки: оценка (= оценка за урок) и ✓ принять без оценки.
 // locked — прошла полночь: оценку за урок менять нельзя (кроме админа), принять можно.
-function WorkReviewControls({ lessonId, row, locked, onChanged, onError }) {
+// suggested — { grade } от ИИ: подставляется в поле, сохраняется кнопкой «Сохранить» (или Enter)
+function WorkReviewControls({ lessonId, row, locked, onChanged, onError, suggested }) {
   const { work } = row;
   const [grade, setGrade] = useState(work.score ?? '');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { setGrade(work.score ?? ''); }, [work.score]);
+  useEffect(() => { if (suggested && !locked) setGrade(suggested.grade); }, [suggested]); // eslint-disable-line
 
   const send = async (payload) => {
     setBusy(true);
@@ -415,6 +616,7 @@ function WorkReviewControls({ lessonId, row, locked, onChanged, onError }) {
     if (num !== work.score || work.status === 'submitted') send({ grade: num });
   };
   const reviewed = work.status === 'accepted' || work.status === 'graded';
+  const unsaved = valid && num !== work.score;
 
   return (
     <div className="hw-review">
@@ -423,7 +625,7 @@ function WorkReviewControls({ lessonId, row, locked, onChanged, onError }) {
         type="number"
         min="0"
         max="100"
-        className={`input input--sm-num hw-review__grade${work.status === 'submitted' ? ' hw-review__grade--todo' : ''}`}
+        className={`input input--sm-num hw-review__grade${work.status === 'submitted' || unsaved ? ' hw-review__grade--todo' : ''}`}
         value={grade}
         disabled={busy || locked}
         data-tip={locked ? 'Прошла полночь — оценку за урок менять нельзя' : 'Оценка за урок (0–100) — сохраняется сразу'}
@@ -440,6 +642,18 @@ function WorkReviewControls({ lessonId, row, locked, onChanged, onError }) {
       >
         {'✓'}
       </button>
+      {suggested && unsaved && !locked && (
+        <button
+          type="button"
+          className="btn btn--sm"
+          data-tip="Сохранить оценку"
+          disabled={busy}
+          onMouseDown={e => e.preventDefault()}
+          onClick={saveGrade}
+        >
+          {'Сохранить'}
+        </button>
+      )}
     </div>
   );
 }
@@ -476,6 +690,8 @@ export function ReviewPanel({ lessonId, rows, queue, toReviewCount, studentId, f
   const [activeId, setActiveId] = useState(fileId || files[0]?.id || null);
   const [view, setView] = useState(null); // { url, type, text }
   const [error, setError] = useState('');
+  const [aiGrade, setAiGrade] = useState(null); // { grade } — оценка от ИИ в поле оценки
+  const [aiDraft, setAiDraft] = useState(null); // { text } — комментарий ИИ в поле сообщения
 
 
   useEffect(() => {
@@ -559,12 +775,21 @@ export function ReviewPanel({ lessonId, rows, queue, toReviewCount, studentId, f
           )}
         </div>
 
+        {files.length > 0 && (
+          <AiReviewBlock
+            lessonId={lessonId}
+            studentId={row.student_id}
+            mode={mode}
+            onFill={({ grade, text }) => { setAiGrade({ grade }); setAiDraft({ text }); }}
+          />
+        )}
+
         {mode === 'work'
-          ? <WorkReviewControls lessonId={lessonId} row={row} locked={locked} onChanged={onChanged} onError={setError} />
-          : <ReviewControls lessonId={lessonId} row={row} onChanged={onChanged} onError={setError} />}
+          ? <WorkReviewControls lessonId={lessonId} row={row} locked={locked} onChanged={onChanged} onError={setError} suggested={aiGrade} />
+          : <ReviewControls lessonId={lessonId} row={row} onChanged={onChanged} onError={setError} suggested={aiGrade} />}
 
         <div className="review-panel__dialog">
-          <DialogThread lessonId={lessonId} studentId={row.student_id} onChanged={onChanged} />
+          <DialogThread lessonId={lessonId} studentId={row.student_id} onChanged={onChanged} draft={aiDraft} />
         </div>
 
         <div className="review-panel__nav">

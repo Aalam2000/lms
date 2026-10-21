@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { getLessonItems } from '../api/lessons';
 import { getMaterialText } from '../api/materials';
 
-const LANG_NAMES = { ru: 'русский', az: 'азербайджанский', en: 'английский' };
+export const LANG_NAMES = { ru: 'русский', az: 'азербайджанский', en: 'английский' };
 
 // Файлы урока, из которых сервер умеет достать текст (backend app/text_extract.py)
 const TEXT_EXT = /\.(docx|pptx|pdf|txt|md)$/i;
@@ -109,7 +109,7 @@ export function parseQuizJson(text, type, defaultTime) {
   };
 }
 
-function copyText(text) {
+export function copyText(text) {
   if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
   const ta = document.createElement('textarea');
   ta.value = text;

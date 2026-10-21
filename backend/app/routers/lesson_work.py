@@ -18,8 +18,8 @@ from .. import storage
 from ..database import get_db
 from ..dependencies import require_teacher, get_current_user
 from ..lesson_work import work_status
-from ..models import Lesson, LessonMark, LessonWorkFile, User
-from .homework import _active_students, _ensure_active_student, _read_upload, file_response
+from ..models import Lesson, LessonMark, LessonResource, LessonWorkFile, Material, User
+from .homework import AiSourceOut, _active_students, _ensure_active_student, _read_upload, build_ai_source, file_response
 from .lessons import (
     LOCK_DETAIL, _safe_delete_object, get_lesson_for_student, get_lesson_for_teacher_or_admin,
     is_lesson_locked, lesson_locked_for,
@@ -224,6 +224,28 @@ async def review_work(
     mark.work_reviewed_by = current_user.id
     await db.commit()
     return _state(files, mark)
+
+
+# Данные для промпта «Проверка с ИИ» (homework.build_ai_source): задание —
+# материалы урока и комментарий педагога к уроку, ответ — файлы работы ученика.
+@router.get("/{lesson_id}/work/{student_id}/ai-source", response_model=AiSourceOut)
+async def work_ai_source(
+    lesson_id: int,
+    student_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_teacher),
+):
+    lesson = await get_lesson_for_teacher_or_admin(lesson_id, db, current_user, write=False)
+    await _ensure_active_student(db, lesson, student_id)
+    materials = (await db.execute(
+        select(Material)
+        .join(LessonResource, (LessonResource.resource_id == Material.id) & (LessonResource.resource_type == "material"))
+        .where(LessonResource.lesson_id == lesson_id)
+        .order_by(LessonResource.id)
+    )).scalars().all()
+    items = [("task", m.id, m.original_filename, m.content_type, m.object_key) for m in materials]
+    items += [("answer", f.id, f.original_filename, f.content_type, f.object_key) for f in await _files(db, lesson_id, student_id)]
+    return await build_ai_source(db, lesson, items, "work")
 
 
 # Файл работы: ученик — свой, педагог/админ — в доступном уроке.

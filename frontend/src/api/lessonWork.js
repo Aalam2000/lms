@@ -40,6 +40,12 @@ export function reviewWork(lessonId, studentId, { grade = null, accepted = false
   });
 }
 
+// «Проверка с ИИ» (тот же формат, что getAiSource в api/homework.js):
+// задание — материалы урока и комментарий к уроку, ответ — файлы работы
+export function getWorkAiSource(lessonId, studentId) {
+  return api.get(`${work(lessonId)}/${studentId}/ai-source`).then(res => res.data);
+}
+
 // --- Файлы (ученик — свои, педагог — в своём уроке) ---
 
 // Для просмотра: картинка/PDF как есть, код/HTML/текст — текстом. Не забыть revokeObjectURL.

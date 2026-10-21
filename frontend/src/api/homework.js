@@ -50,6 +50,12 @@ export function reviewHomework(lessonId, studentId, { grade = null, accepted = f
   });
 }
 
+// «Проверка с ИИ»: язык сектора группы, курс, урок и файлы задания/ответа
+// с текстом (text = null — текста нет, файл прикладывается к запросу вручную)
+export function getAiSource(lessonId, studentId) {
+  return api.get(`${hw(lessonId)}/answers/${studentId}/ai-source`).then(res => res.data);
+}
+
 // --- Студент ---
 
 // { tasks: [...], answer: {status, grade, accepted, deadline, is_locked, files} }

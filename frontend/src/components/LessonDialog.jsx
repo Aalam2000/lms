@@ -8,7 +8,8 @@ import { extractErrorMessage } from '../utils/errors';
 
 const fmt = (v) => (v ? new Date(v).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
 
-export function DialogThread({ lessonId, studentId, onChanged }) {
+// draft — { text } снаружи (ответ ИИ): кладётся в поле сообщения, не отправляется
+export function DialogThread({ lessonId, studentId, onChanged, draft }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
@@ -26,6 +27,12 @@ export function DialogThread({ lessonId, studentId, onChanged }) {
   }, [lessonId, studentId]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'nearest' }); }, [messages]);
+
+  useEffect(() => {
+    if (!draft) return;
+    setEditingId(null);
+    setText(draft.text);
+  }, [draft]);
 
   const submit = async () => {
     if (!text.trim()) return;
