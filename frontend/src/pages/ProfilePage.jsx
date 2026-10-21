@@ -113,6 +113,7 @@ function CameraModal({ onClose, onShot, saving }) {
   const [cameraId, setCameraId] = useState('');
   const [shot, setShot] = useState(null);   // { blob, url }
   const [error, setError] = useState('');
+  const [errorCode, setErrorCode] = useState('');  // код ошибки браузера — по нему видна причина
 
   const stop = () => {
     streamRef.current?.getTracks().forEach(t => t.stop());
@@ -127,6 +128,7 @@ function CameraModal({ onClose, onShot, saving }) {
     }
     stop();
     setError('');
+    setErrorCode('');
     const video = cameraId
       ? { deviceId: { exact: cameraId } }
       : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } };
@@ -139,8 +141,11 @@ function CameraModal({ onClose, onShot, saving }) {
         const devices = await navigator.mediaDevices.enumerateDevices();
         if (alive) setCameras(devices.filter(d => d.kind === 'videoinput'));
       })
-      .catch((err) => {
+      .catch(async (err) => {
         if (!alive) return;
+        let state = '';
+        try { state = (await navigator.permissions?.query({ name: 'camera' }))?.state || ''; } catch { /* не везде есть */ }
+        if (alive) setErrorCode([err?.name, err?.message, state && `permission: ${state}`].filter(Boolean).join(' · '));
         setError(err?.name === 'NotFoundError'
           ? 'Камера не найдена. Выберите «Загрузить».'
           : 'Нет доступа к камере. Разрешите доступ в браузере или выберите «Загрузить».');
@@ -192,7 +197,10 @@ function CameraModal({ onClose, onShot, saving }) {
           </select>
         )}
         {error ? (
-          <div className="banner banner--error">{error}</div>
+          <>
+            <div className="banner banner--error">{error}</div>
+            {errorCode && <p className="hint-text">{errorCode}</p>}
+          </>
         ) : (
           <div className={`camera__frame${shot ? ' camera__frame--shot' : ''}`}>
             <video ref={videoRef} className={`camera__video${shot ? ' camera__video--hidden' : ''}`} autoPlay playsInline muted />
