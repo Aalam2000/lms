@@ -1,6 +1,6 @@
 """Проверка прод-БД перед выкаткой миграций (ничего не меняет).
 
-Текущая выкатка: 0028_push_subscriptions (согласия на уведомления).
+Текущая выкатка: 0032_jsonb (JSON-поля → JSONB).
 Перед следующей выкаткой с миграциями — поправить EXPECTED_* ниже.
 
 Запуск на сервере (работает и на СТАРОМ образе бэкенда):
@@ -11,10 +11,12 @@ import asyncio
 from sqlalchemy import text
 from app.database import engine
 
-EXPECTED_REVISION = "0027_lesson_created_by"   # последняя уже выкаченная
-NEW_TABLES = ["push_subscriptions"]
+EXPECTED_REVISION = "0031_user_ui_prefs"   # последняя уже выкаченная
+NEW_TABLES = []
 NEW_COLUMNS = []
-NEW_INDEXES = ["ix_push_subscriptions_user_id"]
+NEW_INDEXES = []
+# Поля, тип которых меняет миграция: до выкатки ждём json
+TYPE_COLUMNS = [("users", "days_off"), ("users", "ui_prefs"), ("quizzes", "html_translations"), ("quizzes", "questions_data")]
 
 
 async def main():
@@ -31,5 +33,9 @@ async def main():
         print("уроков:", (await c.execute(text("select count(*) from lessons"))).scalar(),
               "| групп:", (await c.execute(text("select count(*) from groups"))).scalar())
         print("УЖЕ ЕСТЬ (мешает миграции):", ", ".join(bad) if bad else "нет — ОК")
+        types = {(r[0], r[1]): r[2] for r in await c.execute(text(
+            "select table_name, column_name, data_type from information_schema.columns where table_schema='public'"))}
+        for t, col in TYPE_COLUMNS:
+            print(f"тип {t}.{col}: {types.get((t, col))}")
 
 asyncio.run(main())

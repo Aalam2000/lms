@@ -21,11 +21,15 @@
 #### Network settings (required)
 - In `postgresql.conf` set:
   - `listen_addresses = '127.0.0.1,<PROD_PRIVATE_IP>'`
-  - `port = 5432`
+  - `port = 5433`
 - In `pg_hba.conf` allow app access from host/private docker network only, for example:
   - `host all all 127.0.0.1/32 scram-sha-256`
   - `host all all <DOCKER_BRIDGE_CIDR> scram-sha-256`
 - Reload config: `sudo systemctl reload postgresql`
+
+#### Memory settings
+- `sudo pg_conftool 18 main set shared_buffers 512MB` (restart required)
+- `sudo pg_conftool 18 main set effective_cache_size 2GB`
 
 ### 1.2 Platform files folder (required before deploy)
 Uploaded files are stored on the host as `<type>/<uuid>` (names only in the DB, see `backend/app/storage.py`).

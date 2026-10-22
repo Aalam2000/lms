@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON, Boolean, UniqueConstraint, Index, CheckConstraint
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Boolean, UniqueConstraint, Index, CheckConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 from .database import Base
 
@@ -23,10 +24,10 @@ class User(Base):
     photo_url = Column(String, nullable=True)  # фото профиля: путь в хранилище «photos/<uuid>» (routers/auth.py)
     theme = Column(String, nullable=True)  # brand | playful | dark — выбор пользователя, NULL = brand по умолчанию
     # Выходные педагога: недельные полоски по версиям и отдельные даты (app/days_off.py)
-    days_off = Column(JSON, nullable=True)
+    days_off = Column(JSONB, nullable=True)
     # Выбор пользователя в интерфейсе (вид страниц, фильтры, папка Базы знаний,
     # язык): {"ключ": значение}; пишет PATCH /auth/me/prefs (routers/auth.py)
-    ui_prefs = Column(JSON, nullable=True)
+    ui_prefs = Column(JSONB, nullable=True)
     # Ученик без группы (добавил куратор): курс, сектор и педагог, к которому его
     # направили — ученик виден этому педагогу в «Студентах», пока тот не запишет
     # его в группу. У остальных ролей пусто.
@@ -205,8 +206,8 @@ class Quiz(Base):
     type = Column(String, nullable=False)  # flash | live | sprint
     template_type = Column(String, nullable=False, default="flash")
     html_content = Column(Text, nullable=False)
-    html_translations = Column(JSON, default={})
-    questions_data = Column(JSON, nullable=True)  # live/sprint — структурированные вопросы, не переводится
+    html_translations = Column(JSONB, default={})
+    questions_data = Column(JSONB, nullable=True)  # live/sprint — структурированные вопросы, не переводится
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=True)  # каталог по темам — как у Material
     sector = Column(String, nullable=True)  # ru | az — направление, для шаблонов курсов; ставит только admin
