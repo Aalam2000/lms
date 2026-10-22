@@ -2,7 +2,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import random
 import re
 import unicodedata
-from jose import jwt
+import jwt
 from datetime import datetime, timedelta
 import os
 
@@ -31,7 +31,7 @@ def decode_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload.get("sub")
-    except jwt.JWTError:
+    except jwt.PyJWTError:
         return None
 
 

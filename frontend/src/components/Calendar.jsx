@@ -8,23 +8,38 @@
 // (getEventColor), и сам показывает список групп для выбора рядом —
 // это не забота календаря.
 import React, { useMemo, useEffect, useState } from 'react';
-import { Calendar as BigCalendar, momentLocalizer } from 'react-big-calendar';
-// moment — из ESM-сборки (moment/dist): локали из moment/locale/* (UMD)
-// под Vite регистрируются не в тот экземпляр moment, и календарь молча
-// остаётся английским. Локали и сам moment должны браться из dist/.
-import moment from 'moment/dist/moment';
-import 'moment/dist/locale/ru';
-import 'moment/dist/locale/az';
+import { Calendar as BigCalendar, dateFnsLocalizer } from 'react-big-calendar';
+import { format, startOfWeek, getDay } from 'date-fns';
+import { ru, az, enUS } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import '../styles/calendar.css';
 import { useLang } from '../hooks/useLang';
 import { lessonEnd } from '../utils/lessonTime';
 
-// Локаль moment завязана на текущий язык интерфейса (useLang) — иначе
-// названия месяцев/дней в сетке календаря (их рисует сам moment, а не
-// autoi18n) всегда оставались бы русскими независимо от переключателя языка.
-const MOMENT_LOCALE_BY_LANG = { ru: 'ru', az: 'az', en: 'en' };
-const localizer = momentLocalizer(moment);
+// Названия месяцев и дней в сетке календаря рисует date-fns по локали
+// (culture = язык интерфейса из useLang), а не autoi18n. Первый день недели
+// — понедельник на всех языках (в en-локали по умолчанию воскресенье).
+const DATE_LOCALES = { ru, az, en: enUS };
+const mondayStartOfWeek = (date, options) => startOfWeek(date, { ...options, weekStartsOn: 1 });
+const localizer = dateFnsLocalizer({ format, startOfWeek: mondayStartOfWeek, getDay, locales: DATE_LOCALES });
+
+// Форматы дат календаря. Формат date-fns: LLLL — месяц в именительном падеже
+// («октябрь 2026», а не «октября 2026»), p — время по локали (ru «8:05»).
+// День недели по-русски — «чт» (EEEEEE), а не «чтв» (ccc).
+const fmt = (pattern) => (date, culture, loc) => loc.format(date, pattern, culture);
+const weekdayShort = (date, culture, loc) => loc.format(date, culture === 'ru' ? 'EEEEEE' : 'ccc', culture);
+const timeRange = ({ start, end }, culture, loc) => `${loc.format(start, 'p', culture)} – ${loc.format(end, 'p', culture)}`;
+const FORMATS = {
+  dayFormat: (date, culture, loc) => `${loc.format(date, 'dd', culture)} ${weekdayShort(date, culture, loc)}`,
+  weekdayFormat: weekdayShort,
+  selectRangeFormat: timeRange,
+  eventTimeRangeFormat: timeRange,
+  eventTimeRangeStartFormat: ({ start }, culture, loc) => `${loc.format(start, 'p', culture)} – `,
+  eventTimeRangeEndFormat: ({ end }, culture, loc) => ` – ${loc.format(end, 'p', culture)}`,
+  monthHeaderFormat: fmt('LLLL yyyy'),
+  dayRangeHeaderFormat: ({ start, end }, culture, loc) =>
+    `${loc.format(start, 'LLLL dd', culture)} – ${loc.format(end, start.getMonth() === end.getMonth() ? 'dd' : 'LLLL dd', culture)}`,
+};
 
 // MESSAGES передаётся как проп в react-big-calendar (не JSX-текст), поэтому
 // autoi18n-сканер его в принципе не видит — переводим вручную, по языку.
@@ -107,7 +122,7 @@ function visibleHours(events) {
 
 // Телефон (та же граница, что в styles/media.css): шапка календаря компактная —
 // месяц сокращён («Окт. 2026»), вместо «Назад/Вперёд» стрелки. Сокращения
-// месяцев и дней берутся из локали moment (ru/az/en), а не из autoi18n.
+// месяцев и дней берутся из локали date-fns (ru/az/en), а не из autoi18n.
 const MOBILE_QUERY = '(max-width: 768px)';
 
 function useIsMobile() {
@@ -122,10 +137,11 @@ function useIsMobile() {
 }
 
 const MOBILE_FORMATS = {
-  monthHeaderFormat: 'MMM YYYY',
-  dayHeaderFormat: 'dd, D MMM',
+  ...FORMATS,
+  monthHeaderFormat: fmt('LLL yyyy'),
+  dayHeaderFormat: fmt('EEEEEE, d MMM'),
   dayRangeHeaderFormat: ({ start, end }, culture, loc) =>
-    `${loc.format(start, 'D MMM', culture)} – ${loc.format(end, 'D MMM', culture)}`,
+    `${loc.format(start, 'd MMM', culture)} – ${loc.format(end, 'd MMM', culture)}`,
 };
 const MOBILE_NAV = { previous: '‹', next: '›' };
 
@@ -136,19 +152,15 @@ const personalNames = (l) => (l.is_personal && l.participants?.length ? `${l.par
 // dayOffTeacher — имя педагога для подсказки «У учителя … выходной» над таким днём
 function Calendar({ lessons, onSelectLesson, getEventColor, defaultView = 'month', highlight = TEACHER_HIGHLIGHT, isDisabled, isLight = TEACHER_LIGHT, isDayOff, dayOffTeacher }) {
   const { lang } = useLang();
-  const momentLocale = MOMENT_LOCALE_BY_LANG[lang] || 'ru';
+  const culture = DATE_LOCALES[lang] ? lang : 'ru';
   const isMobile = useIsMobile();
   const messages = useMemo(() => {
-    const base = MESSAGES_BY_LANG[momentLocale] || MESSAGES_BY_LANG.ru;
+    const base = MESSAGES_BY_LANG[culture] || MESSAGES_BY_LANG.ru;
     return isMobile ? { ...base, ...MOBILE_NAV } : base;
-  }, [momentLocale, isMobile]);
-
-  useEffect(() => {
-    moment.locale(momentLocale);
-  }, [momentLocale]);
+  }, [culture, isMobile]);
 
   // Буква аудитории перед номером («А2») — по языку, из словаря выше
-  const roomLetter = (MESSAGES_BY_LANG[momentLocale] || MESSAGES_BY_LANG.ru).room;
+  const roomLetter = (MESSAGES_BY_LANG[culture] || MESSAGES_BY_LANG.ru).room;
   const events = useMemo(() => lessons
     .filter(l => l.date)
     .map(l => {
@@ -168,7 +180,7 @@ function Calendar({ lessons, onSelectLesson, getEventColor, defaultView = 'month
 
   // Подсказка над выходным: фон дня (месяц) и ячейки времени (неделя, день).
   // Слой событий пропускает мышь к фону (calendar.css, .la-calendar--days-off).
-  const dayOffTip = (MESSAGES_BY_LANG[momentLocale] || MESSAGES_BY_LANG.ru).dayOff(dayOffTeacher);
+  const dayOffTip = (MESSAGES_BY_LANG[culture] || MESSAGES_BY_LANG.ru).dayOff(dayOffTeacher);
   const components = useMemo(() => {
     if (!isDayOff) return undefined;
     const wrap = ({ value, children }) => (isDayOff(value)
@@ -192,8 +204,8 @@ function Calendar({ lessons, onSelectLesson, getEventColor, defaultView = 'month
         views={['month', 'week', 'day']}
         defaultView={defaultView}
         messages={messages}
-        formats={isMobile ? MOBILE_FORMATS : undefined}
-        culture={momentLocale}
+        formats={isMobile ? MOBILE_FORMATS : FORMATS}
+        culture={culture}
         popup
         min={min}
         max={max}

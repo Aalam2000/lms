@@ -7,8 +7,9 @@
 ## 1) Server-side Postgres and platform files (outside app compose)
 
 ### 1.1 Postgres service
-- Install Postgres on prod host using OS packages.
-- Data directory: `/var/lib/postgresql/<version>/main` (default package path).
+- PostgreSQL 18 everywhere (prod host and the dev container `postgres:18`).
+- Install on prod host from the official PostgreSQL APT repository (`/usr/share/postgresql-common/pgdg/apt.postgresql.org.sh`), package `postgresql-18`, port 5433.
+- Data directory: `/var/lib/postgresql/18/main`.
 - Autostart and restart policy:
   - Enable default service: `sudo systemctl enable --now postgresql`
   - Apply restart policy from `deploy/systemd/postgresql.override.conf`:
@@ -55,7 +56,7 @@ The folder is mounted into the backend container at the same path. Create it onc
 
 - Prod (external Postgres and files folder on server):
   - `docker compose -f docker-compose.prod.yml up -d --build`
-- Dev (local Postgres in a container, files in the `files_dev_data` volume):
+- Dev (local Postgres 18 in a container, files in the `files_dev_data` volume):
   - `docker compose -f docker-compose.dev.yml up -d --build`
 
 ## 4) Production deploy from Git

@@ -2,7 +2,7 @@ fastapi==0.141.1
 uvicorn[standard]==0.54.0
 sqlalchemy==2.0.54
 asyncpg==0.31.0
-python-jose[cryptography]==3.5.0
+PyJWT==2.15.1
 python-multipart==0.0.32
 werkzeug==3.1.9
 auto-i18n-lib==2.2.6

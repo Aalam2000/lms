@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "axios": "^1.6.0",
-    "moment": "^2.31.0",
+    "date-fns": "^4.4.0",
     "pdfjs-dist": "^4.10.38",
     "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
