@@ -52,7 +52,7 @@ function SlideViewerPage() {
     canvas.style.width = `${Math.floor(vp.width / dpr)}px`;
     canvas.style.height = `${Math.floor(vp.height / dpr)}px`;
     if (renderTask.current) renderTask.current.cancel();
-    renderTask.current = p.render({ canvasContext: canvas.getContext('2d'), viewport: vp });
+    renderTask.current = p.render({ canvas, viewport: vp });
     try { await renderTask.current.promise; } catch { /* отменён следующим слайдом */ }
   }, [pdf, page]);
 
