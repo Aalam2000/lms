@@ -1,6 +1,7 @@
 // Роутер /materials (backend/app/routers/materials.py)
 import api from './auth';
 import { needsPdfPreview } from '../utils/libraryItems';
+import { viewUrl } from './view';
 
 export function getMaterials() {
   return api.get('/materials/').then(res => res.data);
@@ -78,8 +79,26 @@ export async function getMaterialFile(materialId, contentType) {
   return { blob: new Blob([res.data], { type }), type };
 }
 
+// HTML и SVG показываются только изолированно (api/view.js): скрипт в таком
+// файле не должен работать с правами платформы.
+export function isIsolatedView(contentType) {
+  const ct = (contentType || '').toLowerCase();
+  return ct.includes('html') || ct.includes('svg');
+}
+
+// Ссылка изолированного просмотра HTML/SVG-материала (действует 4 часа)
+export function getMaterialViewUrl(id) {
+  return api.post(`/materials/${id}/view-link`).then(res => viewUrl(res.data.token));
+}
+
 // Показать файл Базы знаний в уже открытой вкладке. Ничего не скачивается.
+// HTML/SVG — по ссылке изолированного просмотра, остальное — blob.
 export async function showMaterialInTab(win, materialId, contentType) {
+  if (isIsolatedView(contentType)) {
+    const url = await getMaterialViewUrl(materialId);
+    if (win) win.location.href = url;
+    return;
+  }
   const { blob, type } = await getMaterialFile(materialId, contentType);
   const url = window.URL.createObjectURL(blob);
   if (win) win.location.href = type === 'application/pdf' ? `${url}#navpanes=0` : url;

@@ -7,8 +7,8 @@
 // Папки считаются в utils/libraryItems.js (folderPaths).
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Dropdown from './Dropdown';
-import { getMaterialFile } from '../api/materials';
-import { getQuizHtml } from '../api/quizzes';
+import { getMaterialFile, getMaterialViewUrl } from '../api/materials';
+import { getQuizViewUrl } from '../api/quizzes';
 import {
   ALL_FOLDER, folderPaths, courseTitleFromItems, leafLabel, leafOrder, subtypeLabel, resourceKey, formatSize,
   needsPdfPreview,
@@ -94,8 +94,9 @@ function Preview({ item }) {
           return;
         }
         if (item.resource_type === 'quiz') {
-          const quiz = await getQuizHtml(item.id);
-          if (!cancelled) setView({ kind: 'html', html: quiz.html });
+          // квиз и HTML — изолированный просмотр по ссылке (api/view.js)
+          const url = await getQuizViewUrl(item.id);
+          if (!cancelled) setView({ kind: 'frame', url });
           return;
         }
         const ct = item.content_type || '';
@@ -107,11 +108,16 @@ function Preview({ item }) {
           setView({ kind: 'none' });
           return;
         }
+        if (ct.includes('html')) {
+          const url = await getMaterialViewUrl(item.id);
+          if (!cancelled) setView({ kind: 'frame', url });
+          return;
+        }
         const { blob, type } = await getMaterialFile(item.id, ct);
         if (cancelled) return;
         if (textLike) {
           const text = await blob.text();
-          if (!cancelled) setView(ct.includes('html') ? { kind: 'html', html: text } : { kind: 'text', text });
+          if (!cancelled) setView({ kind: 'text', text });
           return;
         }
         objectUrl = window.URL.createObjectURL(blob);
@@ -130,7 +136,7 @@ function Preview({ item }) {
     // eslint-disable-next-line
   }, [key]);
 
-  if (view.kind === 'html') return <iframe className="kbs__frame" sandbox="allow-scripts" srcDoc={view.html} title={item.title} />;
+  if (view.kind === 'frame') return <iframe className="kbs__frame" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" allowFullScreen src={view.url} title={item.title} />;
   if (view.kind === 'pdf') return <iframe className="kbs__frame" src={`${view.url}#navpanes=0&toolbar=0`} title={item.title} />;
   if (view.kind === 'image') return <div className="kbs__frame kbs__frame--center"><img className="kbs__frame-img" src={view.url} alt={item.title} /></div>;
   if (view.kind === 'video') return <div className="kbs__frame kbs__frame--center"><video className="kbs__frame-img" src={view.url} controls /></div>;

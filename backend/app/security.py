@@ -35,6 +35,32 @@ def decode_token(token: str):
         return None
 
 
+# ── Ссылка изолированного просмотра (routers/view.py) ─────────────────────
+# HTML-материал или квиз открывается по ссылке /view/<токен> без заголовка
+# Authorization. Токен подписан тем же ключом, но в нём нет "sub" — войти им
+# нельзя (decode_token вернёт None), а токеном входа нельзя открыть просмотр
+# (нет "view"). Срок — 4 часа: урок можно обновить (F5) в течение всей пары.
+VIEW_TOKEN_HOURS = 4
+VIEW_KINDS = ("material", "quiz")
+
+
+def create_view_token(kind: str, obj_id: int) -> str:
+    expire = datetime.utcnow() + timedelta(hours=VIEW_TOKEN_HOURS)
+    return jwt.encode({"view": kind, "id": obj_id, "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def decode_view_token(token: str):
+    """(kind, id) или None, если токен чужой, испорчен или истёк."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.PyJWTError:
+        return None
+    kind, obj_id = payload.get("view"), payload.get("id")
+    if kind not in VIEW_KINDS or not isinstance(obj_id, int):
+        return None
+    return kind, obj_id
+
+
 # ── Логин ученика из ФИО (claude/curator-plan.md, шаг 1) ──────────────────
 # Первое слово — имя целиком, второе — первые 3 буквы фамилии, через точку,
 # плюс 2 случайные цифры: «Мурад Алиев» → murad.ali47; без фамилии — murad47.

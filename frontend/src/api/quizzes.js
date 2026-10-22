@@ -1,5 +1,6 @@
 // Роутер /quizzes (backend/app/routers/quizzes.py)
 import api from './auth';
+import { viewUrl } from './view';
 
 export function getQuizzes() {
   return api.get('/quizzes/').then(res => res.data);
@@ -9,8 +10,9 @@ export function getQuizForEdit(id) {
   return api.get(`/quizzes/${id}/edit`).then(res => res.data);
 }
 
-export function getQuizHtml(id) {
-  return api.get(`/quizzes/${id}/html`).then(res => res.data);
+// Ссылка изолированного просмотра квиза (api/view.js, действует 4 часа)
+export function getQuizViewUrl(id) {
+  return api.post(`/quizzes/${id}/view-link`).then(res => viewUrl(res.data.token));
 }
 
 export function createQuiz(payload) {

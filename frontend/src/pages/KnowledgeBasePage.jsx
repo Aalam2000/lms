@@ -9,7 +9,7 @@ import {
 } from '../api/materials';
 import { getLibraryItems, setFolderTags } from '../api/library';
 import { createLink, deleteLink } from '../api/links';
-import { getQuizHtml, deleteQuiz } from '../api/quizzes';
+import { getQuizViewUrl, deleteQuiz } from '../api/quizzes';
 import { useAuth } from '../context/AuthContext';
 import { usePref } from '../hooks/usePref';
 import { resourceKey, needsPdfPreview, isPresentation, openSlides, ALL_FOLDER } from '../utils/libraryItems';
@@ -270,11 +270,9 @@ function KnowledgeBasePage() {
       if (item.resource_type === 'material') {
         await showMaterialInTab(win, item.id, item.content_type);
       } else {
-        const quiz = await getQuizHtml(item.id);
-        if (win) {
-          win.document.write(quiz.html);
-          win.document.close();
-        }
+        // Квиз — по ссылке изолированного просмотра (api/view.js)
+        const url = await getQuizViewUrl(item.id);
+        if (win) win.location.href = url;
       }
     } catch (err) {
       if (win) win.close();

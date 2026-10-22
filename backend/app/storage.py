@@ -49,6 +49,13 @@ def upload_bytes(object_key: str, data: bytes, content_type: str | None = None) 
         tmp.unlink(missing_ok=True)
 
 
+def exists(object_key: str) -> bool:
+    """Есть ли файл на диске. Проверять до StreamingResponse: stream_object
+    открывает файл уже после отправки заголовков, и без файла ответ
+    обрывается на середине (в браузере — ERR_INCOMPLETE_CHUNKED_ENCODING)."""
+    return _path(object_key).is_file()
+
+
 def stream_object(object_key: str, chunk_size: int = CHUNK):
     with open(_path(object_key), "rb") as f:
         while chunk := f.read(chunk_size):

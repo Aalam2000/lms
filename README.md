@@ -45,7 +45,7 @@
 | Часть | Технологии |
 |---|---|
 | Backend | Python 3.12, FastAPI, Pydantic 2, SQLAlchemy 2 (async), Alembic |
-| Frontend | React 18, Vite, React Router, react-big-calendar |
+| Frontend | React 19, Vite, React Router, react-big-calendar, date-fns, pdf.js |
 | Данные | PostgreSQL — база данных; файлы — папка на диске сервера |
 | Документы | LibreOffice — просмотр офисных файлов; Pillow — обработка фото профиля |
 | Перевод | autoi18n + OpenAI |

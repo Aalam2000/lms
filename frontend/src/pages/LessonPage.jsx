@@ -24,7 +24,7 @@ import {
 } from '../api/lessons';
 import Modal from '../components/Modal';
 import { getMyGroups } from '../api/groups';
-import { getQuizHtml } from '../api/quizzes';
+import { getQuizViewUrl } from '../api/quizzes';
 import { openLiveQuiz } from '../api/quizLive';
 import { createLink } from '../api/links';
 
@@ -274,11 +274,9 @@ function LessonPage() {
         const game = await openLiveQuiz(item.resource_id, Number(lessonId));
         if (win) win.location.href = `/quiz-live/${game.code}/host`;
       } else {
-        const quiz = await getQuizHtml(item.resource_id);
-        if (win) {
-          win.document.write(quiz.html);
-          win.document.close();
-        }
+        // Квиз — по ссылке изолированного просмотра (api/view.js)
+        const url = await getQuizViewUrl(item.resource_id);
+        if (win) win.location.href = url;
       }
     } catch (err) {
       if (win) win.close();

@@ -410,11 +410,45 @@ async def download_material(
     elif current_user.role not in ("teacher", "admin"):
         raise HTTPException(status_code=403, detail="Нет доступа")
 
+    if not storage.exists(material.object_key):
+        raise HTTPException(status_code=404, detail="Файл не найден на диске — загрузите его заново")
+
     return StreamingResponse(
         storage.stream_object(material.object_key),
         media_type=material.content_type or "application/octet-stream",
         headers={"Content-Disposition": _content_disposition(material.original_filename)},
     )
+
+
+# Изолированный просмотр (routers/view.py): HTML и SVG открываются не как
+# blob: в источнике платформы, а по ссылке /view/<токен> с заголовком
+# CSP sandbox — скрипт материала не видит платформу и токен входа.
+# Права — те же, что у скачивания.
+VIEW_EXTENSIONS = {".html", ".htm", ".xhtml", ".svg"}
+
+
+def is_view_file(material: Material) -> bool:
+    return Path(material.original_filename or "").suffix.lower() in VIEW_EXTENSIONS
+
+
+@router.post("/{material_id}/view-link")
+async def material_view_link(
+    material_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    from ..security import create_view_token
+
+    material = (await db.execute(select(Material).where(Material.id == material_id))).scalar_one_or_none()
+    if not material:
+        raise HTTPException(status_code=404, detail="Файл не найден")
+    if current_user.role == "student":
+        await _verify_student_material_access(db, material_id, current_user)
+    elif current_user.role not in ("teacher", "admin"):
+        raise HTTPException(status_code=403, detail="Нет доступа")
+    if not is_view_file(material):
+        raise HTTPException(status_code=400, detail="Этот файл открывается обычным просмотром")
+    return {"token": create_view_token("material", material_id)}
 
 
 # Текст файла — для Помощника квиза (материалы урока прямо в промпт).

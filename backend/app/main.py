@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import auth, quizzes, i18n, admin, groups, lessons, materials, links, library, students, quiz_live, help, usages, homework, lesson_work, presence, methodology, csp, academy, parent, push
+from .routers import auth, quizzes, i18n, admin, groups, lessons, materials, links, library, students, quiz_live, help, usages, homework, lesson_work, presence, methodology, csp, academy, parent, push, view
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -72,4 +72,5 @@ app.include_router(csp.router)
 app.include_router(academy.router)
 app.include_router(parent.router)
 app.include_router(push.router)
+app.include_router(view.router)
 

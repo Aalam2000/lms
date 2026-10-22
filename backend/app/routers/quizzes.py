@@ -149,6 +149,18 @@ async def get_quiz_html(quiz_id: int, db: AsyncSession = Depends(get_db), curren
         raise HTTPException(status_code=404, detail="Quiz not found")
     return {"html": quiz.html_content}
 
+# Изолированный просмотр квиза (routers/view.py) — вместо document.write в
+# новой вкладке: квиз открывается по ссылке /view/<токен> с CSP sandbox.
+# Права — как у /{quiz_id}/html.
+@router.post("/{quiz_id}/view-link")
+async def quiz_view_link(quiz_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_teacher)):
+    from ..security import create_view_token
+
+    exists = (await db.execute(select(Quiz.id).where(Quiz.id == quiz_id))).scalar_one_or_none()
+    if not exists:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    return {"token": create_view_token("quiz", quiz_id)}
+
 @router.get("/{quiz_id}/edit")
 async def get_quiz_edit_data(quiz_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     result = await db.execute(_editable_quiz_query(quiz_id, current_user))
