@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import DeleteButton from '../components/DeleteButton';
 import LibrarySearch, { EMPTY_FILTERS } from '../components/LibrarySearch';
 import { getCourses, getMyGroups } from '../api/groups';

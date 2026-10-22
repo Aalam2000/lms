@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { useLang } from '../hooks/useLang';
 import Button from '../components/Button';
 import { getQuizForEdit, createQuiz, updateQuiz } from '../api/quizzes';

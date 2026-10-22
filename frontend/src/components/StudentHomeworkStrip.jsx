@@ -4,7 +4,7 @@
 // Обновляется при переходе между страницами, раз в 15 секунд и сразу после
 // загрузки или удаления файла ответа (hooks/useHomeworkRefresh.js).
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router';
 import { getMyHomeworkDebts } from '../api/lessons';
 import { useHomeworkRefresh } from '../hooks/useHomeworkRefresh';
 

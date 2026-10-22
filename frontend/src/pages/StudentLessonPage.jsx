@@ -6,7 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { PersonalBadge } from '../components/PersonalLesson';
 import LessonFeedback from '../components/LessonFeedback';
 import Avatar from '../components/Avatar';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import { TYPE_META, formatSize, subtypeLabel, resourceKey, needsPdfPreview, isPresentation, openSlides } from '../utils/libraryItems';
 import { extractErrorMessage } from '../utils/errors';
 import { useAuth } from '../context/AuthContext';

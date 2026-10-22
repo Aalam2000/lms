@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { login as loginRequest } from '../api/auth';
 import LanguageSwitcher from '../components/LanguageSwitcher';

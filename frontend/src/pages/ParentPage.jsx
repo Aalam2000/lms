@@ -3,7 +3,7 @@
 // средние оценки, список уроков и пропуски. Клик по уроку — что задано,
 // ответ ученика и диалог урока. Сервер: backend/app/routers/parent.py.
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import Modal from '../components/Modal';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import {

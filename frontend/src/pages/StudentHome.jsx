@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { usePref } from '../hooks/usePref';
 import { PersonalBadge } from '../components/PersonalLesson';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { getStudentLessons } from '../api/lessons';
 import Calendar from '../components/Calendar';
 import { useDaysOff } from '../hooks/useDaysOff';

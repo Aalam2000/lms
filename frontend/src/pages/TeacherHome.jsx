@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PersonalBadge } from '../components/PersonalLesson';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { getMyLessons, createLesson } from '../api/lessons';
 import { getMyGroups, getCourses } from '../api/groups';
 import Modal from '../components/Modal';

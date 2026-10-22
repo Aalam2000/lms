@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
 import { ContactIcon } from '../components/ContactIcons';

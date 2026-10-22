@@ -13,7 +13,7 @@
 // forceable — админу можно удалить и используемый объект: окно показывает,
 // ЧТО удалится вместе с ним, и кнопку «Удалить всё равно» → onDelete({ force: true }).
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { getUsages } from '../api/usages';
 import IconButton from './IconButton';
 import Modal from './Modal';

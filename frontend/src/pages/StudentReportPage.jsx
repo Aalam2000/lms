@@ -3,7 +3,7 @@
 // фразой, период в цифрах, показатели с оценкой, главное и уроки. Цифры, статусы и
 // нормы считает бэкенд (backend/app/student_report.py), формулировки — здесь.
 import React, { useEffect, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import { getStudentReport } from '../api/students';
 import { extractErrorMessage } from '../utils/errors';
 import Avatar from '../components/Avatar';

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { getCourses, getMyGroups } from '../api/groups';
 import { getGroups } from '../api/admin';
 import { useAuth } from '../context/AuthContext';

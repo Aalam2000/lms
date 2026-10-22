@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { QRCodeSVG } from 'qrcode.react';
 import { getLiveHostState, setLiveExam, startLiveQuiz, nextLiveQuestion } from '../api/quizLive';
 import { QUIZ_LIVE_OPTION_STYLES } from '../utils/quizLiveColors';

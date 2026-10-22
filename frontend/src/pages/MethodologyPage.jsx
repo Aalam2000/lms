@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import { getMethodologyTree, getMethodologyDoc } from '../api/methodology';
 import { useLang } from '../hooks/useLang';
 import { useInternalLinks } from '../hooks/useInternalLinks';

@@ -3,7 +3,7 @@
 // components.css). Сумма всех звёзд за уроки за всё время. Пока звёзд нет —
 // ничего не показываем. Обновляется при переходе между страницами.
 import React, { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router';
 import { getMyStars } from '../api/lessons';
 
 function StudentStars({ user }) {

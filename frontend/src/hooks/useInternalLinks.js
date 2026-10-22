@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 // Клик по ссылкам внутри HTML, отрисованного из Markdown (помощь, методика).
 // Ссылки на разделы приложения — относительные пути (/dashboard/...):

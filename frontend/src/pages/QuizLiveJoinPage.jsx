@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { getLiveRoster, getLivePlayerState, joinLiveQuiz, answerLiveQuestion } from '../api/quizLive';
 import { QUIZ_LIVE_OPTION_STYLES } from '../utils/quizLiveColors';
 

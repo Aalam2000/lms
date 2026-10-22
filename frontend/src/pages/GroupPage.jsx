@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router';
 import Modal from '../components/Modal';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';

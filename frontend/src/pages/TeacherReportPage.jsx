@@ -3,7 +3,7 @@
 // выставляет себе сам. Цифры, статусы и нормы считает бэкенд
 // (backend/app/teacher_report.py), формулировки — здесь.
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router';
 import { getTeacherReport } from '../api/admin';
 import { extractErrorMessage } from '../utils/errors';
 import Avatar from '../components/Avatar';

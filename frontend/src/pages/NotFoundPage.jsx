@@ -2,7 +2,7 @@
 // маршрутов, и когда роль пользователя не соответствует запрошенной
 // странице (зеркалит проверку роли, которая уже есть на бэкенде).
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import Button from '../components/Button';
 
 function NotFoundPage() {

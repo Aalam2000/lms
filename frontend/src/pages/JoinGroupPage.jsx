@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router';
 import { registerStudent } from '../api/auth';
 import { getGroupByInvite } from '../api/groups';
 import { useAcademyName } from '../utils/academyName';

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { getNewStudentsCount } from '../api/students';
 import { useHomeworkRefresh } from '../hooks/useHomeworkRefresh';
 import { useAuth } from '../context/AuthContext';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router';
 import { useAcademyName } from '../utils/academyName';
 import InstallButton from './InstallButton';
 import {
