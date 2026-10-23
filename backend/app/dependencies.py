@@ -74,7 +74,11 @@ async def require_teacher(current_user: User = Depends(get_current_user)):
 # строка; эндпоинт проверяет право (require("…")), а не имя роли. Фронт получает
 # права пользователя в /auth/me (permissions) и по ним показывает меню и кнопки.
 #   students.view    — «Студенты»: список, карточка, отчёт по ученику
-#   students.edit    — завести ученика, править карточку, пароль, вход родителя
+#   students.create  — завести нового ученика
+#   students.edit    — править данные ученика
+#   students.access  — доступ ученика и родителя: пароль, ссылка и вход родителя
+#   students.move    — записать ученика, уже состоящего в группе, в другую группу
+#   schedule.edit    — расписание группы: создать, удалить, аудитории по дням, нумерованный урок
 #   students.all     — все ученики и группы, а не только свои
 #   lessons.personal — доп. урок ученику из «Студентов»
 #   teachers.view    — список педагогов
@@ -85,12 +89,14 @@ async def require_teacher(current_user: User = Depends(get_current_user)):
 # Остальные эндпоинты пока проверяют роль (require_admin, require_teacher).
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     "admin": frozenset({
-        "students.view", "students.edit", "students.all", "lessons.personal",
+        "students.view", "students.create", "students.edit", "students.access", "students.move",
+        "students.all", "lessons.personal", "schedule.edit",
         "teachers.view", "groups.all", "calendars.all", "catalog.view", "rooms.edit",
     }),
-    "teacher": frozenset({"students.view", "students.edit", "lessons.personal", "catalog.view"}),
+    "teacher": frozenset({"students.view", "students.access", "lessons.personal", "catalog.view"}),
     "curator": frozenset({
-        "students.view", "students.edit", "students.all", "lessons.personal",
+        "students.view", "students.create", "students.edit", "students.access",
+        "students.all", "lessons.personal",
         "teachers.view", "groups.all", "calendars.all", "catalog.view", "lessons.own",
         "rooms.edit",
     }),

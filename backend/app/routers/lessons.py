@@ -29,7 +29,7 @@ from ..models import (
     HomeworkTask, HomeworkAnswer, HomeworkAnswerFile, LessonMessage, LessonStudent, LessonFeedback,
     LessonWorkFile, Room,
 )
-from ..dependencies import has_perm, require_teacher, get_current_user
+from ..dependencies import has_perm, require, require_teacher, get_current_user
 from ..resources import RESOURCE_MODELS, RESOURCE_NOT_FOUND, fetch_resource_details, resource_exists
 
 router = APIRouter(prefix="/lessons", tags=["lessons"])
@@ -188,6 +188,9 @@ class ScheduleGenerate(BaseModel):
     start_time: str  # "HH:MM", одно и то же время для всех уроков серии
     weekdays: list[int] = Field(min_length=1)  # 0=Пн .. 6=Вс (date.weekday())
     lesson_count: int = Field(ge=1, le=200)
+    # Номер первого урока серии (группа может начинать не с 1, а, например, с 10);
+    # материалы шаблона и другой группы привязываются по этому же номеру
+    start_order: int = Field(default=1, ge=1, le=500)
     duration_min: Optional[int] = Field(default=None, ge=DURATION_MIN, le=DURATION_MAX)  # не задано — из группы
     fill_source: Optional[str] = None  # "template" | "group"
     fill_group_id: Optional[int] = None  # обязателен при fill_source == "group"
@@ -601,8 +604,11 @@ async def create_lesson(
     group = (await db.execute(group_query)).scalar_one_or_none()
     if not group:
         raise HTTPException(status_code=403, detail="Нет доступа к этой группе")
+    # Номер в нумерации группы ставит только расписание (schedule.edit);
+    # урок педагога из «+ Урок» — всегда без номера, как доп. урок
     lesson = await add_lesson(
-        db, group, current_user, data.date, title=data.title, order=data.order,
+        db, group, current_user, data.date, title=data.title,
+        order=data.order if has_perm(current_user, "schedule.edit") else 0,
         duration_min=data.duration_min, source=data.source,
         is_personal=data.is_personal, student_ids=data.student_ids,
     )
@@ -628,7 +634,7 @@ async def create_lesson(
 async def generate_schedule(
     data: ScheduleGenerate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_teacher),
+    current_user: User = Depends(require("schedule.edit")),
 ):
     group = await get_accessible_group(data.group_id, db, current_user)
 
@@ -683,7 +689,7 @@ async def generate_schedule(
 
     word = await lesson_word(db, group.sector)
     lessons_by_order: dict[int, Lesson] = {}
-    for i, lesson_date in enumerate(dates, start=1):
+    for i, lesson_date in enumerate(dates, start=data.start_order):
         lesson = Lesson(
             group_id=data.group_id,
             # Название — сразу на языке сектора группы («Урок N» / «Dərs N»), при показе не переводится
@@ -891,7 +897,7 @@ async def set_group_room_day(
     group_id: int,
     data: RoomDayIn,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_teacher),
+    current_user: User = Depends(require("schedule.edit")),
 ):
     await get_accessible_group(group_id, db, current_user)
     if not await db.get(Room, data.room_id):
@@ -941,7 +947,7 @@ async def open_group_lessons_range(
 async def delete_group_lessons(
     group_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_teacher),
+    current_user: User = Depends(require("schedule.edit")),
 ):
     await get_accessible_group(group_id, db, current_user)
 

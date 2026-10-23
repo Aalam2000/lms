@@ -143,7 +143,7 @@ async def _link_out(db: AsyncSession, student: User) -> ParentLinkOut:
 async def get_parent_link(
     student_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require("students.edit")),
+    current_user: User = Depends(require("students.access")),
 ):
     student, _, _ = await _get_accessible_student(db, student_id, current_user)
     return await _link_out(db, student)
@@ -154,7 +154,7 @@ async def make_parent_link(
     student_id: int,
     data: ParentLinkIn,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require("students.edit")),
+    current_user: User = Depends(require("students.access")),
 ):
     student, _, _ = await _get_accessible_student(db, student_id, current_user)
     if not student.parent_phone:
@@ -175,7 +175,7 @@ async def make_parent_link(
 async def reset_parent_password(
     student_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require("students.edit")),
+    current_user: User = Depends(require("students.access")),
 ):
     student, _, _ = await _get_accessible_student(db, student_id, current_user)
     parent = await _parent_user(db, student.parent_phone)

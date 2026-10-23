@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import Modal from './Modal';
+import { useAuth } from '../context/AuthContext';
 import { registerStudent } from '../api/auth';
 import { isValidPhone, registerErrorText, PHONE_PLACEHOLDER, PHONE_FORMAT_TEXT } from '../utils/phone';
 
 // QR для регистрации + «Добавить студента»: педагог сам вносит студентов
 // (имя, логин, пароль). После «Сохранить» — снова QR, и так сколько нужно.
 function QRModal({ group, onClose, onAdded }) {
+  // «Добавить студента» — завести ученика сразу в группу: право students.create (админ, куратор)
+  const { can } = useAuth();
   const [copied, setCopied] = useState(false);
   const [adding, setAdding] = useState(false);
   const [fullName, setFullName] = useState('');
@@ -110,9 +113,11 @@ function QRModal({ group, onClose, onAdded }) {
         {'Отправьте эту ссылку или QR-код ученикам для регистрации в группе'}
       </p>
 
-      <button type="button" className="btn btn--outline" onClick={() => { setError(''); setAdding(true); }}>
-        {'Добавить студента'}
-      </button>
+      {can('students.create') && (
+        <button type="button" className="btn btn--outline" onClick={() => { setError(''); setAdding(true); }}>
+          {'Добавить студента'}
+        </button>
+      )}
       {lastAdded && <p className="hint-text">{`Добавлен: ${lastAdded}`}</p>}
     </Modal>
   );

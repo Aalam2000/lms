@@ -1,5 +1,7 @@
-// Карточка ученика: все его данные в одном окне — для админа (секретаря) и
-// педагога (только ученики своих групп, проверка на бэкенде).
+// Карточка ученика: все его данные в одном окне. Заводит и правит ученика
+// право students.create / students.edit (админ, куратор); педагог (ученики
+// своих групп, проверка на бэкенде) видит данные только для чтения, блоки
+// доступа ученика и родителя у него работают (students.access).
 //   <StudentCardModal studentId={id} onClose onSaved />        — правка
 //   <StudentCardModal groups={[{id, name}]} onClose onSaved />   — новый ученик сразу в группу
 //   <StudentCardModal groups courses teachers defaults onClose onSaved />
@@ -15,6 +17,7 @@ import DateTimePicker, { nextHour } from './DateTimePicker';
 import { getStudentProfile, updateStudentProfile, createStudent } from '../api/students';
 import { PHONE_PLACEHOLDER } from '../utils/phone';
 import ParentLinkBlock, { StudentAccessBlock } from './ParentLinkBlock';
+import { useAuth } from '../context/AuthContext';
 
 const EMPTY = {
   full_name: '', phone: '', email: '', telegram_username: '', whatsapp: '',
@@ -24,6 +27,8 @@ const EMPTY = {
 
 function StudentCardModal({ studentId, groups = [], defaultGroupId = '', courses, teachers, defaults = {}, onClose, onSaved }) {
   const isNew = !studentId;
+  const { can } = useAuth();
+  const readOnly = !isNew && !can('students.edit');
   const allowNoGroup = isNew && !!courses; // курс вместо группы (куратор, админ)
   const [draft, setDraft] = useState(isNew ? {
     ...EMPTY, group_id: defaultGroupId || '',
@@ -117,9 +122,11 @@ function StudentCardModal({ studentId, groups = [], defaultGroupId = '', courses
       footer={(
         <>
           <button type="button" className="btn btn--secondary" onClick={onClose}>{'Отмена'}</button>
-          <button type="submit" form="student-card-form" className="btn" disabled={!draft || saving}>
-            {saving ? 'Сохранение…' : 'Сохранить'}
-          </button>
+          {!readOnly && (
+            <button type="submit" form="student-card-form" className="btn" disabled={!draft || saving}>
+              {saving ? 'Сохранение…' : 'Сохранить'}
+            </button>
+          )}
         </>
       )}
     >
@@ -134,11 +141,11 @@ function StudentCardModal({ studentId, groups = [], defaultGroupId = '', courses
             </div>
           )}
           <div className="form-grid">
-            <FormField label={'Имя и фамилия'} value={draft.full_name} onChange={set('full_name')} autoFocus />
-            <FormField label={'Телефон ученика'} type="tel" placeholder={PHONE_PLACEHOLDER} value={draft.phone} onChange={set('phone')} />
-            <FormField label={'Email'} type="email" value={draft.email} onChange={set('email')} />
-            <FormField label={'Telegram'} value={draft.telegram_username} onChange={set('telegram_username')} />
-            <FormField label={'WhatsApp'} value={draft.whatsapp} onChange={set('whatsapp')} />
+            <FormField disabled={readOnly} label={'Имя и фамилия'} value={draft.full_name} onChange={set('full_name')} autoFocus />
+            <FormField disabled={readOnly} label={'Телефон ученика'} type="tel" placeholder={PHONE_PLACEHOLDER} value={draft.phone} onChange={set('phone')} />
+            <FormField disabled={readOnly} label={'Email'} type="email" value={draft.email} onChange={set('email')} />
+            <FormField disabled={readOnly} label={'Telegram'} value={draft.telegram_username} onChange={set('telegram_username')} />
+            <FormField disabled={readOnly} label={'WhatsApp'} value={draft.whatsapp} onChange={set('whatsapp')} />
           </div>
 
           {isNew ? (
@@ -152,8 +159,8 @@ function StudentCardModal({ studentId, groups = [], defaultGroupId = '', courses
 
           <h4 className="form-section">{'Родитель'}</h4>
           <div className="form-grid">
-            <FormField label={'Имя родителя'} value={draft.parent_name} onChange={set('parent_name')} />
-            <FormField label={'Телефон родителя'} type="tel" placeholder={PHONE_PLACEHOLDER} value={draft.parent_phone} onChange={set('parent_phone')} />
+            <FormField disabled={readOnly} label={'Имя родителя'} value={draft.parent_name} onChange={set('parent_name')} />
+            <FormField disabled={readOnly} label={'Телефон родителя'} type="tel" placeholder={PHONE_PLACEHOLDER} value={draft.parent_phone} onChange={set('parent_phone')} />
           </div>
           {/* Личная ссылка родителя: успеваемость без входа (routers/parent.py) */}
           {!isNew && <ParentLinkBlock studentId={studentId} />}

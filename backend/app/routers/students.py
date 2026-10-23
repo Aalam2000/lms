@@ -428,7 +428,7 @@ async def set_student_password(
     student_id: int,
     data: NewPasswordIn,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require("students.edit")),
+    current_user: User = Depends(require("students.access")),
 ):
     student, _, _ = await _get_accessible_student(db, student_id, current_user)
     student.hashed_password = get_password_hash(data.new_password)
@@ -515,7 +515,7 @@ async def _profile_out(db: AsyncSession, student: User) -> StudentProfileOut:
 async def create_student(
     data: StudentCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require("students.edit")),
+    current_user: User = Depends(require("students.create")),
 ):
     group = None
     if data.group_id is not None:
@@ -622,7 +622,7 @@ async def create_student_lesson(
 async def get_student_profile(
     student_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require("students.edit")),
+    current_user: User = Depends(require("students.view")),
 ):
     student, _, _ = await _get_accessible_student(db, student_id, current_user)
     return await _profile_out(db, student)

@@ -30,6 +30,11 @@ async def _get_owned_group(db: AsyncSession, group_id: int, current_user: User) 
     return group
 
 
+def _active_student_ids():
+    """Ученики, которые сейчас активно состоят хотя бы в одной группе."""
+    return select(GroupMember.student_id).where(GroupMember.status == "active")
+
+
 def _guest_group_ids(user_id: int):
     """Группы, где педагог не основной, но ведёт или вёл уроки (lesson_teacher.py)."""
     return select(Lesson.group_id).where(Lesson.teacher_id == user_id).distinct()
@@ -384,6 +389,9 @@ async def search_available_students(
         GroupMember.group_id == group_id, GroupMember.status == "active"
     )
     query = select(User).where(User.role == "student", User.id.notin_(already_active))
+    # Ученика, который уже учится в другой группе, записывает только админ (students.move)
+    if not has_perm(current_user, "students.move"):
+        query = query.where(User.id.notin_(_active_student_ids()))
     q = q.strip()
     if q:
         like = f"%{q}%"
@@ -420,6 +428,12 @@ async def add_group_member(
     student = student_result.scalar_one_or_none()
     if not student:
         raise HTTPException(status_code=404, detail="Ученик не найден")
+    if not has_perm(current_user, "students.move"):
+        busy = (await db.execute(
+            select(GroupMember.id).where(GroupMember.student_id == student.id, GroupMember.status == "active")
+        )).first()
+        if busy:
+            raise HTTPException(status_code=403, detail="Ученик уже учится в другой группе — перевести его может только администратор")
 
     existing_result = await db.execute(
         select(GroupMember).where(

@@ -15,7 +15,7 @@ from ..database import get_db
 from ..models import User, Group, GroupMember
 from ..schemas import UserLogin, Token, UserOut, UserCreate, StudentRegister, UserUpdate, DaysOffSettings
 from ..security import verify_password, get_password_hash, create_access_token, decode_token
-from ..dependencies import ROLE_PERMISSIONS, get_current_user, get_optional_user
+from ..dependencies import ROLE_PERMISSIONS, get_current_user, get_optional_user, has_perm
 from ..days_off import current_settings
 from ..phones import checked_student_phone, ensure_phone_free, normalize_phone, PHONE_REQUIRED_ERROR
 
@@ -138,7 +138,9 @@ async def register_student(
     if not group or group.status != "active":
         raise HTTPException(status_code=404, detail="Приглашение недействительно")
 
-    by_staff = actor is not None and (actor.role == "admin" or (actor.role == "teacher" and group.teacher_id == actor.id))
+    # Сразу в группу, без подтверждения, — только тот, кто заводит учеников (students.create:
+    # админ, куратор); остальные регистрации ждут подтверждения педагога группы
+    by_staff = actor is not None and has_perm(actor, "students.create")
     if not by_staff:
         since = datetime.now(timezone.utc) - timedelta(hours=1)
         recent = (await db.execute(

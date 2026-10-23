@@ -1,4 +1,4 @@
-<!-- autoi18n: source=curator.md lang=en sha1=35c923ce2827b8964afed02fe46eefcd3a5291a4 -->
+<!-- autoi18n: source=curator.md lang=en sha1=0d53dcb4cba32dadc49f52634dd119089ab969dd -->
 # How to Work as a Curator
 
 The curator brings students to the academy and hands them over to the teachers.
@@ -22,6 +22,8 @@ All students of the academy — just like in the administrator's view: filters b
 - **Pencil** — student and parent data.
 - **Key** — change password.
 - **Additional lesson** — personal lesson for the student; if they do not have a group, select one — the student will enroll in it.
+
+You add new students and enrol them in a group. A student who already studies in another group is enrolled only by the administrator.
 - Student's name — report on them.
 
 ## Rooms

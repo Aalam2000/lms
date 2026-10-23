@@ -1,4 +1,4 @@
-<!-- autoi18n: source=teacher.md lang=az sha1=2d77b3cd877a099c99a198dd9ab12d031e87e52b -->
+<!-- autoi18n: source=teacher.md lang=az sha1=2909bda8949066aaec70e9d65d1fe760b9e6e2b5 -->
 # Platformada necə işləmək
 
 ## Mənim qruplarım
@@ -16,8 +16,8 @@ Qrupun üzərinə klikləyin ki, onu açasınız.
 Qrup səhifəsinin üstündə — ikonlar, hər birinin adı üzərinə gəldikdə görünür:
 
 - **Qrup parametrləri** (dişli) — ad, Telegram, WhatsApp, videokonfrans linki və dərsin standart müddəti;
-- **Qeydiyyat üçün QR** — şagirdlərin özləri qruplara qeydiyyatdan keçməsi üçün link və QR-kod; orada həmçinin dərhal şagirdi istifadəçi adı və şifrə ilə əlavə etmək mümkündür;
-- **Şagirdlər** (şəxslər və say) — qrup tərkibi və telefonlar: şagirdi axtarışla əlavə etmək, **məlumatlarını** və valideynin məlumatlarını **dəyişdirmək**, xaric etmək (səbəbini göstərməklə) və ya arxivdən qaytarmaq. "Telefon" sütununda qırmızı xətt — telefon doldurulmayıb.
+- **Qeydiyyat üçün QR** — şagirdlərin özləri qruplara qeydiyyatdan keçməsi üçün link və QR-kod;
+- **Şagirdlər** (şəxslər və say) — qrup tərkibi və telefonlar: şagirdi axtarışla qrupa yazmaq, onun və valideynin məlumatlarına baxmaq, xaric etmək (səbəbini göstərməklə) və ya arxivdən qaytarmaq. Axtarışda yalnız hazırda heç bir qrupda oxumayan şagirdlər görünür; başqa qrupdan olan şagirdi administrator köçürür. "Telefon" sütununda qırmızı xətt — telefon doldurulmayıb.
 
 ### Yeni şagirdlər (QR ilə qeydiyyat)
 
@@ -26,7 +26,7 @@ QR qrupu ilə öz-özünə qeydiyyatdan keçən şagird dərhal qrupa daxil olmu
 - **Qəbul et** — şagird dərhal qrupa daxil olur; bu günə qədərki dərslər onun üçün buraxılmış sayılmır.
 - **Redd et** — müraciət silinir. Əgər şagird başqa heç bir qrupa daxil deyilsə, onun hesabı da silinir və telefon boşalır.
 
-Özünüzün əlavə etdiyiniz şagirdlər (QR pəncərəsində "Tələbə əlavə et" düyməsi və ya şagirdlər pəncərəsində axtarış) təsdiq gözləmir.
+Şagirdlər pəncərəsində axtarışla yazdığınız şagirdlər təsdiq gözləmir.
 
 Artıq hesabların qarşısını almaq üçün: telefon ölkələrin telefon planları ilə yoxlanılır — mövcud olmayan operator kodu, düzgün uzunluqda olmayan və ya eyni rəqəmlərdən ibarət olan nömrələr qəbul edilmir. Bir saat ərzində bir QR ilə 30 dəfədən çox qeydiyyatdan keçmək olmaz. Arxiv qrupu üçün QR ilə qeydiyyatdan keçmək mümkün deyil.
 
@@ -34,11 +34,13 @@ Artıq hesabların qarşısını almaq üçün: telefon ölkələrin telefon pla
 
 Dərslər **cədvəl** və ya **təqvim** şəklində görünür — solda iki simvol. Filtr — bu gündən, həftənin əvvəlinə, ayın əvvəlinə və ya hamısı.
 
-- **+ Dərs** — bir dərs yaratmaq: tarix, vaxt, müddət və lazım gələrsə, öz adı.
-- **Cədvəl və materiallar** (artı ilə təqvim) — eyni anda bir çox dərs yaratmaq: ilk dərsin tarixi, vaxtı, müddəti, həftənin günləri, dərslərin sayı. Materialları kurs şablonundan və ya başqa bir qrupdan götürmək mümkündür. Əgər dərslər artıq varsa, burada tarixləri saxlamaq və yalnız materialları əlavə etmək mümkündür.
+Qrupun cədvəlini — 1, 2, 3… nömrəli dərsləri — administrator yaradır. Nömrələr dərslərə bağlanıb.
+
+- **+ Dərs** — bütün qrup üçün əlavə dərs və ya fərdi dərs: tarix, vaxt, müddət və lazım gələrsə, öz adı. Əlavə dərsin nömrəsi yoxdur. Onu, məsələn, «Dərs 2» adlandırmaq olar, əgər o ikinci dərsin əvəzinə və ya ona əlavədirsə — qrupun nömrələnməsi bundan dəyişmir.
+- **Cədvəl və materiallar** (artı ilə təqvim) — dərsləri materiallarla doldurmaq: kurs şablonundan və ya başqa qrupdan, № dərsdən № dərsə qədər. Qrupun hələ cədvəli yoxdursa, sistem bunu bildirəcək — onu administrator yaradır.
 - **Dərsləri aç** (kilid) — şagirdlərə bir neçə dərsi nömrələrinə görə eyni anda açmaq.
 - **Bayram kimi qeyd et** — bu tarixdə dərs keçirilmir: o və bütün sonrakı dərslər cədvəldə dəyişdirilir.
-- **İstirahət günləri** təqvimdə qırmızı ilə işarələnir. Öz istirahət gününüzdə dərs qoya bilərsiniz. Əgər cədvəl istirahət günlərinə düşürsə, sistem tarixləri göstərəcək — dərsləri yenə də yaratmaq üçün **Dərsləri yarat** düyməsini bir daha basın.
+- **İstirahət günləri** təqvimdə qırmızı ilə işarələnir. Öz istirahət gününüzdə dərs qoya bilərsiniz.
 
 ### Fərdi dərs
 
@@ -147,8 +149,9 @@ Adın altında olan rəngli zolaq — son verilmiş Ev tapşırığı üzrə bor
 
 “Davamiyyət” sütununda — yalnız üzrlü səbəb olmadan bağlanmamış davamiyyətlər. Davamiyyət sayının ətrafında qırmızı halqa — şagird son dərsi qaçırıb və ondan sonra fərdi dərsdə olmayıb. Halqa dərsdən bir gün sonra görünür. O, fərdi dərs bitdikdə və şagird orada “Gəldi” və ya “Onlayn” qeyd edildikdə, ya da şagird növbəti qrup dərsinə gəldikdə yox olur; üzrlü səbəb ilə qaçırma halqa yaratmır.
 
-- **+ Şagird** — yeni şagird əlavə etmək üçün dərhal sizin qrupa: ad və soyad, telefon, valideyn məlumatları. İstifadəçi adı avtomatik yaradılır (ad, nöqtə, soyadın üç hərfi və rəqəmlər — məsələn, `murad.ali47`), parol əvvəlcə istifadəçi adına bərabərdir. Saxlandıqdan sonra şagirdin kartı açılacaq, **Şagirdin Girişi** bloku: platformanın ünvanı, istifadəçi adı və parol, **Kopyala** və **WhatsApp-a Göndər** düymələri. Əgər şagird parolu dəyişibsə və onu unudubsa — **İstifadəçi adına Sıfırlamaq**.
-- **Şagird və valideyn məlumatları** (qələm) — ad, telefon, email, messencerlər, valideynin adı və telefonunu dəyişmək.
+Yeni şagirdləri administrator və kurator yaradır; istifadəçi adı avtomatik yaradılır (ad, nöqtə, soyadın üç hərfi və rəqəmlər — məsələn, `murad.ali47`), parol əvvəlcə istifadəçi adına bərabərdir.
+
+- **Tələbənin məlumatları** (qələm) — məlumatlara baxmaq; onları administrator və ya kurator dəyişə bilər. Kartda **Şagirdin girişi** bloku var: platformanın ünvanı, istifadəçi adı və parol, **Kopyala** və **WhatsApp-a göndər** düymələri; şagird parolu dəyişib unudubsa — **Girişə sıfırlamaq**. Valideyn üçün link də oradadır.
 - **Parolu Dəyişmək** (açar) — əgər şagird parolu unudubsa.
 
 - **Əlavə dərs** (artı ilə təqvim) — bu şagird üçün fərdi dərs: tarix və vaxt. Əgər şagird hələ qrupa daxil olmayıbsa (onu kurator göndərib — “Qrup” sütununda “qrupsuz” işarəsi), qrup seçin — şagird ora yazılacaq.

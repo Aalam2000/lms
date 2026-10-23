@@ -239,7 +239,9 @@ function StudentsPage() {
               {'Моё'}
             </button>
           )}
-          <button type="button" className="btn" onClick={() => setIsAddingStudent(true)}>{'+ Ученик'}</button>
+          {can('students.create') && (
+            <button type="button" className="btn" onClick={() => setIsAddingStudent(true)}>{'+ Ученик'}</button>
+          )}
         </div>
       </div>
 

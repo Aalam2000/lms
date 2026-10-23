@@ -1,4 +1,4 @@
-<!-- autoi18n: source=admin.md lang=en sha1=d55756e8ef4581c4dc1bb11cd10137ac0603eb16 -->
+<!-- autoi18n: source=admin.md lang=en sha1=a5410694d26efe39a568162f14c8d8b4f9961cf9 -->
 # How to Work on the Platform
 
 The administrator sees everything that the teacher sees — but for all groups and all teachers — and additionally manages users, courses, and groups.
@@ -9,9 +9,20 @@ On the [Main](/dashboard) — all groups of the platform. Filter by teacher or *
 
 Click on a group — its page will open: settings, QR for student registration, composition, schedule, and lessons. Working with a group and lessons is the same as for the teacher: lessons, journal, homework, quizzes, dialogue with students.
 
+### Group Schedule
+
+Only the administrator creates a group's schedule. A group can be created without a schedule — to fill it with students — and the schedule added once it is clear.
+
+The schedule opens with the **Schedule** button in the group's row (the "Groups" tab in the admin section) or with the **Schedule and materials** button on the group page.
+
+- The group has no lessons yet — fill in the date and time of the first lesson (one time for all lessons), duration, weekdays, number of lessons and **Start from lesson №**: a group may start not from lesson 1 but, for example, from lesson 10. Lesson numbers are fixed to the lessons and do not change later. Materials from the course template or from another group are attached by the same numbers: lesson 10 gets the materials of lesson 10.
+- The group already has lessons — **Delete and recreate** (personal lessons are not deleted), **Rooms by weekday** or, on the group page, **Leave dates — fill in with materials**.
+
+The teacher does not create or delete the schedule: they fill lessons with materials, shift lessons for a holiday and add extra lessons — for the whole group or personal. An extra lesson has no number, even if the teacher named it "Lesson 2": it does not change the group's numbering.
+
 ### Lesson Teacher
 
-A group has a main teacher, and each lesson has its own: usually the same, but for one or several lessons, another can be assigned. On the group page, click **Lesson Teacher** and select the teacher, from which lesson and to which.
+A group has a main teacher, and each lesson has its own: usually the same, but for one or several lessons, another can be assigned. Click **Lesson Teacher** on the group page or in the group's row on the "Groups" tab of the admin section and select the teacher, from which lesson and to which.
 
 - **Replacement** — select one or several lessons. The main teacher of the group does not change. The replacing teacher sees only these lessons and works in each until midnight of the lesson day, then the lesson remains for them to view.
 - **Transfer of Group** — select the lesson from which the group is transferred, and "until the end." The teacher becomes the main one: receives the entire group and all its lessons, new lessons are created for them. The previous teacher sees only the lessons they taught and cannot change anything in them.
@@ -60,7 +71,9 @@ Name, course, sector, teacher, video conference, Telegram.
 
 - **+ Add group** — new group with course and teacher.
 - Click on the row — data can be edited. Changing the teacher in the row takes effect from today: past lessons remain with the one who taught them.
-- **Group schedule** — open the group page.
+- **Group schedule** (calendar) — open the group page.
+- **Schedule** — create the group's schedule, delete and create again, rooms by weekday (the "Group Schedule" section above).
+- **Lesson Teacher** — replacement for lessons and transfer of the group (the "Lesson Teacher" section above).
 - **Send to archive** — the group is no longer active; it can be **returned** or **deleted permanently** from the archive.
 
 ## Knowledge base
@@ -127,7 +140,9 @@ Through the link, the parent sees only the performance: grades for lessons, Home
 
 - **Change Password** (key) — if the student forgot the password. The new password will be displayed on the screen, and it needs to be communicated to the student.
 - **Delete** (trash can) — the system will show what is associated with the student and ask for confirmation.
-- Transfer the student to another group or expel — on the group page, the **Students** icon.
+- Transfer the student to another group or expel — on the group page, the **Students** icon: enrol the student in the new group and expel them from the old one. A student may also study in two groups at once.
+
+Students are added and their data changed by the administrator and the curator. The teacher sees the student card read-only but gives access: the student's login and password, the parent's link and login. The teacher and the curator enrol in a group only students who are not currently studying in any group; a student from another group is enrolled only by the administrator.
 
 ### Student Report
 

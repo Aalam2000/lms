@@ -1,4 +1,4 @@
-<!-- autoi18n: source=admin.md lang=az sha1=d55756e8ef4581c4dc1bb11cd10137ac0603eb16 -->
+<!-- autoi18n: source=admin.md lang=az sha1=a5410694d26efe39a568162f14c8d8b4f9961cf9 -->
 # Platformada necə işləmək olar
 
 Administrator müəllimlərin gördüyü hər şeyi görür — amma bütün qruplar və bütün müəllimlər üzrə — və əlavə olaraq istifadəçiləri, kursları və qrupları idarə edir.
@@ -9,9 +9,20 @@ Administrator müəllimlərin gördüyü hər şeyi görür — amma bütün qru
 
 Qrupa klikləyin — onun səhifəsi açılacaq: parametrlər, şagirdlərin qeydiyyatı üçün QR, tərkibi, cədvəl və dərslər. Qrupla və dərslərlə iş müəllimlə eynidir: dərslər, jurnal, ev tapşırıqları, quizlər, şagirdlərlə dialoq.
 
+### Qrupun cədvəli
+
+Qrupun cədvəlini yalnız administrator yaradır. Qrupu cədvəlsiz yaratmaq olar — ona şagird yığmaq üçün — cədvəli isə aydın olanda qurmaq.
+
+Cədvəl qrupun sətrindəki **Cədvəl** düyməsi ilə (admin bölməsində «Qruplar» vərəqi) və ya qrup səhifəsindəki **Cədvəl və materiallar** düyməsi ilə açılır.
+
+- Qrupun hələ dərsi yoxdur — ilk dərsin tarixini və vaxtını (bütün dərslər üçün bir vaxt), müddəti, həftənin günlərini, dərslərin sayını və **Başlanğıc dərs №** doldurun: qrup 1-ci dərsdən deyil, məsələn, 10-cu dərsdən başlaya bilər. Dərslərin nömrələri dərslərə bağlanır və sonra dəyişmir. Kurs şablonundan və ya başqa qrupdan materiallar eyni nömrələrlə gəlir: 10-cu dərsə 10-cu dərsin materialları.
+- Qrupun artıq dərsləri var — **Sil və yenidən yarad** (fərdi dərslər silinmir), **Həftənin günlərinə görə otaqlar** və ya qrup səhifəsində **Tarixləri saxlayın - materiallarla tamamlayın**.
+
+Müəllim cədvəli yaratmır və silmir: o, dərsləri materiallarla doldurur, dərsləri bayram kimi sürüşdürür və əlavə dərslər qoyur — bütün qrup üçün və ya fərdi. Əlavə dərsin nömrəsi yoxdur, hətta müəllim onu «Dərs 2» adlandırsa belə: qrupun nömrələnməsini dəyişmir.
+
 ### Dərslərin müəllimi
 
-Qrupun əsas müəllimi var, hər dərsin isə öz müəllimi: adətən eyni, amma bir və ya bir neçə dərs üçün başqa müəllim təyin etmək mümkündür. Qrup səhifəsində **Dərslərin müəllimi** düyməsini basın və dərsdən hansı müəllimi seçin.
+Qrupun əsas müəllimi var, hər dərsin isə öz müəllimi: adətən eyni, amma bir və ya bir neçə dərs üçün başqa müəllim təyin etmək mümkündür. Qrup səhifəsində və ya admin bölməsinin «Qruplar» vərəqində qrupun sətrində **Dərslərin müəllimi** düyməsini basın və müəllimi, hansı dərsdən hansı dərsə qədər olduğunu seçin.
 
 - **Dəyişmə** — bir və ya bir neçə dərsi seçin. Qrupun əsas müəllimi dəyişmir. Dəyişən yalnız bu dərsləri görür və hər birində dərs günü gecə yarısına qədər işləyir, sonra dərs ona baxış üçün qalır.
 - **Qrupun ötürülməsi** — qrupun keçəcəyi dərsi seçin və "sonuna qədər". Müəllim əsas olur: bütün qrupu və onun bütün dərslərini alır, yeni dərslər onun adına yaradılır. Əvvəlki müəllim yalnız öz apardığı dərsləri görür və onlarda heç nəyi dəyişmir.
@@ -60,7 +71,9 @@ Ad, kurs, sektor, müəllim, videokonfrans, Telegram.
 
 - **+ Qrup əlavə et** — yeni qrup kurs və müəllim ilə.
 - Sətirə klikləyin — məlumatları dəyişmək mümkündür. Sətirdə müəllimin dəyişməsi bu gündən etibarən qüvvəyə minir: keçmiş dərslər onları aparan müəllimdə qalır.
-- **Qrup cədvəli** — qrup səhifəsini açın.
+- **Qrup cədvəli** (təqvim) — qrup səhifəsini açın.
+- **Cədvəl** — qrupun cədvəlini yaratmaq, silib yenidən yaratmaq, həftənin günlərinə görə otaqlar (yuxarıda «Qrupun cədvəli» bölməsi).
+- **Dərslərin müəllimi** — dərslərə əvəzetmə və qrupun ötürülməsi (yuxarıda «Dərslərin müəllimi» bölməsi).
 - **Arxivə göndər** — qrup artıq aktiv deyil; arxivdən onu **geri qaytarmaq** və ya **tamamilə silmək** mümkündür.
 
 ## Bilik bazası
@@ -127,7 +140,9 @@ Link vasitəsilə valideyn yalnız akademik göstəriciləri görür: dərslər,
 
 - **Şifrəni dəyişmək** (açar) — əgər şagird şifrəsini unutmuşdursa. Yeni şifrə sistemi ekranda göstərəcək, onu şagirdə bildirmək lazımdır.
 - **Silmək** (tullantı) — sistem şagirdlə bağlı olanları göstərəcək və təsdiq tələb edəcək.
-- Şagirdi başqa qrupa köçürmək və ya xaric etmək — qrup səhifəsində, **Şagirdlər** simgesi.
+- Şagirdi başqa qrupa köçürmək və ya xaric etmək — qrup səhifəsində, **Şagirdlər** simgesi: şagirdi yeni qrupa yazın və köhnə qrupdan xaric edin. Şagird eyni vaxtda iki qrupda da oxuya bilər.
+
+Şagirdləri administrator və kurator yaradır və onların məlumatlarını dəyişir. Müəllim şagird kartını yalnız oxumaq üçün görür, amma giriş verir: şagirdin login və şifrəsi, valideynin linki və girişi. Müəllim və kurator qrupa yalnız hazırda heç bir qrupda oxumayan şagirdləri yazır; başqa qrupdan olan şagirdi yalnız administrator yazır.
 
 ### Şagird üzrə hesabat
 

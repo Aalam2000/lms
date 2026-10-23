@@ -15,6 +15,9 @@ import { AccessBlock } from '../components/ParentLinkBlock';
 import { getSectors } from '../api/academy';
 import PushMark from '../components/PushMark';
 import { usePushUsers } from '../hooks/usePushUsers';
+import GroupScheduleModal from '../components/GroupScheduleModal';
+import LessonTeacherModal from '../components/LessonTeacherModal';
+import { getGroupLessons } from '../api/lessons';
 
 const emptyTeacher = { username: '', password: '', full_name: '', email: '', phone: '', telegram_username: '', whatsapp: '' };
 const emptyAdmin   = { username: '', password: '', full_name: '', email: '', phone: '', telegram_username: '', whatsapp: '' };
@@ -37,6 +40,9 @@ function AdminPage() {
   const [curators, setCurators] = useState([]);
   const [courses,  setCourses]  = useState([]);
   const [groups,   setGroups]   = useState([]);
+  // Окна по группе из строки таблицы «Группы»: расписание и педагог уроков
+  const [scheduleGroup, setScheduleGroup] = useState(null);
+  const [teacherGroup, setTeacherGroup] = useState(null); // { group, lessons }
   // Секторы — справочник с вкладки «Академия»: [{code, name, lesson_word}]
   const [sectors,  setSectors]  = useState([]);
 
@@ -420,6 +426,15 @@ function AdminPage() {
   // использования (DeleteButton, entity "user")
   const showError = (msg) => { setError(msg); setTimeout(() => setError(''), 4000); };
 
+  // «Педагог уроков»: окну нужны уроки группы
+  const openTeacherModal = async (group) => {
+    try {
+      setTeacherGroup({ group, lessons: await getGroupLessons(group.id) });
+    } catch (err) {
+      showError(err?.response?.data?.detail || 'Не удалось загрузить уроки группы');
+    }
+  };
+
   // Смена роли педагог ⇄ админ. Себе менять нельзя (кнопка неактивна, бэкенд тоже откажет).
   const changeRole = async (u, role) => {
     const name = u.full_name || u.username;
@@ -760,12 +775,24 @@ function AdminPage() {
                             />
                           </>
                         ) : (
-                          <IconButton
-                            icon="archive"
-                            tip="Отправить в архив"
-                            variant="warn"
-                            onClick={(e) => { e.stopPropagation(); archiveGroup(g); }}
-                          />
+                          <>
+                            <IconButton
+                              icon="schedule"
+                              tip="Расписание: создать, начать с урока N, аудитории по дням"
+                              onClick={(e) => { e.stopPropagation(); setScheduleGroup(g); }}
+                            />
+                            <IconButton
+                              icon="role"
+                              tip="Педагог уроков: замена, передача группы"
+                              onClick={(e) => { e.stopPropagation(); openTeacherModal(g); }}
+                            />
+                            <IconButton
+                              icon="archive"
+                              tip="Отправить в архив"
+                              variant="warn"
+                              onClick={(e) => { e.stopPropagation(); archiveGroup(g); }}
+                            />
+                          </>
                         )}
                       </div>
                     </td>
@@ -775,6 +802,22 @@ function AdminPage() {
             </table>
           </div>
         </div>
+      )}
+
+      {scheduleGroup && (
+        <GroupScheduleModal
+          group={scheduleGroup}
+          groups={groups.filter(g => g.status !== 'archived')}
+          onClose={() => setScheduleGroup(null)}
+        />
+      )}
+      {teacherGroup && (
+        <LessonTeacherModal
+          group={teacherGroup.group}
+          lessons={teacherGroup.lessons}
+          onClose={() => setTeacherGroup(null)}
+          onSaved={() => { setTeacherGroup(null); loadGroups(); }}
+        />
       )}
 
       {/* АКАДЕМИЯ: данные академии и секторы */}

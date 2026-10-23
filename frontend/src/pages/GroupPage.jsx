@@ -9,26 +9,26 @@ import QRModal from '../components/QRModal';
 import StudentsModal from '../components/StudentsModal';
 import GroupSettingsModal from '../components/GroupSettingsModal';
 import { GroupContactIcons } from '../components/ContactIcons';
-import DurationSelect from '../components/DurationSelect';
 import { DEFAULT_DURATION_MIN } from '../utils/lessonTime';
 import Calendar from '../components/Calendar';
 import DateTimePicker, { nextHour } from '../components/DateTimePicker';
 import { PersonalBadge, ParticipantsPicker } from '../components/PersonalLesson';
 import LessonTeacherModal from '../components/LessonTeacherModal';
+import GroupScheduleModal from '../components/GroupScheduleModal';
 import { useDaysOff } from '../hooks/useDaysOff';
-import { WEEKDAY_LABELS } from '../utils/weekdays';
 import { getMyGroups, getCourses } from '../api/groups';
 import { useHomeworkRefresh } from '../hooks/useHomeworkRefresh';
 import {
-  getGroupLessons, createLesson, generateSchedule,
-  fillGroupSchedule, deleteGroupLessons, markLessonHoliday, openGroupLessonsRange,
-  getGroupRoomDays, setGroupRoomDay,
+  getGroupLessons, createLesson,
+  fillGroupSchedule, markLessonHoliday, openGroupLessonsRange,
 } from '../api/lessons';
 
 function GroupPage() {
   const navigate = useNavigate();
-  const { hasRole, user } = useAuth();
+  const { hasRole, user, can } = useAuth();
   const isAdmin = hasRole('admin');
+  // Расписание группы (создать, удалить, аудитории по дням) — только право schedule.edit (админ)
+  const canSchedule = can('schedule.edit');
   const { groupId } = useParams();
   const gid = parseInt(groupId);
 
@@ -55,29 +55,8 @@ function GroupPage() {
   // Таблица/Календарь — выбор хранится в профиле (hooks/usePref.js)
   const [viewMode, setViewMode] = usePref('group.view', 'table'); // table | calendar
 
-  // Генератор расписания (claude/group-schedule-plan.md, задача 1)
-  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
-  // Первый урок серии: дата и время (минуты шагом 10); по умолчанию — сегодня, следующий час
-  const [genStart, setGenStart] = useState(nextHour);
-  const [genWeekdays, setGenWeekdays] = useState([]); // 0..6
-  const [genLessonCount, setGenLessonCount] = useState('');
-  const [genDuration, setGenDuration] = useState(DEFAULT_DURATION_MIN); // мин, одна на всю серию
-  const [genFillSource, setGenFillSource] = useState(''); // '' | template | group
-  const [genFillGroupId, setGenFillGroupId] = useState('');
-  const [genError, setGenError] = useState('');
-  // Серия попадает на выходные педагога: бэкенд предупредил (428), повторное
-  // нажатие с теми же параметрами создаёт уроки (backend/app/days_off.py)
-  const [genDaysOffWarned, setGenDaysOffWarned] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  // Диалог решения, если в группе уже есть уроки — см. handleOpenScheduleFlow
-  const [isExistingLessonsDialogOpen, setIsExistingLessonsDialogOpen] = useState(false);
-  const [isRecreating, setIsRecreating] = useState(false);
-
-  // «Аудитории по дням недели»: аудитория на каждый день недели — во все будущие уроки этого дня
-  const [roomDays, setRoomDays] = useState(null); // null — окно закрыто
-  const [roomDaysBusy, setRoomDaysBusy] = useState(false);
-  const [roomDaysError, setRoomDaysError] = useState('');
+  // Расписание группы (создать заново, аудитории по дням) — components/GroupScheduleModal.jsx
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
 
   // Дозаполнение/обновление материалов уже существующих уроков — и как
   // шаг после решения "уроки уже есть", и как отдельная кнопка
@@ -228,128 +207,25 @@ function GroupPage() {
     }
   };
 
-  // "Заполнить расписание" — если в группе уже есть уроки, сперва
-  // спрашиваем: удалить и пересоздать заново или оставить даты как есть и
-  // просто дозаполнить материалами (см. ответ Андрея в group-schedule-plan.md).
+  // «Расписание и материалы»: админ — окно расписания группы (GroupScheduleModal),
+  // педагог расписание не создаёт — только дозаполняет уроки материалами
   const handleOpenScheduleFlow = () => {
-    setGenError('');
     // Персональные уроки в расписание группы не входят
     const hasLessons = lessons.some(l => l.group_id === gid && !l.is_personal);
-    if (hasLessons) {
-      setIsExistingLessonsDialogOpen(true);
-    } else {
-      openGenerateModal();
-    }
-  };
-
-  const openGenerateModal = () => {
-    setGenStart(nextHour());
-    setGenWeekdays([]);
-    setGenLessonCount('');
-    setGenDuration(group?.lesson_duration_min || DEFAULT_DURATION_MIN);
-    setGenFillSource('');
-    setGenFillGroupId('');
-    setGenError('');
-    setGenDaysOffWarned('');
-    setIsGenerateModalOpen(true);
-  };
-
-  const toggleGenWeekday = (day) => {
-    setGenWeekdays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
-  };
-
-  const handleRecreateSchedule = async () => {
-    setIsRecreating(true);
-    setError('');
-    try {
-      await deleteGroupLessons(gid);
-      setLessons(prev => prev.filter(l => l.group_id !== gid));
-      setIsExistingLessonsDialogOpen(false);
-      openGenerateModal();
-    } catch (err) {
-      setError(err?.response?.data?.detail || 'Не удалось удалить уроки группы');
-    } finally {
-      setIsRecreating(false);
-    }
-  };
-
-  const loadRoomDays = () => getGroupRoomDays(gid)
-    .then(setRoomDays)
-    .catch(err => setRoomDaysError(err?.response?.data?.detail || 'Не удалось загрузить аудитории'));
-
-  const handleChooseRooms = () => {
-    setIsExistingLessonsDialogOpen(false);
-    setRoomDaysError('');
-    setRoomDays({ group_size: 0, days: [] });
-    loadRoomDays();
-  };
-
-  const handleSetRoomDay = async (weekday, roomId) => {
-    if (!roomId) return;
-    setRoomDaysBusy(true);
-    setRoomDaysError('');
-    try {
-      await setGroupRoomDay(gid, weekday, Number(roomId));
-      await loadRoomDays();
-    } catch (err) {
-      setRoomDaysError(err?.response?.data?.detail || 'Не удалось сохранить аудиторию');
-    } finally {
-      setRoomDaysBusy(false);
-    }
-  };
-
-  const handleChooseFillInstead = () => {
-    setIsExistingLessonsDialogOpen(false);
-    openFillModal();
-  };
-
-  const handleGenerateSchedule = async (e) => {
-    e.preventDefault();
-    if (!genStart || genWeekdays.length === 0 || !genLessonCount) {
-      setGenError('Заполните дату начала, время, дни недели и количество уроков');
-      return;
-    }
-    if (genFillSource === 'group' && !genFillGroupId) {
-      setGenError('Выберите группу-источник материалов');
-      return;
-    }
-
-    const payload = {
-      group_id: gid,
-      start_date: `${genStart.getFullYear()}-${String(genStart.getMonth() + 1).padStart(2, '0')}-${String(genStart.getDate()).padStart(2, '0')}`,
-      start_time: `${String(genStart.getHours()).padStart(2, '0')}:${String(genStart.getMinutes()).padStart(2, '0')}`,
-      weekdays: genWeekdays,
-      lesson_count: parseInt(genLessonCount, 10),
-      duration_min: genDuration,
-    };
-    if (genFillSource) {
-      payload.fill_source = genFillSource;
-      if (genFillSource === 'group') payload.fill_group_id = parseInt(genFillGroupId, 10);
-    }
-    const payloadKey = JSON.stringify(payload);
-
-    setIsGenerating(true);
-    setGenError('');
-    try {
-      const created = await generateSchedule({ ...payload, confirm_days_off: genDaysOffWarned === payloadKey });
-      setLessons(prev => [...prev, ...created]);
-      setIsGenerateModalOpen(false);
-    } catch (err) {
-      if (err?.response?.status === 428) setGenDaysOffWarned(payloadKey);
-      setGenError(err?.response?.data?.detail || 'Не удалось сгенерировать расписание');
-    } finally {
-      setIsGenerating(false);
-    }
+    if (canSchedule) setIsScheduleOpen(true);
+    else if (hasLessons) openFillModal();
+    else setError('Расписания у группы пока нет — его создаёт администратор');
   };
 
   // «Обновить материалы» — источник (шаблон курса группы / другая группа),
   // диапазон уроков, режим Дополнить/Заменить. См. course-templates-plan.md.
   const openFillModal = () => {
-    const groupLessonsCount = lessons.filter(l => l.group_id === gid && !l.is_personal).length;
+    // Диапазон — по настоящим номерам уроков (расписание может начинаться не с 1)
+    const orders = lessons.filter(l => l.group_id === gid && !l.is_personal).map(l => l.order);
     setFillSource('template');
     setFillGroupId('');
-    setFillRangeFrom('1');
-    setFillRangeTo(String(groupLessonsCount || 1));
+    setFillRangeFrom(String(orders.length ? Math.min(...orders) : 1));
+    setFillRangeTo(String(orders.length ? Math.max(...orders) : 1));
     setFillMode('add');
     setFillError('');
     setIsFillModalOpen(true);
@@ -722,155 +598,16 @@ function GroupPage() {
         </Modal>
       )}
 
-      {/* В группе уже есть уроки — выбор действия перед генерацией */}
-      {isExistingLessonsDialogOpen && (
-        <Modal
-          title={'В группе уже есть уроки'}
-          onClose={() => setIsExistingLessonsDialogOpen(false)}
-          footer={(
-            <button type="button" className="btn btn--secondary" onClick={() => setIsExistingLessonsDialogOpen(false)}>
-              {'Отмена'}
-            </button>
-          )}
-        >
-          <div className="form-stack">
-            <p>{'Что сделать с уже существующим расписанием этой группы?'}</p>
-            <button type="button" className="btn" onClick={handleRecreateSchedule} disabled={isRecreating}>
-              {isRecreating ? 'Удаление...' : 'Удалить и создать заново'}
-            </button>
-            <button type="button" className="btn btn--outline" onClick={handleChooseFillInstead}>
-              {'Оставить даты — дозаполнить материалами'}
-            </button>
-            <button type="button" className="btn btn--outline" onClick={handleChooseRooms}>
-              {'Аудитории по дням недели'}
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {/* Генератор расписания — claude/group-schedule-plan.md, задача 1 */}
-      {isGenerateModalOpen && (
-        <Modal
-          title={'Заполнить расписание'}
-          onClose={() => setIsGenerateModalOpen(false)}
-          footer={(
-            <>
-              <button type="button" className="btn btn--secondary" onClick={() => setIsGenerateModalOpen(false)}>
-                {'Отмена'}
-              </button>
-              <button type="submit" form="generate-schedule-form" className="btn" disabled={isGenerating}>
-                {isGenerating ? 'Создание...' : 'Создать уроки'}
-              </button>
-            </>
-          )}
-        >
-          <form id="generate-schedule-form" onSubmit={handleGenerateSchedule} className="form-stack">
-            <div className="field-label">
-              {'Дата первого урока и время (одно на все уроки)'}
-              <div>
-                <DateTimePicker value={genStart} onChange={setGenStart} floating />
-              </div>
-            </div>
-            <label className="field-label">
-              {'Длительность (одна на все уроки)'}
-              <DurationSelect value={genDuration} onChange={setGenDuration} />
-            </label>
-            <div className="field-label">
-              {'Дни недели'}
-              <div className="button-row">
-                {WEEKDAY_LABELS.map((label, day) => (
-                  <button
-                    type="button"
-                    key={day}
-                    className={`tab${genWeekdays.includes(day) ? ' tab--active' : ''}`}
-                    onClick={() => toggleGenWeekday(day)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <label className="field-label">
-              {'Количество уроков'}
-              <input
-                type="number"
-                min="1"
-                max="200"
-                className="input input--sm-num"
-                value={genLessonCount}
-                onChange={e => setGenLessonCount(e.target.value)}
-                required
-              />
-            </label>
-            <label className="field-label">
-              {'Материалы'}
-              <select className="input" value={genFillSource} onChange={e => setGenFillSource(e.target.value)}>
-                <option value="">{'Не заполнять сейчас'}</option>
-                <option value="template">{'Из шаблона курса группы'}</option>
-                <option value="group">{'Из другой группы'}</option>
-              </select>
-            </label>
-            {genFillSource === 'group' && (
-              <label className="field-label">
-                {'Группа-источник'}
-                <select className="input" value={genFillGroupId} onChange={e => setGenFillGroupId(e.target.value)}>
-                  <option value="">{'— Группа —'}</option>
-                  {groups.filter(g => g.id !== gid).map(g => (
-                    <option key={g.id} value={g.id}>{g.name}</option>
-                  ))}
-                </select>
-              </label>
-            )}
-
-            {genError && <div className="form-field__error">{genError}</div>}
-          </form>
-        </Modal>
+      {isScheduleOpen && (
+        <GroupScheduleModal
+          group={group}
+          groups={groups}
+          onFill={() => { setIsScheduleOpen(false); openFillModal(); }}
+          onClose={(changed) => { setIsScheduleOpen(false); if (changed) setReloadKey(k => k + 1); }}
+        />
       )}
 
       {/* Открыть / закрыть доступ к урокам с № по № */}
-      {roomDays && (
-        <Modal
-          title={'Аудитории по дням недели'}
-          onClose={() => setRoomDays(null)}
-          footer={(
-            <button type="button" className="btn btn--secondary" onClick={() => setRoomDays(null)}>
-              {'Закрыть'}
-            </button>
-          )}
-        >
-          <div className="form-stack">
-            <p className="text-muted">{'Аудитория записывается во все будущие уроки группы в этот день недели. Прошедшие уроки не меняются.'}</p>
-            {roomDaysError && <div className="error-text">{roomDaysError}</div>}
-            {roomDays.days.length === 0 && !roomDaysError && (
-              <p className="text-muted">{'У группы нет будущих уроков.'}</p>
-            )}
-            {roomDays.days.map(d => (
-              <label key={d.weekday} className="field-label">
-                <span>
-                  {WEEKDAY_LABELS[d.weekday]}{` · ${d.times.join(', ')} · `}{'уроков'}{`: ${d.lesson_count}`}
-                  {!d.room_id && <span className="error-text">{d.mixed ? ' — аудитории разные' : ' — аудитория не выбрана'}</span>}
-                </span>
-                <select
-                  className="input"
-                  value={d.room_id || ''}
-                  disabled={roomDaysBusy}
-                  onChange={e => handleSetRoomDay(d.weekday, e.target.value)}
-                >
-                  <option value="">{'— выберите аудиторию —'}</option>
-                  {d.rooms.map(r => (
-                    <option key={r.id} value={r.id}>
-                      {`${r.number} · мест ${r.capacity}`
-                        + (r.capacity < roomDays.group_size ? ` (в группе ${roomDays.group_size})` : '')
-                        + (r.busy_count > 0 ? ` · занята: ${r.busy_count} из ${d.lesson_count}` : ' · свободна')}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ))}
-          </div>
-        </Modal>
-      )}
-
       {isOpenRangeModalOpen && (
         <Modal
           title={'Открыть уроки'}

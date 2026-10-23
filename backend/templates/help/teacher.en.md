@@ -1,4 +1,4 @@
-<!-- autoi18n: source=teacher.md lang=en sha1=2d77b3cd877a099c99a198dd9ab12d031e87e52b -->
+<!-- autoi18n: source=teacher.md lang=en sha1=2909bda8949066aaec70e9d65d1fe760b9e6e2b5 -->
 # How to work on the platform
 
 ## My groups
@@ -16,8 +16,8 @@ If students have submitted answers to homework assignments, the group is highlig
 At the top of the group page — icons, the name of each is visible on hover:
 
 - **Group settings** (gear) — name, Telegram, WhatsApp, link to the video conference, and default lesson duration;
-- **QR for registration** — link and QR code, through which students register in the group themselves; you can also immediately add a student with a login and password;
-- **Students** (little people with a number) — group composition and phones: add a student through search, **edit** their data and parent data, expel (with a reason) or return from the archive. A red dash in the "Phone" column means the phone is not filled in.
+- **QR for registration** — link and QR code, through which students register in the group themselves;
+- **Students** (little people with a number) — group composition and phones: enrol a student in the group through search, view their data and parent data, expel (with a reason) or return from the archive. The search shows only students who are not currently studying in any group; a student from another group is transferred by the administrator. A red dash in the "Phone" column means the phone is not filled in.
 
 ### New Students (registration via QR)
 
@@ -26,7 +26,7 @@ A student who registered via the group's QR code does not join immediately but w
 - **Accept** — the student is immediately in the group; lessons up to this day are not counted as absences.
 - **Decline** — the application is deleted. If the student is not in any other group, their account is also deleted, and the phone number is freed up.
 
-Students that you add yourself (the "Add Student" button in the QR window or search in the students' window) do not wait for confirmation.
+Students that you enrol through search in the students' window do not wait for confirmation.
 
 Protection against unnecessary accounts: the phone number is checked against the phone plans of countries — a number with a non-existent operator code, incorrect length, or made up of the same digits is not accepted. You can register no more than 30 times per hour with one QR code. Registration via the QR code of an archived group is not allowed.
 
@@ -34,11 +34,13 @@ Protection against unnecessary accounts: the phone number is checked against the
 
 Lessons are visible as a **table** or **calendar** — two icons on the left. The filter — from today, from the beginning of the week, from the beginning of the month, or all.
 
-- **+ Lesson** — create one lesson: date, time, duration, and, if needed, your own title.
-- **Schedule and materials** (calendar with a plus) — create many lessons at once: date of the first lesson, time, duration, days of the week, number of lessons. Materials can be taken from the course template or from another group. If lessons already exist, you can leave the dates here and just pull in the materials.
+The group's schedule — lessons numbered 1, 2, 3… — is created by the administrator. The numbers are fixed to the lessons.
+
+- **+ Lesson** — an extra lesson for the whole group or a personal one: date, time, duration, and, if needed, your own title. An extra lesson has no number. You can name it, for example, "Lesson 2" if it replaces or adds to the second lesson — the group's numbering does not change.
+- **Schedule and materials** (calendar with a plus) — fill lessons with materials: from the course template or from another group, from lesson № to №. If the group has no schedule yet, the system will say so — it is created by the administrator.
 - **Open lessons** (lock) — open several lessons for students by numbers at once.
 - **Mark as holiday** — no lesson is held on this date: it and all subsequent lessons are shifted in the schedule.
-- **Weekends** are highlighted in red in the calendar. You can schedule a lesson on your own weekend. If the schedule falls on weekends, the system will show the dates — click **Create lessons** again to create lessons anyway.
+- **Weekends** are highlighted in red in the calendar. You can schedule a lesson on your own weekend.
 
 ### Personal Lesson
 
@@ -147,8 +149,9 @@ The colored bar under the name — the debt for the last issued Homework: orange
 
 In the "Absences" column — only unresolved absences without a Valid reason. A red ring around the number of absences — the student missed the last group lesson and did not attend the personal lesson afterward. The ring appears the day after the lesson. It disappears when the personal lesson is completed and the student is marked as "Attended" or "Online," or when the student attends the next group lesson; an absence for a Valid reason does not give a ring.
 
-- **+ Student** — add a new student directly to your group: first name and last name, phone, parent details. The login is created automatically (first name, dot, three letters of the last name, and numbers — for example, `murad.ali47`), the password initially equals the login. After saving, the student's card will open with the **Student Access** block: platform address, login and password, **Copy** and **Send via WhatsApp** buttons. If the student has changed the password and forgotten it — **Reset to login**.
-- **Student and Parent Data** (pencil) — change the first name, phone, email, messengers, parent’s name and phone.
+New students are added by the administrator and the curator; the login is created automatically (first name, dot, three letters of the last name, and numbers — for example, `murad.ali47`), the password initially equals the login.
+
+- **Student details** (pencil) — view the data; the administrator or the curator can change it. The card has the **Student access** block: platform address, login and password, **Copy** and **Send via WhatsApp** buttons; if the student has changed the password and forgotten it — **Reset to login**. The parent's link is there too.
 - **Change Password** (key) — if the student has forgotten the password.
 
 - **Additional Lesson** (calendar with a plus) — personal lesson for this student: date and time. If the student is not yet in the group (sent by the curator — in the "Group" column marked "without group"), select a group — the student will be enrolled in it.

@@ -1,4 +1,4 @@
-<!-- autoi18n: source=curator.md lang=az sha1=35c923ce2827b8964afed02fe46eefcd3a5291a4 -->
+<!-- autoi18n: source=curator.md lang=az sha1=0d53dcb4cba32dadc49f52634dd119089ab969dd -->
 # Müəllim necə işləməlidir
 
 Müəllim şagirdləri akademiyaya gətirir və onları müəllimlərə təqdim edir.
@@ -22,6 +22,8 @@ Akademiyanın bütün şagirdləri — administratorun gördüyü kimi: müəlli
 - **Qələm** — şagirdin və valideynin məlumatları.
 - **Açar** — şifrəni dəyişmək.
 - **Əlavə dərs** — şagirdə fərdi dərs; əgər onun qrupu yoxdursa, onu seçin — şagird ora yazılacaq.
+
+Siz yeni şagirdləri yaradır və onları qrupa yazırsınız. Artıq başqa qrupda oxuyan şagirdi yalnız administrator yazır.
 - Şagirdin adı — onun üzrə hesabat.
 
 ## Auditoriyalar
