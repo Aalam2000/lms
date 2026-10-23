@@ -61,6 +61,7 @@
   --avatar-sm: 32px;               /* шапка */
   --avatar-md: 48px;               /* карточки */
   --avatar-lg: 160px;              /* профиль */
+  --avatar-zoom: 200px;            /* увеличенная копия при наведении (фото хранится 256×256) */
   --color-avatar-bg: #E6EDF7;      /* фон кружка с инициалами */
   --color-avatar-text: var(--color-info);
   --overlay-photo: rgba(32, 30, 29, 0.45);       /* «Изменить» поверх фото */

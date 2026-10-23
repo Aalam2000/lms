@@ -3496,6 +3496,25 @@ a.row-icon:hover {
 .avatar--xs.avatar--initials,
 .avatar--sm.avatar--initials { font-size: var(--font-xs); }
 .avatar--lg.avatar--initials { font-size: var(--font-xl); }
+/* Увеличенная копия при наведении: место задаёт Avatar.jsx (--zoom-left/top),
+   до расчёта места копия невидима */
+.avatar-zoom {
+  position: fixed;
+  left: var(--zoom-left, 0);
+  top: var(--zoom-top, 0);
+  z-index: 1100;
+  width: var(--avatar-zoom);
+  height: var(--avatar-zoom);
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+  border: 3px solid var(--color-white);
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+  visibility: hidden;
+}
+.avatar-zoom--shown {
+  visibility: visible;
+}
 /* Фото + имя в строке таблицы или списка */
 .person {
   display: inline-flex;
