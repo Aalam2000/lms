@@ -36,7 +36,7 @@ Uploaded files are stored on the host as `<type>/<uuid>` (names only in the DB, 
 The folder is mounted into the backend container at the same path. Create it once, owned by the deploy user:
 - `sudo install -d -o quizadm -g quizadm -m 700 /var/lib/logacademy/data`
 
-`scripts/deploy-prod.sh` refuses to deploy if the folder is missing or not writable; `scripts/backup.sh` archives it as `files.tar.gz`.
+`quiz deploy` (`scripts/quiz.sh`) refuses to deploy if the folder is missing or not writable; `scripts/backup.sh` archives it as `files.tar.gz`.
 
 ### 1.3 Pre-deploy health checks
 - Postgres service is active:
@@ -65,11 +65,12 @@ The folder is mounted into the backend container at the same path. Create it onc
 
 ## 4) Production deploy from Git
 
-- Script: `scripts/deploy-prod.sh`
-- Usage:
-  - `chmod +x scripts/deploy-prod.sh`
-  - `./scripts/deploy-prod.sh main`
-- The script does:
+- Script: `scripts/quiz.sh` — server control command; `quiz` without arguments lists all commands (deploy, status, log, restart, precheck, backup, csp, load).
+- Install once (works from any folder, Tab-completes):
+  - `chmod +x /var/www/quiz/scripts/quiz.sh`
+  - `sudo ln -sfn /var/www/quiz/scripts/quiz.sh /usr/local/bin/quiz`
+- Deploy: `quiz deploy` (branch `master` by default, `quiz deploy <branch>` for another)
+- `quiz deploy` does:
   - `git fetch origin`
   - `git reset --hard origin/<branch>`
   - `docker compose -f docker-compose.prod.yml up -d --build --remove-orphans`

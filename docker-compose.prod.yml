@@ -13,7 +13,7 @@ services:
     build:
       context: ./backend
       # контейнер работает под uid/gid того, кто деплоит (quizadm) —
-      # см. scripts/deploy-prod.sh и backend/Dockerfile
+      # см. scripts/quiz.sh и backend/Dockerfile
       args:
         APP_UID: ${APP_UID:-1000}
         APP_GID: ${APP_GID:-1000}
@@ -33,7 +33,7 @@ services:
       - ./frontend/src:/app/frontend/src:ro
       - ./.env.prod:/app/.env
       # файлы платформы (app/storage.py) — папка сервера, создаётся один раз
-      # при установке (DEPLOYMENT.md), deploy-prod.sh проверяет её до выкатки
+      # при установке (DEPLOYMENT.md), quiz deploy проверяет её до выкатки
       - /var/lib/logacademy/data:/var/lib/logacademy/data
 
   frontend:
