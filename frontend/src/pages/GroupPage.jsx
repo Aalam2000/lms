@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router';
+import { useBack } from '../hooks/useBack';
 import Modal from '../components/Modal';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
@@ -25,6 +26,7 @@ import {
 
 function GroupPage() {
   const navigate = useNavigate();
+  const back = useBack();
   const { hasRole, user, can } = useAuth();
   const isAdmin = hasRole('admin');
   // Расписание группы (создать, удалить, аудитории по дням) — только право schedule.edit (админ)
@@ -327,7 +329,7 @@ function GroupPage() {
   if (!group) {
     return (
       <div className="page">
-        <button className="btn btn--outline" onClick={() => navigate('/dashboard')}>
+        <button className="btn btn--outline" onClick={() => back('/dashboard')}>
           {'Назад'}
         </button>
         <div className="error-text error-text--muted">
@@ -342,7 +344,7 @@ function GroupPage() {
       {/* Шапка группы в одну строку: «Назад», название/курс/педагог — слева; контакты и значки (настройки, QR, ученики) — справа */}
       <div className="group-header">
         <div className="group-header__left">
-          <button className="btn btn--outline" onClick={() => navigate('/dashboard')}>
+          <button className="btn btn--outline" onClick={() => back('/dashboard')}>
             {'Назад'}
           </button>
           {/* Название и курс — в одну строку, чтобы шапка была ниже */}

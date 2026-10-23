@@ -17,6 +17,7 @@ from ..dependencies import has_perm, require, require_admin
 from ..phones import checked_student_phone, normalize_phone, phone_key, PHONE_FORMAT_ERROR, PHONE_REQUIRED_ERROR
 from ..report_common import resolve_period
 from ..student_report import build_student_report
+from ..lesson_teacher import is_group_teacher
 from ..models import (
     Course, Group, GroupMember, HomeworkAnswer, HomeworkAnswerFile, HomeworkTask, Lesson, LessonMark,
     LessonMessage, User, UserSession,
@@ -416,7 +417,22 @@ async def get_student_report(
             own_lessons_of[gid] = current_user.id
     if not sees_all and not groups:
         raise HTTPException(status_code=403, detail="Этот студент не в ваших группах")
-    return await build_student_report(db, student, groups, report_period, own_lessons_of)
+    report = await build_student_report(db, student, groups, report_period, own_lessons_of)
+    # Урок в списке открывается кликом — у того, кому он доступен
+    # (lesson_teacher.can_view_lesson): админ, основной педагог группы,
+    # педагог, который вёл урок. Куратору уроки не открываются.
+    lesson_ids = [r["id"] for r in report.get("lessons", [])]
+    access = {}
+    if lesson_ids:
+        access = {lid: is_group_teacher(group_teacher_id, current_user) or lesson_teacher_id == current_user.id
+                  for lid, lesson_teacher_id, group_teacher_id in (await db.execute(
+                      select(Lesson.id, Lesson.teacher_id, Group.teacher_id)
+                      .join(Group, Group.id == Lesson.group_id)
+                      .where(Lesson.id.in_(lesson_ids))
+                  )).all()}
+    for r in report.get("lessons", []):
+        r["can_open"] = access.get(r["id"], False)
+    return report
 
 
 # Смена пароля ученика педагогом (ученик забыл пароль): без старого пароля.

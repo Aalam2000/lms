@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
+import { useBack } from '../hooks/useBack';
 import { getMethodologyTree, getMethodologyDoc } from '../api/methodology';
 import { useLang } from '../hooks/useLang';
 import { useInternalLinks } from '../hooks/useInternalLinks';
@@ -15,6 +16,7 @@ import { useInternalLinks } from '../hooks/useInternalLinks';
 // На адрес материала можно ссылаться из других материалов и из помощи.
 function MethodologyPage() {
   const { section, slug } = useParams();
+  const back = useBack();
   const { lang } = useLang();
   const handleLinkClick = useInternalLinks();
   const [tree, setTree] = useState([]);
@@ -50,7 +52,7 @@ function MethodologyPage() {
     return (
       <div className="page methodology">
         <div className="methodology__back">
-          <Link to="/dashboard/methodology" className="btn btn--outline">{'Назад'}</Link>
+          <button type="button" className="btn btn--outline" onClick={() => back('/dashboard/methodology')}>{'Назад'}</button>
         </div>
         {loading && <div className="table__empty">{'Загрузка...'}</div>}
         {error && <div className="error-text error-text--muted">{error}</div>}

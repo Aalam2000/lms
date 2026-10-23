@@ -3,7 +3,8 @@
 // фразой, период в цифрах, показатели с оценкой, главное и уроки. Цифры, статусы и
 // нормы считает бэкенд (backend/app/student_report.py), формулировки — здесь.
 import React, { useEffect, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
+import { useBack } from '../hooks/useBack';
 import { getStudentReport } from '../api/students';
 import { extractErrorMessage } from '../utils/errors';
 import Avatar from '../components/Avatar';
@@ -107,9 +108,7 @@ function Homework({ lesson }) {
 
 function StudentReportPage() {
   const { studentId } = useParams();
-  const navigate = useNavigate();
-  // Откуда пришли (журнал урока передаёт свой адрес) — туда и «Назад»
-  const backTo = useLocation().state?.from || '/dashboard/students';
+  const back = useBack();
   const [period, setPeriod] = useState(defaultPeriod);
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -148,7 +147,7 @@ function StudentReportPage() {
   return (
     <div className="page">
       <ReportToolbar
-        onBack={() => navigate(backTo)}
+        onBack={() => back('/dashboard/students')}
         period={period}
         onPeriod={setPeriod}
         allLabel={'С начала обучения'}
@@ -304,7 +303,13 @@ function StudentReportPage() {
                     {lessons.map(l => (
                       <tr key={l.id}>
                         <td className="nowrap">{shortDate(l.date)}</td>
-                        <td>{l.is_personal && <>{'👤'} </>}{l.title}</td>
+                        <td>
+                          {l.is_personal && <>{'👤'} </>}
+                          {/* Урок открывается тому, кому доступен (can_open — routers/students.py) */}
+                          {l.can_open
+                            ? <Link className="link" to={`/dashboard/lessons/${l.id}`} data-tip="Открыть урок">{l.title}</Link>
+                            : l.title}
+                        </td>
                         <td className="nowrap"><Attendance lesson={l} /></td>
                         <td className="report__value">{l.score ?? '—'}</td>
                         {hasExams && <td className="report__value">{l.exam_score ?? '—'}</td>}

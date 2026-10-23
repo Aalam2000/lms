@@ -7,6 +7,7 @@ import { PersonalBadge } from '../components/PersonalLesson';
 import LessonFeedback from '../components/LessonFeedback';
 import Avatar from '../components/Avatar';
 import { useLocation, useNavigate, useParams } from 'react-router';
+import { useBack } from '../hooks/useBack';
 import { TYPE_META, formatSize, subtypeLabel, resourceKey, needsPdfPreview, isPresentation, openSlides } from '../utils/libraryItems';
 import { extractErrorMessage } from '../utils/errors';
 import { useAuth } from '../context/AuthContext';
@@ -23,6 +24,7 @@ import { useHomeworkRefresh } from '../hooks/useHomeworkRefresh';
 function StudentLessonPage() {
   const { lessonId } = useParams();
   const navigate = useNavigate();
+  const back = useBack();
   const { user } = useAuth();
 
   const [lesson, setLesson] = useState(null);
@@ -148,7 +150,7 @@ function StudentLessonPage() {
     <div className="page">
       <div className="toolbar">
         <div className="lesson-toolbar__info">
-          <button className="btn btn--outline" onClick={() => navigate('/dashboard')}>
+          <button className="btn btn--outline" onClick={() => back('/dashboard')}>
             {'Назад'}
           </button>
           {lesson.group_name && (

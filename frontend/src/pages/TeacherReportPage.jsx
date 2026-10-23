@@ -3,7 +3,8 @@
 // выставляет себе сам. Цифры, статусы и нормы считает бэкенд
 // (backend/app/teacher_report.py), формулировки — здесь.
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useParams } from 'react-router';
+import { useBack } from '../hooks/useBack';
 import { getTeacherReport } from '../api/admin';
 import { extractErrorMessage } from '../utils/errors';
 import Avatar from '../components/Avatar';
@@ -83,7 +84,7 @@ function indicatorRow(ind, norms) {
 
 function TeacherReportPage() {
   const { teacherId } = useParams();
-  const navigate = useNavigate();
+  const back = useBack();
   const [period, setPeriod] = useState(defaultPeriod);
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -110,7 +111,7 @@ function TeacherReportPage() {
   return (
     <div className="page">
       <ReportToolbar
-        onBack={() => navigate('/dashboard/teachers')}
+        onBack={() => back('/dashboard/teachers')}
         period={period}
         onPeriod={setPeriod}
         allLabel={'С начала преподавания'}

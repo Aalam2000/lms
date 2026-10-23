@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
+import { useBack } from '../hooks/useBack';
 import DateTimePicker, { formatDateTime } from '../components/DateTimePicker';
 import { formatDuration, DEFAULT_DURATION_MIN } from '../utils/lessonTime';
 import LibraryPickerModal from '../components/LibraryPickerModal';
@@ -47,6 +48,7 @@ const LATE_STATUSES = new Set(['in_person', 'online']);
 function LessonPage() {
   const { lessonId } = useParams();
   const navigate = useNavigate();
+  const back = useBack();
   const location = useLocation();
 
   // ?view=students — сразу журнал (ссылка «Проверь работы» из шапки)
@@ -622,7 +624,7 @@ function LessonPage() {
     <div className="page">
       <div className="toolbar">
         <div className="lesson-toolbar__info">
-          <button className="btn btn--outline" onClick={() => navigate(`/dashboard/groups/${lesson.group_id}`)}>
+          <button className="btn btn--outline" onClick={() => back(`/dashboard/groups/${lesson.group_id}`)}>
             {'Назад'}
           </button>
           {canManage ? (
@@ -1054,8 +1056,8 @@ function LessonPage() {
                             <td>
                               <span className="person">
                                 <Avatar userId={row.student_id} photoUrl={row.photo_url} name={row.full_name} size="xs" />
-                                {/* Отчёт по ученику; «Назад» из него вернёт в этот урок */}
-                                <Link className="link" to={`/dashboard/students/${row.student_id}/report`} state={{ from: `/dashboard/lessons/${lessonId}` }} data-tip="Отчёт по ученику">
+                                {/* Отчёт по ученику; «Назад» из него вернёт в этот урок (hooks/useBack.js) */}
+                                <Link className="link" to={`/dashboard/students/${row.student_id}/report`} data-tip="Отчёт по ученику">
                                   {row.full_name}
                                 </Link>
                               </span>
