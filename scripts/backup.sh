@@ -10,7 +10,7 @@ set -euo pipefail
 # одинаково и для ручного запуска, и для таймера.
 export TZ="${TZ:-Asia/Baku}"
 
-PROJECT_DIR="${PROJECT_DIR:-/var/www/quiz}"
+PROJECT_DIR="${PROJECT_DIR:-/var/www/lms}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/logacademy}"
 KEEP_DAYS="${KEEP_DAYS:-14}"
 FILES_DIR="${FILES_DIR:-/var/lib/logacademy/data}"

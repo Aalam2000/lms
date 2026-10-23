@@ -24,8 +24,11 @@
   - `port = 5433`
 - In `pg_hba.conf` allow app access from host/private docker network only, for example:
   - `host all all 127.0.0.1/32 scram-sha-256`
-  - `host all all <DOCKER_BRIDGE_CIDR> scram-sha-256`
+  - `host all all 172.18.0.0/16 scram-sha-256` — the platform's Docker network (`lms_default`, fixed in `docker-compose.prod.yml`: bridge `br-lms`, subnet `172.18.0.0/16`)
 - Reload config: `sudo systemctl reload postgresql`
+- Firewall: allow the database (and the NetDiag report) only from the platform's Docker bridge:
+  - `sudo ufw allow in on br-lms to any port 5433`
+  - `sudo ufw allow in on br-lms to any port 8090 proto tcp`
 
 #### Memory settings
 - `sudo pg_conftool 18 main set shared_buffers 512MB` (restart required)
@@ -67,8 +70,8 @@ The folder is mounted into the backend container at the same path. Create it onc
 
 - Script: `scripts/lms.sh` — server control command; `lms` without arguments lists all commands (deploy, status, log, restart, precheck, backup, csp, load).
 - Install once (works from any folder, Tab-completes):
-  - `chmod +x /var/www/quiz/scripts/lms.sh`
-  - `sudo ln -sfn /var/www/quiz/scripts/lms.sh /usr/local/bin/lms`
+  - `chmod +x /var/www/lms/scripts/lms.sh`
+  - `sudo ln -sfn /var/www/lms/scripts/lms.sh /usr/local/bin/lms`
   - Tab completion of commands and services: `echo 'eval "$(/usr/local/bin/lms completion)"' | sudo tee /etc/bash_completion.d/lms` (takes effect on next login)
 - Deploy: `lms deploy` (branch `master` by default, `lms deploy <branch>` for another)
 - `lms deploy` does:

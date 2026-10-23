@@ -2,7 +2,7 @@
 # Файл пишет nginx-контейнер, поэтому copytruncate: файл обрезается на месте,
 # дескриптор nginx остаётся валидным, перезапуск контейнера не нужен.
 # Установка: sudo cp deploy/logrotate/logacademy /etc/logrotate.d/logacademy
-/var/www/quiz/logs/nginx-fail2ban/*.log {
+/var/www/lms/logs/nginx-fail2ban/*.log {
     su root root
     weekly
     maxsize 20M

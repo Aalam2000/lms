@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # lms — управление платформой на прод-сервере. Запуск из любой папки:
-# ссылка /usr/local/bin/lms → /var/www/quiz/scripts/lms.sh.
+# ссылка /usr/local/bin/lms → /var/www/lms/scripts/lms.sh.
 # Без аргументов — список команд с пояснениями.
 set -euo pipefail
 

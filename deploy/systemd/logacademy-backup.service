@@ -12,7 +12,7 @@ After=network-online.target docker.service postgresql.service
 Type=oneshot
 User=quizadm
 Group=quizadm
-Environment=PROJECT_DIR=/var/www/quiz
+Environment=PROJECT_DIR=/var/www/lms
 # имена папок и время в backup.log — по Баку
 Environment=TZ=Asia/Baku
-ExecStart=/bin/bash /var/www/quiz/scripts/backup.sh
+ExecStart=/bin/bash /var/www/lms/scripts/backup.sh

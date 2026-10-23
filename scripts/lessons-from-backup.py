@@ -29,7 +29,7 @@ import tarfile
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-PROJECT_DIR = Path(os.environ.get("PROJECT_DIR", "/var/www/quiz"))
+PROJECT_DIR = Path(os.environ.get("PROJECT_DIR", "/var/www/lms"))
 BACKUP_DIR = Path(os.environ.get("BACKUP_DIR", "/var/backups/logacademy"))
 BAKU = timezone(timedelta(hours=4))
 PRESENT = {"in_person": "очно", "online": "онлайн"}

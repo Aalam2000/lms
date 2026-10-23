@@ -4,8 +4,8 @@
 # Данные — из истории sysstat (один замер = среднее за 10 минут).
 # Скрипт только читает, на сервере ничего не меняет.
 #
-#   bash /var/www/quiz/scripts/load-report.sh       # за последние сутки
-#   bash /var/www/quiz/scripts/load-report.sh 7     # за последние 7 суток
+#   bash /var/www/lms/scripts/load-report.sh       # за последние сутки
+#   bash /var/www/lms/scripts/load-report.sh 7     # за последние 7 суток
 set -euo pipefail
 
 DAYS="${1:-1}"
