@@ -40,7 +40,10 @@ deploy_failed() {
 
 main() {
 BRANCH="${1:-master}"
-PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+# Папка проекта — по расположению самого скрипта (scripts/ внутри проекта),
+# а не текущая папка: скрипт можно запускать откуда угодно, в т. ч. по ссылке
+# ~/.local/bin/deploy-prod (readlink -f раскрывает ссылку до настоящего файла).
+PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)}"
 
 cd "$PROJECT_DIR"
 
