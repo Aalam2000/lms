@@ -4,35 +4,31 @@ import Modal from '../components/Modal';
 import { ContactIcon } from '../components/ContactIcons';
 import IconButton from '../components/IconButton';
 import DeleteButton from '../components/DeleteButton';
-import PasswordModal from '../components/PasswordModal';
-import DaysOffEditor from '../components/DaysOffEditor';
 import * as adminApi from '../api/admin';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
 import AcademyTab from '../components/AcademyTab';
-import { AccessBlock } from '../components/ParentLinkBlock';
 import { getSectors } from '../api/academy';
 import PushMark from '../components/PushMark';
 import { usePushUsers } from '../hooks/usePushUsers';
 import { GroupAdminModal } from '../components/GroupScheduleModal';
+import UserCardModal from '../components/UserCardModal';
 
-const emptyTeacher = { username: '', password: '', full_name: '', email: '', phone: '', telegram_username: '', whatsapp: '' };
-const emptyAdmin   = { username: '', password: '', full_name: '', email: '', phone: '', telegram_username: '', whatsapp: '' };
-// Куратор: логин и пароль генерирует бэкенд (пароль = логину)
-const emptyCurator = { full_name: '', phone: '', email: '', telegram_username: '', whatsapp: '' };
 const emptyCourse  = { title: '', description: '' };
 
-const emptyUserEdit = { full_name: '', email: '', phone: '', telegram_username: '', whatsapp: '' };
 const emptyCourseEdit = { title: '', description: '' };
+const ROLE_LABELS = { admin: 'Админ', teacher: 'Педагог', curator: 'Куратор' };
 
 function AdminPage() {
   const { user: currentUser } = useAuth();
   const pushUsers = usePushUsers(); // кто разрешил уведомления
-  const [tab, setTab] = useState('teachers');
+  const [tab, setTab] = useState('users');
 
-  const [teachers, setTeachers] = useState([]);
-  const [admins,   setAdmins]   = useState([]);
-  const [curators, setCurators] = useState([]);
+  // Пользователи — админы, педагоги, кураторы одной вкладкой
+  const [users, setUsers] = useState([]);
+  const [userFilter, setUserFilter] = useState('all'); // all | admin | teacher | curator
+  // Карточка пользователя: { user } — клик по строке, { user: null } — «+ Добавить пользователя»
+  const [userModal, setUserModal] = useState(null);
   const [courses,  setCourses]  = useState([]);
   const [groups,   setGroups]   = useState([]);
   // «Настройка группы»: { group } — клик по строке, { group: null } — «+ Добавить группу»
@@ -40,29 +36,10 @@ function AdminPage() {
   // Секторы — справочник с вкладки «Академия»: [{code, name, lesson_word}]
   const [sectors,  setSectors]  = useState([]);
 
-  const [newTeacher, setNewTeacher] = useState(emptyTeacher);
-  const [newAdmin,   setNewAdmin]   = useState(emptyAdmin);
-  const [newCurator, setNewCurator] = useState(emptyCurator);
   const [newCourse,  setNewCourse]  = useState(emptyCourse);
 
-  // Модалка «Добавить»: null | 'teacher' | 'admin' | 'course' | 'group'
+  // Модалка «Добавить»: null | 'course'
   const [openAddModal, setOpenAddModal] = useState(null);
-
-  const [editingTeacherId, setEditingTeacherId] = useState(null);
-  const [editingTeacherDraft, setEditingTeacherDraft] = useState(emptyUserEdit);
-  const [isSavingTeacher, setIsSavingTeacher] = useState(false);
-  const teachersTableRef = useRef(null);
-
-  const [editingAdminId, setEditingAdminId] = useState(null);
-  const [editingAdminDraft, setEditingAdminDraft] = useState(emptyUserEdit);
-  const [isSavingAdmin, setIsSavingAdmin] = useState(false);
-  const adminsTableRef = useRef(null);
-
-  const [editingCuratorId, setEditingCuratorId] = useState(null);
-  const [editingCuratorDraft, setEditingCuratorDraft] = useState(emptyUserEdit);
-  const [isSavingCurator, setIsSavingCurator] = useState(false);
-  const curatorsTableRef = useRef(null);
-  const [accessUser, setAccessUser] = useState(null); // куратор: окно «Доступ» (логин и пароль)
 
   const [editingCourseId, setEditingCourseId] = useState(null);
   const [editingCourseDraft, setEditingCourseDraft] = useState(emptyCourseEdit);
@@ -71,25 +48,16 @@ function AdminPage() {
 
 
   const [error, setError] = useState('');
-  const [passwordUser, setPasswordUser] = useState(null); // кому админ меняет пароль
-  const [daysOffUser, setDaysOffUser] = useState(null); // чьи выходные админ правит
 
   useEffect(() => {
     loadAll();
   }, []);
 
-  // Клик по строке таблицы открывает её поля для редактирования, клик
-  // мимо таблицы (в любой вкладке) сохраняет черновик. Один обработчик
-  // на все 4 вкладки — ветвимся по активной.
+  // Курсы: клик по строке открывает её поля для редактирования, клик мимо
+  // таблицы сохраняет черновик.
   useEffect(() => {
     const handleDocumentMouseDown = (event) => {
-      if (tab === 'teachers' && editingTeacherId !== null && !isSavingTeacher) {
-        if (!teachersTableRef.current?.contains(event.target)) saveEditingTeacher();
-      } else if (tab === 'admins' && editingAdminId !== null && !isSavingAdmin) {
-        if (!adminsTableRef.current?.contains(event.target)) saveEditingAdmin();
-      } else if (tab === 'curators' && editingCuratorId !== null && !isSavingCurator) {
-        if (!curatorsTableRef.current?.contains(event.target)) saveEditingCurator();
-      } else if (tab === 'courses' && editingCourseId !== null && !isSavingCourse) {
+      if (tab === 'courses' && editingCourseId !== null && !isSavingCourse) {
         if (!coursesTableRef.current?.contains(event.target)) saveEditingCourse();
       }
     };
@@ -98,24 +66,17 @@ function AdminPage() {
     return () => document.removeEventListener('mousedown', handleDocumentMouseDown);
   }, [
     tab,
-    editingTeacherId, editingTeacherDraft, isSavingTeacher,
-    editingAdminId, editingAdminDraft, isSavingAdmin,
-    editingCuratorId, editingCuratorDraft, isSavingCurator,
     editingCourseId, editingCourseDraft, isSavingCourse,
   ]);
 
   const loadAll = () => {
-    loadTeachers();
-    loadAdmins();
-    loadCurators();
+    loadUsers();
     loadCourses();
     loadGroups();
     loadSectors();
   };
 
-  const loadTeachers = async () => setTeachers(await adminApi.getTeachers());
-  const loadAdmins   = async () => setAdmins(await adminApi.getAdmins());
-  const loadCurators = async () => setCurators(await adminApi.getCurators());
+  const loadUsers    = async () => setUsers(await adminApi.getUsers());
   const loadCourses  = async () => setCourses(await adminApi.getCourses());
   const loadGroups   = async () => setGroups(await adminApi.getGroups());
   const loadSectors  = async () => { setSectors(await getSectors()); };
@@ -128,41 +89,7 @@ function AdminPage() {
 
   const closeAddModal = () => {
     setOpenAddModal(null);
-    setNewTeacher(emptyTeacher);
-    setNewAdmin(emptyAdmin);
-    setNewCurator(emptyCurator);
     setNewCourse(emptyCourse);
-  };
-
-  const createTeacher = async () => {
-    try {
-      await adminApi.createTeacher({ ...newTeacher, role: 'teacher' });
-      closeAddModal();
-      loadTeachers();
-    } catch(e) { handleError(e); }
-  };
-
-  const createAdmin = async () => {
-    try {
-      await adminApi.createAdmin({ ...newAdmin, role: 'admin' });
-      closeAddModal();
-      loadAdmins();
-    } catch(e) { handleError(e); }
-  };
-
-  // Новый куратор: после создания сразу окно «Доступ» — скопировать или отправить логин и пароль
-  const createCurator = async () => {
-    if (!newCurator.full_name.trim()) {
-      setError('Укажите имя и фамилию');
-      setTimeout(() => setError(''), 4000);
-      return;
-    }
-    try {
-      const saved = await adminApi.createCurator(newCurator);
-      closeAddModal();
-      await loadCurators();
-      setAccessUser(saved);
-    } catch(e) { handleError(e); }
   };
 
   const createCourse = async () => {
@@ -191,87 +118,6 @@ function AdminPage() {
     catch(e) { handleError(e); }
   };
 
-  // ── inline-редактирование: педагоги ──
-  const startEditTeacher = (u) => {
-    if (editingTeacherId === u.id) return;
-    if (isSavingTeacher) return;
-    setEditingTeacherId(u.id);
-    setEditingTeacherDraft({
-      full_name: u.full_name || '',
-      email: u.email || '',
-      phone: u.phone || '',
-      telegram_username: u.telegram_username || '',
-      whatsapp: u.whatsapp || '',
-    });
-  };
-  const saveEditingTeacher = async () => {
-    if (editingTeacherId === null || isSavingTeacher) return;
-    try {
-      setIsSavingTeacher(true);
-      const saved = await adminApi.updateTeacher(editingTeacherId, editingTeacherDraft);
-      setTeachers(prev => prev.map(u => u.id === editingTeacherId ? saved : u));
-      setEditingTeacherId(null);
-    } catch (e) {
-      handleError(e);
-    } finally {
-      setIsSavingTeacher(false);
-    }
-  };
-
-  // ── inline-редактирование: админы ──
-  const startEditAdmin = (u) => {
-    if (editingAdminId === u.id) return;
-    if (isSavingAdmin) return;
-    setEditingAdminId(u.id);
-    setEditingAdminDraft({
-      full_name: u.full_name || '',
-      email: u.email || '',
-      phone: u.phone || '',
-      telegram_username: u.telegram_username || '',
-      whatsapp: u.whatsapp || '',
-    });
-  };
-  const saveEditingAdmin = async () => {
-    if (editingAdminId === null || isSavingAdmin) return;
-    try {
-      setIsSavingAdmin(true);
-      const saved = await adminApi.updateAdmin(editingAdminId, editingAdminDraft);
-      setAdmins(prev => prev.map(u => u.id === editingAdminId ? saved : u));
-      setEditingAdminId(null);
-    } catch (e) {
-      handleError(e);
-    } finally {
-      setIsSavingAdmin(false);
-    }
-  };
-
-  // ── inline-редактирование: кураторы ──
-  const startEditCurator = (u) => {
-    if (editingCuratorId === u.id) return;
-    if (isSavingCurator) return;
-    setEditingCuratorId(u.id);
-    setEditingCuratorDraft({
-      full_name: u.full_name || '',
-      email: u.email || '',
-      phone: u.phone || '',
-      telegram_username: u.telegram_username || '',
-      whatsapp: u.whatsapp || '',
-    });
-  };
-  const saveEditingCurator = async () => {
-    if (editingCuratorId === null || isSavingCurator) return;
-    try {
-      setIsSavingCurator(true);
-      const saved = await adminApi.updateCurator(editingCuratorId, editingCuratorDraft);
-      setCurators(prev => prev.map(u => u.id === editingCuratorId ? saved : u));
-      setEditingCuratorId(null);
-    } catch (e) {
-      handleError(e);
-    } finally {
-      setIsSavingCurator(false);
-    }
-  };
-
   // ── inline-редактирование: курсы ──
   const startEditCourse = (c) => {
     if (editingCourseId === c.id) return;
@@ -297,17 +143,14 @@ function AdminPage() {
   };
 
   const tabs = [
-    { key: 'teachers', label: 'Педагоги' },
-    { key: 'admins',   label: 'Админы' },
-    { key: 'curators', label: 'Кураторы' },
+    { key: 'users',    label: 'Пользователи' },
     { key: 'courses',  label: 'Курсы' },
     { key: 'groups',   label: 'Группы' },
     { key: 'academy',  label: 'Компания' },
   ];
 
-  const teachersForGroups = [...teachers, ...admins].filter(
-    (user, index, arr) => arr.findIndex(u => u.id === user.id) === index
-  );
+  // Вести группы могут педагоги и админы
+  const teachersForGroups = users.filter(u => u.role === 'teacher' || u.role === 'admin');
 
   const sectorLabel = (code) => sectors.find(s => s.code === code)?.name || code || '—';
   const courseLabelById = (courseId) => courses.find(c => c.id === courseId)?.title || `#${courseId}`;
@@ -316,159 +159,13 @@ function AdminPage() {
     return user?.full_name || user?.username || `#${teacherId}`;
   };
 
-  const userFields = (data, setData) => [
-    ['username',          'Логин',    'text'],
-    ['password',          'Пароль',   'password'],
-    ['full_name',         'Полное имя', 'text'],
-    ['email',             'Email',    'text'],
-    ['phone',             'Телефон',  'text'],
-    ['telegram_username', 'Telegram', 'text'],
-    ['whatsapp',           'WhatsApp', 'text'],
-  ].map(([field, label, type]) => (
-    <input key={field} placeholder={label} className="input input--min160"
-      type={type} autoComplete={field === 'username' || field === 'password' ? 'new-password' : 'off'}
-      value={data[field]}
-      onChange={e => setData({ ...data, [field]: e.target.value })}
-    />
-  ));
-
   // del: {path, reload, tip} — удаление через общую кнопку с контролем
   // использования (DeleteButton, entity "user")
   const showError = (msg) => { setError(msg); setTimeout(() => setError(''), 4000); };
 
-  // Смена роли педагог ⇄ админ. Себе менять нельзя (кнопка неактивна, бэкенд тоже откажет).
-  const changeRole = async (u, role) => {
-    const name = u.full_name || u.username;
-    if (!window.confirm(role === 'admin' ? `Сделать админом: ${name}?` : `Перевести в педагоги: ${name}?`)) return;
-    try {
-      await adminApi.setUserRole(u.id, role);
-      await Promise.all([loadTeachers(), loadAdmins()]);
-    } catch (e) { handleError(e); }
-  };
-  const userTable = (list, del, editingId, editingDraft, setEditingDraft, onRowClick, tableRef) => (
-    <div className="table-scroll" ref={tableRef}>
-      <table className="table">
-        <thead><tr>
-          <th>{'Имя'}</th>
-          <th>{'Логин'}</th>
-          <th>{'Email'}</th>
-          <th>{'Телефон'}</th>
-          <th>{'Telegram'}</th>
-          <th>{'WhatsApp'}</th>
-          <th></th>
-        </tr></thead>
-        <tbody>
-          {list.map(u => (
-            <tr key={u.id} onClick={() => onRowClick(u)} className="table__row--clickable">
-              <td>
-                {editingId === u.id ? (
-                  <input className="input input--min160" value={editingDraft.full_name}
-                    onChange={e => setEditingDraft({ ...editingDraft, full_name: e.target.value })}
-                  />
-                ) : (
-                  <>
-                    <span className="person">
-                      <Avatar userId={u.id} photoUrl={u.photo_url} name={u.full_name || u.username} size="xs" />
-                      {u.full_name}
-                    </span>
-                    {pushUsers.has(u.id) && <PushMark />}
-                  </>
-                )}
-              </td>
-              <td>{u.username}</td>
-              <td>
-                {editingId === u.id ? (
-                  <input className="input input--min160" value={editingDraft.email}
-                    onChange={e => setEditingDraft({ ...editingDraft, email: e.target.value })}
-                  />
-                ) : u.email}
-              </td>
-              <td>
-                {editingId === u.id ? (
-                  <input className="input input--min160" value={editingDraft.phone}
-                    onChange={e => setEditingDraft({ ...editingDraft, phone: e.target.value })}
-                  />
-                ) : u.phone}
-              </td>
-              <td>
-                {editingId === u.id ? (
-                  <input className="input input--min160" value={editingDraft.telegram_username}
-                    onChange={e => setEditingDraft({ ...editingDraft, telegram_username: e.target.value })}
-                  />
-                ) : u.telegram_username}
-              </td>
-              <td>
-                {editingId === u.id ? (
-                  <input className="input input--min160" value={editingDraft.whatsapp}
-                    onChange={e => setEditingDraft({ ...editingDraft, whatsapp: e.target.value })}
-                  />
-                ) : u.whatsapp}
-              </td>
-              <td>
-                {/* stopPropagation: клик по строке включает правку — кнопкам это не нужно */}
-                <div className="icon-row" onClick={e => e.stopPropagation()}>
-                  {/* У куратора пароль по умолчанию = логину: вместо смены пароля — окно «Доступ» */}
-                  {del.toRole ? (
-                    <IconButton icon="key" tip="Сменить пароль" onClick={() => setPasswordUser(u)} />
-                  ) : (
-                    <IconButton icon="key" tip="Логин и пароль" onClick={() => setAccessUser(u)} />
-                  )}
-                  {del.toRole === 'admin' && (
-                    <IconButton icon="schedule" tip="Выходные" onClick={() => setDaysOffUser(u)} />
-                  )}
-                  {!del.toRole ? null : u.id === currentUser?.id ? (
-                    <IconButton icon="role" tip="Нельзя сменить роль самому себе" disabled />
-                  ) : del.toRole === 'admin' ? (
-                    <IconButton icon="role" tip="Сделать админом" onClick={() => changeRole(u, 'admin')} />
-                  ) : (
-                    <IconButton icon="role" tip="Сделать педагогом" onClick={() => changeRole(u, 'teacher')} />
-                  )}
-                  <DeleteButton
-                    entity="user"
-                    id={u.id}
-                    name={u.full_name || u.username}
-                    tip={del.tip}
-                    onDelete={() => del.remove(u.id)}
-                    onDeleted={del.reload}
-                    onError={showError}
-                  />
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-
   return (
     <div className="page">
       {error && <div className="banner banner--error">{error}</div>}
-
-      {passwordUser && (
-        <PasswordModal
-          user={passwordUser}
-          save={(password) => adminApi.setUserPassword(passwordUser.id, password)}
-          onClose={() => setPasswordUser(null)}
-        />
-      )}
-
-      {accessUser && (
-        <Modal title={<>{'Логин и пароль'}: {accessUser.full_name || accessUser.username}</>} onClose={() => { setAccessUser(null); loadCurators(); }}>
-          <AccessBlock
-            username={accessUser.username}
-            phone={accessUser.phone}
-            passwordIsLogin={!!accessUser.password_is_login}
-            onReset={() => adminApi.setUserPassword(accessUser.id, accessUser.username)}
-          />
-        </Modal>
-      )}
-
-      {daysOffUser && (
-        <Modal title={<>{'Выходные'}: {daysOffUser.full_name || daysOffUser.username}</>} onClose={() => setDaysOffUser(null)} size="wide">
-          <DaysOffEditor teacherId={daysOffUser.id} onSaved={() => setDaysOffUser(null)} />
-        </Modal>
-      )}
 
       <div className="tabs-row">
         {tabs.map(tb => (
@@ -479,37 +176,79 @@ function AdminPage() {
         ))}
       </div>
 
-      {/* ПЕДАГОГИ */}
-      {tab === 'teachers' && (
+      {/* ПОЛЬЗОВАТЕЛИ: админы, педагоги, кураторы. Клик по строке — карточка */}
+      {tab === 'users' && (
         <div>
           <div className="toolbar">
-            <h3 className="toolbar__title">{'Список педагогов'}</h3>
-            <Button onClick={() => setOpenAddModal('teacher')}>{'+ Добавить педагога'}</Button>
+            <h3 className="toolbar__title">{'Пользователи'}</h3>
+            <div className="icon-row">
+              {[['all', 'Все'], ['admin', 'Админы'], ['teacher', 'Педагоги'], ['curator', 'Кураторы']].map(([key, label]) => (
+                <button key={key} type="button" className={`tab${userFilter === key ? ' tab--active' : ''}`} onClick={() => setUserFilter(key)}>
+                  {label}
+                </button>
+              ))}
+              <Button onClick={() => setUserModal({ user: null })}>{'+ Добавить пользователя'}</Button>
+            </div>
           </div>
-          {userTable(teachers, { remove: adminApi.deleteTeacher, reload: loadTeachers, tip: 'Удалить педагога', toRole: 'admin' }, editingTeacherId, editingTeacherDraft, setEditingTeacherDraft, startEditTeacher, teachersTableRef)}
+          <div className="table-scroll">
+            <table className="table">
+              <thead><tr>
+                <th>{'Имя'}</th>
+                <th>{'Роль'}</th>
+                <th>{'Логин'}</th>
+                <th>{'Телефон'}</th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+              </tr></thead>
+              <tbody>
+                {users.filter(u => userFilter === 'all' || u.role === userFilter).length === 0 && (
+                  <tr><td colSpan="8" className="table__empty">{'Пользователей нет'}</td></tr>
+                )}
+                {users.filter(u => userFilter === 'all' || u.role === userFilter).map(u => (
+                  <tr key={u.id} onClick={() => setUserModal({ user: u })} className="table__row--clickable"
+                    data-tip={'Карточка пользователя'}>
+                    <td>
+                      <span className="person">
+                        <Avatar userId={u.id} photoUrl={u.photo_url} name={u.full_name || u.username} size="xs" />
+                        {u.full_name}
+                      </span>
+                      {pushUsers.has(u.id) && <PushMark />}
+                    </td>
+                    <td><span className={`badge badge--role badge--${u.role}`}>{ROLE_LABELS[u.role] || u.role}</span></td>
+                    <td>{u.username}</td>
+                    <td>{u.phone}</td>
+                    <td className="table__icon-col">{u.telegram_username ? <ContactIcon type="telegram" value={u.telegram_username} /> : null}</td>
+                    <td className="table__icon-col">{u.whatsapp ? <ContactIcon type="whatsapp" value={u.whatsapp} /> : null}</td>
+                    <td className="table__icon-col">{u.email ? <ContactIcon type="email" value={u.email} /> : null}</td>
+                    <td className="table__icon-col" onClick={e => e.stopPropagation()}>
+                      {u.id !== currentUser?.id && (
+                        <DeleteButton
+                          entity="user"
+                          id={u.id}
+                          name={u.full_name || u.username}
+                          tip={'Удалить пользователя'}
+                          onDelete={() => adminApi.deleteUser(u.id)}
+                          onDeleted={loadUsers}
+                          onError={showError}
+                        />
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
-      {/* АДМИНЫ */}
-      {tab === 'admins' && (
-        <div>
-          <div className="toolbar">
-            <h3 className="toolbar__title">{'Список администраторов'}</h3>
-            <Button onClick={() => setOpenAddModal('admin')}>{'+ Добавить администратора'}</Button>
-          </div>
-          {userTable(admins, { remove: adminApi.deleteAdmin, reload: loadAdmins, tip: 'Удалить админа', toRole: 'teacher' }, editingAdminId, editingAdminDraft, setEditingAdminDraft, startEditAdmin, adminsTableRef)}
-        </div>
-      )}
-
-      {/* КУРАТОРЫ */}
-      {tab === 'curators' && (
-        <div>
-          <div className="toolbar">
-            <h3 className="toolbar__title">{'Список кураторов'}</h3>
-            <Button onClick={() => setOpenAddModal('curator')}>{'+ Добавить куратора'}</Button>
-          </div>
-          {userTable(curators, { remove: adminApi.deleteCurator, reload: loadCurators, tip: 'Удалить куратора', toRole: null }, editingCuratorId, editingCuratorDraft, setEditingCuratorDraft, startEditCurator, curatorsTableRef)}
-        </div>
+      {userModal && (
+        <UserCardModal
+          user={userModal.user}
+          currentUserId={currentUser?.id}
+          onClose={(changed) => { setUserModal(null); if (changed) loadUsers(); }}
+        />
       )}
 
       {/* КУРСЫ */}
@@ -654,60 +393,6 @@ function AdminPage() {
       {/* АКАДЕМИЯ: данные академии и секторы */}
       {tab === 'academy' && (
         <AcademyTab sectors={sectors} onSectorsChanged={loadSectors} onError={showError} />
-      )}
-
-      {/* Модалка: новый педагог */}
-      {openAddModal === 'teacher' && (
-        <Modal title={'Новый педагог'} onClose={closeAddModal} footer={(
-          <>
-            <button className="btn btn--secondary" onClick={closeAddModal}>{'Отмена'}</button>
-            <Button onClick={createTeacher}>{'Добавить'}</Button>
-          </>
-        )}>
-          <div className="form-stack">
-            {userFields(newTeacher, setNewTeacher)}
-          </div>
-        </Modal>
-      )}
-
-      {/* Модалка: новый администратор */}
-      {openAddModal === 'admin' && (
-        <Modal title={'Новый администратор'} onClose={closeAddModal} footer={(
-          <>
-            <button className="btn btn--secondary" onClick={closeAddModal}>{'Отмена'}</button>
-            <Button onClick={createAdmin}>{'Добавить'}</Button>
-          </>
-        )}>
-          <div className="form-stack">
-            {userFields(newAdmin, setNewAdmin)}
-          </div>
-        </Modal>
-      )}
-
-      {/* Модалка: новый куратор — логин и пароль создадутся сами */}
-      {openAddModal === 'curator' && (
-        <Modal title={'Новый куратор'} onClose={closeAddModal} footer={(
-          <>
-            <button className="btn btn--secondary" onClick={closeAddModal}>{'Отмена'}</button>
-            <Button onClick={createCurator}>{'Добавить'}</Button>
-          </>
-        )}>
-          <div className="form-stack">
-            {[
-              ['full_name',         'Имя и фамилия'],
-              ['phone',             'Телефон'],
-              ['email',             'Email'],
-              ['telegram_username', 'Telegram'],
-              ['whatsapp',          'WhatsApp'],
-            ].map(([field, label]) => (
-              <input key={field} placeholder={label} className="input input--min160" autoComplete="off"
-                value={newCurator[field]}
-                onChange={e => setNewCurator({ ...newCurator, [field]: e.target.value })}
-              />
-            ))}
-            <div className="hint-text">{'Логин и пароль создадутся сами: имя.3 буквы фамилии и цифры, пароль равен логину.'}</div>
-          </div>
-        </Modal>
       )}
 
       {/* Модалка: новый курс */}

@@ -400,6 +400,134 @@ async def delete_admin(user_id: int, db: AsyncSession = Depends(get_db), admin: 
     await db.commit()
     return {"detail": "Удалён"}
 
+# ── ПОЛЬЗОВАТЕЛИ: админы, педагоги, кураторы — одна вкладка и одна карточка ──
+# Роль переключается в карточке (себе — нельзя). Логин и пароль новому
+# пользователю создаются сами, как у учеников (security.make_login, пароль =
+# логину), админ может их поправить при создании. Телефон обязателен и в базе
+# не повторяется. Куратором нельзя сделать того, кто ведёт группы или уроки.
+
+STAFF_ROLES = ("admin", "teacher", "curator")
+
+
+class StaffOut(UserOut):
+    password_is_login: bool = False
+
+
+class StaffIn(BaseModel):
+    role: str
+    full_name: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    telegram_username: Optional[str] = None
+    whatsapp: Optional[str] = None
+    username: Optional[str] = None   # только при создании; пусто — создастся из имени
+    password: Optional[str] = None   # только при создании; пусто — равен логину
+
+
+def _staff_out(user: User) -> StaffOut:
+    out = StaffOut.model_validate(user)
+    out.password_is_login = verify_password(user.username, user.hashed_password)
+    return out
+
+
+def _clean(value: Optional[str]) -> Optional[str]:
+    return (value or "").strip() or None
+
+
+def _check_staff(data: StaffIn) -> tuple[str, str]:
+    if data.role not in STAFF_ROLES:
+        raise HTTPException(status_code=400, detail="Недопустимая роль")
+    full_name = (data.full_name or "").strip()
+    if not full_name:
+        raise HTTPException(status_code=422, detail="Укажите имя и фамилию")
+    phone = _clean(data.phone)
+    if not phone:
+        raise HTTPException(status_code=422, detail="Укажите телефон")
+    return full_name, phone
+
+
+@router.get("/users", response_model=list[StaffOut])
+async def get_staff(db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)):
+    rows = (await db.execute(
+        select(User).where(User.role.in_(STAFF_ROLES)).order_by(User.full_name, User.username)
+    )).scalars().all()
+    return [_staff_out(u) for u in rows]
+
+
+@router.get("/login-suggestion")
+async def suggest_login(full_name: str, db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)):
+    """Свободный логин по имени — карточка подставляет его в поле «Логин» (и «Пароль»)."""
+    return {"username": await make_login(db, full_name)}
+
+
+@router.post("/users", response_model=StaffOut)
+async def create_staff(data: StaffIn, db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)):
+    full_name, phone = _check_staff(data)
+    username = (data.username or "").strip()
+    if username:
+        if (await db.execute(select(User.id).where(func.lower(User.username) == username.lower()))).first():
+            raise HTTPException(status_code=400, detail="Такой логин уже занят")
+    else:
+        username = await make_login(db, full_name)
+    await ensure_phone_free(db, phone)  # номер в базе не повторяется
+    user = User(
+        username=username,
+        hashed_password=get_password_hash(data.password or username),
+        full_name=full_name,
+        email=_clean(data.email),
+        phone=phone,
+        telegram_username=_clean(data.telegram_username),
+        whatsapp=_clean(data.whatsapp),
+        role=data.role,
+        created_by=admin.id,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return _staff_out(user)
+
+
+@router.patch("/users/{user_id}", response_model=StaffOut)
+async def update_staff(
+    user_id: int, data: StaffIn, db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin),
+):
+    full_name, phone = _check_staff(data)
+    user = (await db.execute(select(User).where(User.id == user_id, User.role.in_(STAFF_ROLES)))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    if data.role != user.role:
+        if user.id == admin.id:
+            raise HTTPException(status_code=400, detail="Нельзя сменить роль самому себе")
+        if data.role == "curator":
+            teaches = (await db.execute(select(Group.id).where(Group.teacher_id == user.id).limit(1))).first() \
+                or (await db.execute(select(Lesson.id).where(Lesson.teacher_id == user.id).limit(1))).first()
+            if teaches:
+                raise HTTPException(status_code=409, detail="Пользователь ведёт группы или уроки — сначала передайте их другому педагогу")
+        user.role = data.role
+    await ensure_phone_free(db, phone, exclude_user_id=user.id)  # номер в базе не повторяется
+    user.full_name = full_name
+    user.phone = phone
+    user.email = _clean(data.email)
+    user.telegram_username = _clean(data.telegram_username)
+    user.whatsapp = _clean(data.whatsapp)
+    await db.commit()
+    await db.refresh(user)
+    return _staff_out(user)
+
+
+@router.delete("/users/{user_id}")
+async def delete_staff(user_id: int, db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)):
+    user = (await db.execute(select(User).where(User.id == user_id, User.role.in_(STAFF_ROLES)))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    if user.id == admin.id:
+        raise HTTPException(status_code=400, detail="Нельзя удалить самого себя")
+    await ensure_not_used(db, "user", user_id)
+    await db.delete(user)
+    await db.commit()
+    return {"detail": "Удалён"}
+
+
 # ── КУРАТОРЫ (claude/curator-plan.md, шаг 3) ──
 # Логин генерируется из ФИО (security.make_login), пароль = логину; админ
 # выдаёт их куратору кнопками «Скопировать / Отправить». Телефон в базе не

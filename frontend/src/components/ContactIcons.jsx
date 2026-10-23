@@ -36,7 +36,7 @@ export function videoHref(value) {
 }
 
 // Один значок контакта: цветной и кликабельный, если значение задано,
-// серый с подсказкой «не указан» — если пусто. type: video | telegram | whatsapp.
+// серый с подсказкой «не указан» — если пусто. type: video | telegram | whatsapp | email.
 const CONTACT_TYPES = {
   // Залитая видеокамера на синем — чтобы не путалась с зелёным WhatsApp и голубым Telegram
   video: {
@@ -70,6 +70,19 @@ const CONTACT_TYPES = {
       <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
       <path d="M12 2a10 10 0 0 0-8.5 15.2L2 22l4.9-1.5A10 10 0 1 0 12 2Zm4.9 14.1c-.5.6-1.6 1.2-1.8 1.2-.5.1-.9.3-3.1-.6-2.6-1-4.3-3.7-4.4-3.8-.1-.2-1-1.4-1-2.6 0-1.2.7-1.8.9-2.1.2-.3.5-.3.7-.3.2 0 .4 0 .6.5.3.5.8 1.9.9 2 .1.1.1.3 0 .4-.1.1-.1.3-.2.4l-.4.5c-.1.1-.3.3-.1.6.1.3.7 1.2 1.5 1.9 1 .9 1.9 1.3 2.2 1.4.3.2.5.1.6 0 .1-.1.6-.7.8-1 .2-.2.3-.2.6-.1.3.1 1.6.8 1.9.9.3.2.5.3.6.4 0 .1 0 .6-.2 1.2Z" />
     </svg>
+    ),
+  },
+  // Почта — серый конверт, клик открывает письмо (mailto:)
+  email: {
+    href: (v) => { const x = (v || '').trim(); return x.includes('@') ? `mailto:${x}` : null; },
+    label: 'Email',
+    emptyTip: 'Email не указан',
+    className: 'row-icon--mail',
+    svg: (
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="3" y="5" width="18" height="14" rx="1" />
+        <path d="m3 6 9 7 9-7" />
+      </svg>
     ),
   },
 };

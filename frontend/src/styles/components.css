@@ -1292,6 +1292,10 @@ span.month-grid__day:not(.month-grid__day--off):hover {
 .row-icon--video {
   background: #2d6cdf;
 }
+/* Почта — серый: вторичный канал связи */
+.row-icon--mail {
+  background: var(--color-muted);
+}
 .row-icon--disabled {
   background: var(--color-bg-muted);
   color: var(--color-muted);
@@ -3860,4 +3864,39 @@ a.row-icon:hover {
   text-align: center;
   padding-left: 3px;
   padding-right: 3px;
+}
+
+/* ===== Карточка пользователя (components/UserCardModal.jsx): переключатель роли ===== */
+.role-switch {
+  display: inline-flex;
+  border: 1px solid var(--color-primary-border);
+}
+.role-switch__btn {
+  height: 34px;
+  padding: 0 16px;
+  border: 0;
+  border-right: 1px solid var(--color-primary-border);
+  background: var(--color-white);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+.role-switch__btn:last-child {
+  border-right: 0;
+}
+.role-switch__btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.role-switch__btn--on.role-switch__btn--admin {
+  background: var(--color-danger);
+  color: var(--color-white);
+}
+.role-switch__btn--on.role-switch__btn--teacher {
+  background: var(--color-info);
+  color: var(--color-white);
+}
+.role-switch__btn--on.role-switch__btn--curator {
+  background: var(--color-role-curator);
+  color: var(--color-white);
 }

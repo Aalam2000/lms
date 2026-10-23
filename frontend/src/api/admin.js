@@ -159,3 +159,28 @@ export function getRoomsReport(dateFrom, dateTo) {
     params: { date_from: dateFrom.toISOString(), date_to: dateTo.toISOString() },
   }).then(res => res.data);
 }
+
+// Пользователи — админы, педагоги, кураторы одной вкладкой (role в данных):
+// [{id, username, full_name, role, phone, email, telegram_username, whatsapp, photo_url, password_is_login}]
+export function getUsers() {
+  return api.get('/admin/users').then(res => res.data);
+}
+
+// Свободный логин по имени — для поля «Логин» новой карточки
+export function suggestLogin(fullName) {
+  return api.get('/admin/login-suggestion', { params: { full_name: fullName } }).then(res => res.data.username);
+}
+
+// data: {role, full_name, phone, email, telegram_username, whatsapp, username?, password?}
+export function createUser(data) {
+  return api.post('/admin/users', data).then(res => res.data);
+}
+
+// Те же поля (без логина и пароля); смена роли — полем role
+export function updateUser(id, data) {
+  return api.patch(`/admin/users/${id}`, data).then(res => res.data);
+}
+
+export function deleteUser(id) {
+  return api.delete(`/admin/users/${id}`).then(res => res.data);
+}
