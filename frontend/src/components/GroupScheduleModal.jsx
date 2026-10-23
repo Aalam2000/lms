@@ -426,7 +426,9 @@ function WeekPlan({ weeks, setWeeks, rooms, groupSize, firstWeekHint }) {
                       <TimeSelect value={d.end} onChange={v => update(wi, day, { end: v })} />
                     </span>
                     <span className="week-plan__room">
-                      <select className="input" value={d.room_id} onChange={e => update(wi, day, { room_id: e.target.value })}>
+                      <select className={`input${d.room_id ? '' : ' week-plan__room-empty'}`} value={d.room_id}
+                        data-tip={d.room_id ? undefined : 'Аудитория не выбрана'}
+                        onChange={e => update(wi, day, { room_id: e.target.value })}>
                         <option value="">{'— аудитория —'}</option>
                         {(info?.rooms || []).map(r => (
                           <option key={r.id} value={r.id}>
@@ -436,7 +438,6 @@ function WeekPlan({ weeks, setWeeks, rooms, groupSize, firstWeekHint }) {
                           </option>
                         ))}
                       </select>
-                      {!d.room_id && <span className="error-text">{'не выбрана'}</span>}
                       {d.room_id && (info?.rooms || []).some(r => String(r.id) === d.room_id && r.capacity < groupSize) && (
                         <span className="week-plan__over">{`мест меньше, чем учеников (${groupSize})`}</span>
                       )}

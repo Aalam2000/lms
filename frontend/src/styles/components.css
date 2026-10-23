@@ -3829,6 +3829,12 @@ a.row-icon:hover {
   align-items: center;
   gap: 4px 6px;
 }
+/* Аудитория у дня не выбрана — поле красное */
+.group-form .week-plan__room-empty {
+  border-color: var(--color-danger);
+  background: var(--color-danger-bg-light);
+  color: var(--color-danger-text);
+}
 .week-plan__over {
   color: var(--color-warning);
   font-size: 12px;
