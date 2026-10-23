@@ -196,6 +196,8 @@ class ScheduleGenerate(BaseModel):
     fill_group_id: Optional[int] = None  # обязателен при fill_source == "group"
     # Педагог сам ставит серию на свои выходные — подтвердил повторным нажатием (app/days_off.py)
     confirm_days_off: bool = False
+    # Аудитория на каждый день недели серии: {день недели: id аудитории}; без записи — без аудитории
+    rooms: dict[int, int] = {}
 
 
 # Дозаполнение/обновление материалов уже существующих уроков по шаблону
@@ -617,6 +619,65 @@ async def create_lesson(
     return (await with_unreviewed_flag(db, [lesson], current_user))[0]
 
 
+def _series_dates(data: "ScheduleGenerate") -> list[datetime]:
+    """Даты уроков серии (по Баку): с start_date по выбранным дням недели, lesson_count штук."""
+    try:
+        hh, mm = (int(part) for part in data.start_time.split(":"))
+        if not (0 <= hh <= 23 and 0 <= mm <= 59):
+            raise ValueError
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Неверный формат времени, ожидается ЧЧ:ММ")
+
+    weekday_set = set(data.weekdays)
+    if not weekday_set.issubset(set(range(7))):
+        raise HTTPException(status_code=422, detail="День недели должен быть числом от 0 (Пн) до 6 (Вс)")
+
+    dates: list[datetime] = []
+    cursor = data.start_date
+    # Предохранитель от зацикливания при некорректных входных данных —
+    # не более (запрошено уроков × 30 + год) дней вперёд.
+    safety_limit = data.lesson_count * 30 + 365
+    steps = 0
+    while len(dates) < data.lesson_count and steps < safety_limit:
+        if cursor.weekday() in weekday_set:
+            dates.append(datetime(cursor.year, cursor.month, cursor.day, hh, mm, tzinfo=BAKU_TZ))
+        cursor += timedelta(days=1)
+        steps += 1
+
+    if len(dates) < data.lesson_count:
+        raise HTTPException(status_code=422, detail="Не удалось подобрать достаточно дат — проверьте дни недели и период")
+    return dates
+
+
+async def _fill_from_source(
+    db: AsyncSession, group: Group, lessons_by_order: dict[int, Lesson],
+    fill_source: str, fill_group_id: Optional[int], current_user: User,
+) -> None:
+    """Материалы новым урокам серии: из шаблона курса группы или из другой группы (по номеру урока)."""
+    await db.flush()  # нужны id уроков для привязки ресурсов ниже
+    if fill_source == "template":
+        if not group.course_id or not group.sector:
+            raise HTTPException(status_code=400, detail="У группы не указан курс или сектор — заполнение из шаблона невозможно")
+        positions = await _collect_template_positions(db, group.course_id, group.sector)
+    elif fill_source == "group":
+        if not fill_group_id:
+            raise HTTPException(status_code=422, detail="Укажите группу-источник материалов")
+        source_lessons = await db.execute(select(Lesson).where(Lesson.group_id == fill_group_id))
+        positions = {}
+        for source_lesson in source_lessons.scalars().all():
+            res_rows = await db.execute(
+                select(LessonResource.resource_type, LessonResource.resource_id)
+                .where(LessonResource.lesson_id == source_lesson.id)
+            )
+            items = res_rows.all()
+            if items:
+                positions[source_lesson.order] = [(rt, rid) for rt, rid in items]
+    else:
+        raise HTTPException(status_code=422, detail="Недопустимый источник материалов")
+
+    await _apply_positions_to_lessons(db, lessons_by_order, positions, mode="add", current_user=current_user)
+
+
 # Генератор расписания (claude/group-schedule-plan.md, задача 1). Требует
 # пустую группу (без уроков) — если уроки уже есть, фронт сперва спрашивает
 # педагога "удалить и пересоздать или дозаполнить материалами" и в первом
@@ -648,31 +709,12 @@ async def generate_schedule(
             detail="В группе уже есть уроки — удалите их (DELETE /lessons/group/{id}) либо дозаполните материалами вместо генерации",
         )
 
-    try:
-        hh, mm = (int(part) for part in data.start_time.split(":"))
-        if not (0 <= hh <= 23 and 0 <= mm <= 59):
-            raise ValueError
-    except ValueError:
-        raise HTTPException(status_code=422, detail="Неверный формат времени, ожидается ЧЧ:ММ")
-
-    weekday_set = set(data.weekdays)
-    if not weekday_set.issubset(set(range(7))):
-        raise HTTPException(status_code=422, detail="День недели должен быть числом от 0 (Пн) до 6 (Вс)")
-
-    dates: list[datetime] = []
-    cursor = data.start_date
-    # Предохранитель от зацикливания при некорректных входных данных —
-    # не более (запрошено уроков × 30 + год) дней вперёд.
-    safety_limit = data.lesson_count * 30 + 365
-    steps = 0
-    while len(dates) < data.lesson_count and steps < safety_limit:
-        if cursor.weekday() in weekday_set:
-            dates.append(datetime(cursor.year, cursor.month, cursor.day, hh, mm, tzinfo=BAKU_TZ))
-        cursor += timedelta(days=1)
-        steps += 1
-
-    if len(dates) < data.lesson_count:
-        raise HTTPException(status_code=422, detail="Не удалось подобрать достаточно дат — проверьте дни недели и период")
+    dates = _series_dates(data)
+    if data.rooms:
+        room_ids = set(data.rooms.values())
+        found = set((await db.execute(select(Room.id).where(Room.id.in_(room_ids)))).scalars().all())
+        if room_ids - found:
+            raise HTTPException(status_code=404, detail="Аудитория не найдена")
 
     # Выходные педагога (app/days_off.py): другому — отказ, самому педагогу —
     # предупреждение (428), серия создаётся после повторного нажатия.
@@ -700,33 +742,13 @@ async def generate_schedule(
             source="academy",
             is_open=False,
             teacher_id=group.teacher_id,
+            room_id=data.rooms.get(lesson_date.weekday()),
         )
         db.add(lesson)
         lessons_by_order[i] = lesson
 
     if data.fill_source:
-        await db.flush()  # нужны id уроков для привязки ресурсов ниже
-        if data.fill_source == "template":
-            if not group.course_id or not group.sector:
-                raise HTTPException(status_code=400, detail="У группы не указан курс или сектор — заполнение из шаблона невозможно")
-            positions = await _collect_template_positions(db, group.course_id, group.sector)
-        elif data.fill_source == "group":
-            if not data.fill_group_id:
-                raise HTTPException(status_code=422, detail="Укажите группу-источник материалов")
-            source_lessons = await db.execute(select(Lesson).where(Lesson.group_id == data.fill_group_id))
-            positions = {}
-            for source_lesson in source_lessons.scalars().all():
-                res_rows = await db.execute(
-                    select(LessonResource.resource_type, LessonResource.resource_id)
-                    .where(LessonResource.lesson_id == source_lesson.id)
-                )
-                items = res_rows.all()
-                if items:
-                    positions[source_lesson.order] = [(rt, rid) for rt, rid in items]
-        else:
-            raise HTTPException(status_code=422, detail="Недопустимый источник материалов")
-
-        await _apply_positions_to_lessons(db, lessons_by_order, positions, mode="add", current_user=current_user)
+        await _fill_from_source(db, group, lessons_by_order, data.fill_source, data.fill_group_id, current_user)
 
     await db.commit()
     lessons = list(lessons_by_order.values())
@@ -799,6 +821,7 @@ class RoomChoiceOut(BaseModel):
     number: int
     capacity: int
     busy_count: int      # сколько уроков этого дня пересекаются с уроками других групп в этой аудитории
+    busy_with: list[str] = []   # какие группы занимают её в это время
 
 
 class RoomDayOut(BaseModel):
@@ -840,6 +863,75 @@ def _lesson_span(l: Lesson) -> tuple[datetime, datetime]:
     return start, start + timedelta(minutes=l.duration_min or 0)
 
 
+async def _room_choices(
+    db: AsyncSession, group_id: int, spans_by_day: dict[int, list[tuple[datetime, datetime]]],
+) -> dict[int, list[RoomChoiceOut]]:
+    """Для каждого дня недели: аудитории и сколько уроков дня в них пересекаются
+    с уроками других групп (и каких групп)."""
+    rooms = (await db.execute(select(Room).order_by(Room.number))).scalars().all()
+    all_spans = [sp for spans in spans_by_day.values() for sp in spans]
+    others: list[tuple[Lesson, str]] = []
+    if all_spans:
+        first = min(a for a, _ in all_spans)
+        last = max(b for _, b in all_spans)
+        others = (await db.execute(
+            select(Lesson, Group.name)
+            .join(Group, Group.id == Lesson.group_id)
+            .where(
+                Lesson.group_id != group_id,
+                Lesson.room_id.is_not(None),
+                Lesson.date < last,
+                Lesson.date > first - timedelta(days=1),
+            )
+        )).all()
+    other_spans = [(o.room_id, *_lesson_span(o), name) for o, name in others]
+    result: dict[int, list[RoomChoiceOut]] = {}
+    for weekday, spans in spans_by_day.items():
+        choices = []
+        for r in rooms:
+            busy, names = 0, []
+            for a, b in spans:
+                hit = [name for rid, oa, ob, name in other_spans if rid == r.id and oa < b and a < ob]
+                if hit:
+                    busy += 1
+                    names += [n for n in hit if n not in names]
+            choices.append(RoomChoiceOut(id=r.id, number=r.number, capacity=r.capacity, busy_count=busy, busy_with=names))
+        result[weekday] = choices
+    return result
+
+
+async def _group_size(db: AsyncSession, group_id: int) -> int:
+    return (await db.execute(
+        select(func.count()).select_from(GroupMember)
+        .where(GroupMember.group_id == group_id, GroupMember.status == "active")
+    )).scalar() or 0
+
+
+# Подсказка аудиторий для новой серии (окно «Заполнить расписание»): по тем же
+# параметрам, что и генератор, — на каждый выбранный день недели аудитории,
+# свободные или занятые в это время.
+@router.post("/generate/rooms-preview", response_model=RoomDaysOut)
+async def preview_schedule_rooms(
+    data: ScheduleGenerate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require("schedule.edit")),
+):
+    group = await get_accessible_group(data.group_id, db, current_user)
+    duration = timedelta(minutes=data.duration_min or group.lesson_duration_min or 0)
+    spans_by_day: dict[int, list[tuple[datetime, datetime]]] = {}
+    for d in _series_dates(data):
+        spans_by_day.setdefault(d.weekday(), []).append((d, d + duration))
+    choices = await _room_choices(db, data.group_id, spans_by_day)
+    days = []
+    for weekday in sorted(spans_by_day):
+        a, b = spans_by_day[weekday][0]
+        days.append(RoomDayOut(
+            weekday=weekday, lesson_count=len(spans_by_day[weekday]),
+            times=[f"{a:%H:%M}–{b:%H:%M}"], rooms=choices[weekday],
+        ))
+    return RoomDaysOut(group_size=await _group_size(db, data.group_id), days=days)
+
+
 @router.get("/group/{group_id}/room-days", response_model=RoomDaysOut)
 async def get_group_room_days(
     group_id: int,
@@ -848,26 +940,10 @@ async def get_group_room_days(
 ):
     await get_accessible_group(group_id, db, current_user)
     by_day = await _future_lessons_by_weekday(db, group_id)
-    rooms = (await db.execute(select(Room).order_by(Room.number))).scalars().all()
-    group_size = (await db.execute(
-        select(func.count()).select_from(GroupMember)
-        .where(GroupMember.group_id == group_id, GroupMember.status == "active")
-    )).scalar() or 0
-
-    # Уроки других групп в аудиториях — для отметки «занята»
-    others: list[Lesson] = []
-    all_lessons = [l for ls in by_day.values() for l in ls]
-    if all_lessons:
-        first = _lesson_span(all_lessons[0])[0]
-        last = max(_lesson_span(l)[1] for l in all_lessons)
-        others = (await db.execute(
-            select(Lesson).where(
-                Lesson.group_id != group_id,
-                Lesson.room_id.is_not(None),
-                Lesson.date < last,
-                Lesson.date > first - timedelta(days=1),
-            )
-        )).scalars().all()
+    group_size = await _group_size(db, group_id)
+    choices_by_day = await _room_choices(
+        db, group_id, {wd: [_lesson_span(l) for l in ls] for wd, ls in by_day.items()},
+    )
 
     days = []
     for weekday in sorted(by_day):
@@ -877,13 +953,7 @@ async def get_group_room_days(
             f"{a.astimezone(BAKU_TZ):%H:%M}–{b.astimezone(BAKU_TZ):%H:%M}" for a, b in spans
         })
         room_ids = {l.room_id for l in ls}
-        choices = []
-        for r in rooms:
-            busy = 0
-            for a, b in spans:
-                if any(o.room_id == r.id and _lesson_span(o)[0] < b and a < _lesson_span(o)[1] for o in others):
-                    busy += 1
-            choices.append(RoomChoiceOut(id=r.id, number=r.number, capacity=r.capacity, busy_count=busy))
+        choices = choices_by_day[weekday]
         single = next(iter(room_ids)) if len(room_ids) == 1 else None
         days.append(RoomDayOut(
             weekday=weekday, lesson_count=len(ls), times=times,
@@ -907,6 +977,267 @@ async def set_group_room_day(
         l.room_id = data.room_id
     await db.commit()
     return {"ok": True, "updated": len(ls)}
+
+
+# ── План расписания группы: неделя (или две чередующиеся) ──
+# Окно «Настройка группы» у админа. Неделя — набор дней (1–7), у каждого
+# дня своё время и аудитория; вторая неделя — если по чередованию недель
+# меняются время или аудитория. Первой считается неделя первого урока серии.
+# Новая группа: уроки создаются с «Даты первого урока». Группа с уроками:
+# прошедшие не трогаются, будущие (в порядке номеров) получают новые даты,
+# время и аудитории по плану с ближайшего урока; не хватает — добавляются в
+# конец, лишние в конце — удаляются.
+
+class PlanSlot(BaseModel):
+    weekday: int = Field(ge=0, le=6)
+    start: str                    # «ЧЧ:ММ»
+    end: str                      # «ЧЧ:ММ»
+    room_id: Optional[int] = None
+
+
+class PlanIn(BaseModel):
+    group_id: Optional[int] = None          # для подсказки аудиторий новой группы — пусто
+    start_date: Optional[date_type] = None  # новой группе обязательна
+    lesson_count: int = Field(ge=1, le=500) # всего уроков в нумерации группы
+    start_order: int = Field(default=1, ge=1, le=500)
+    weeks: list[list[PlanSlot]] = Field(min_length=1, max_length=2)
+    fill_source: Optional[str] = None       # "template" | "group" — только новой группе
+    fill_group_id: Optional[int] = None
+
+
+class PlanOut(BaseModel):
+    exists: bool                  # у группы уже есть уроки
+    first_date: Optional[date_type] = None
+    next_date: Optional[date_type] = None   # ближайший урок — с него считается «Неделя 1»
+    lesson_count: int = 0
+    past_count: int = 0
+    start_order: int = 1
+    weeks: list[list[PlanSlot]] = []
+
+
+class PlanSlotRoomsOut(BaseModel):
+    week: int
+    weekday: int
+    lesson_count: int
+    rooms: list[RoomChoiceOut]
+
+
+class PlanRoomsOut(BaseModel):
+    group_size: int
+    slots: list[PlanSlotRoomsOut]
+
+
+def _minutes(value: str) -> int:
+    try:
+        hh, mm = (int(part) for part in value.split(":"))
+        if not (0 <= hh <= 23 and 0 <= mm <= 59):
+            raise ValueError
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Неверный формат времени, ожидается ЧЧ:ММ")
+    return hh * 60 + mm
+
+
+def _week_index(day: date_type, anchor: date_type, weeks_count: int) -> int:
+    """0 — «Неделя 1», 1 — «Неделя 2»; неделя anchor — первая."""
+    if weeks_count == 1:
+        return 0
+    monday = lambda d: d - timedelta(days=d.weekday())
+    return ((monday(day) - monday(anchor)).days // 7) % 2
+
+
+def _plan_dates(start: date_type, count: int, weeks: list[list[PlanSlot]]) -> list[tuple[datetime, int, Optional[int], int, int]]:
+    """Даты серии по плану: [(начало по Баку, длительность, аудитория, неделя, день недели)]."""
+    if count <= 0:
+        return []
+    slots = []
+    for w in weeks:
+        by_day = {}
+        for slot in w:
+            a, b = _minutes(slot.start), _minutes(slot.end)
+            if not (DURATION_MIN <= b - a <= DURATION_MAX):
+                raise HTTPException(status_code=422, detail="Время окончания урока должно быть позже начала (длительность от 30 минут)")
+            by_day[slot.weekday] = (a, b - a, slot.room_id)
+        slots.append(by_day)
+    if not any(slots):
+        raise HTTPException(status_code=422, detail="Выберите хотя бы один день недели")
+    out = []
+    cursor, steps = start, 0
+    while len(out) < count and steps < count * 30 + 365:
+        wi = _week_index(cursor, start, len(weeks))
+        slot = slots[wi].get(cursor.weekday())
+        if slot:
+            a, duration, room_id = slot
+            begin = datetime(cursor.year, cursor.month, cursor.day, a // 60, a % 60, tzinfo=BAKU_TZ)
+            out.append((begin, duration, room_id, wi, cursor.weekday()))
+        cursor += timedelta(days=1)
+        steps += 1
+    return out
+
+
+async def _group_numbered(db: AsyncSession, group_id: int) -> tuple[list[Lesson], list[Lesson]]:
+    """Уроки расписания группы (без персональных): прошедшие и будущие, по номерам."""
+    now = datetime.now(dt_timezone.utc)
+    lessons = (await db.execute(
+        select(Lesson).where(Lesson.group_id == group_id, Lesson.is_personal.is_(False))
+        .order_by(Lesson.order, Lesson.id)
+    )).scalars().all()
+    past = [l for l in lessons if l.date and aware(l.date) <= now]
+    future = [l for l in lessons if l not in past]
+    return past, future
+
+
+def _plan_start(future: list[Lesson]) -> date_type:
+    dated = [aware(l.date).astimezone(BAKU_TZ).date() for l in future if l.date]
+    return min(dated) if dated else datetime.now(BAKU_TZ).date()
+
+
+@router.get("/group/{group_id}/plan", response_model=PlanOut)
+async def get_group_plan(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require("schedule.edit")),
+):
+    await get_accessible_group(group_id, db, current_user)
+    past, future = await _group_numbered(db, group_id)
+    if not past and not future:
+        return PlanOut(exists=False)
+    every = past + future
+    dated = sorted(aware(l.date).astimezone(BAKU_TZ) for l in every if l.date)
+    # Шаблон недели — по будущим урокам (нет будущих — по всем)
+    source = [l for l in (future or every) if l.date]
+    anchor = _plan_start(future) if future else (dated[0].date() if dated else None)
+    found: list[dict[int, PlanSlot]] = [{}, {}]
+    for l in sorted(source, key=lambda x: aware(x.date)):
+        local = aware(l.date).astimezone(BAKU_TZ)
+        wi = _week_index(local.date(), anchor, 2) if anchor else 0
+        if local.weekday() not in found[wi]:
+            end = local + timedelta(minutes=l.duration_min or 0)
+            found[wi][local.weekday()] = PlanSlot(
+                weekday=local.weekday(), start=f"{local:%H:%M}", end=f"{end:%H:%M}", room_id=l.room_id,
+            )
+    week1 = [found[0][d] for d in sorted(found[0])]
+    week2 = [found[1][d] for d in sorted(found[1])]
+    weeks = [week1] if not week2 or [x.model_dump() for x in week1] == [x.model_dump() for x in week2] else [week1, week2]
+    return PlanOut(
+        exists=True,
+        first_date=dated[0].date() if dated else None,
+        next_date=_plan_start(future) if future else None,
+        lesson_count=len(every),
+        past_count=len(past),
+        start_order=min(l.order for l in every),
+        weeks=weeks,
+    )
+
+
+@router.post("/plan/preview", response_model=PlanRoomsOut)
+async def preview_group_plan(
+    data: PlanIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require("schedule.edit")),
+):
+    """Аудитории на каждый день плана: свободны или чьими уроками заняты на эти даты."""
+    group_id, start, count = data.group_id or 0, data.start_date, data.lesson_count
+    if data.group_id:
+        await get_accessible_group(data.group_id, db, current_user)
+        past, future = await _group_numbered(db, data.group_id)
+        if past or future:
+            start, count = _plan_start(future), data.lesson_count - len(past)
+    if not start:
+        return PlanRoomsOut(group_size=0, slots=[])
+    spans: dict[str, list[tuple[datetime, datetime]]] = {
+        f"{wi}-{slot.weekday}": [] for wi, w in enumerate(data.weeks) for slot in w
+    }
+    for begin, duration, _room, wi, wd in _plan_dates(start, count, data.weeks):
+        spans.setdefault(f"{wi}-{wd}", []).append((begin, begin + timedelta(minutes=duration)))
+    choices = await _room_choices(db, group_id, spans)
+    slots = []
+    for wi, w in enumerate(data.weeks):
+        for slot in w:
+            key = f"{wi}-{slot.weekday}"
+            slots.append(PlanSlotRoomsOut(
+                week=wi, weekday=slot.weekday, lesson_count=len(spans.get(key, [])),
+                rooms=choices[key],
+            ))
+    size = await _group_size(db, data.group_id) if data.group_id else 0
+    return PlanRoomsOut(group_size=size, slots=slots)
+
+
+@router.put("/group/{group_id}/plan")
+async def apply_group_plan(
+    group_id: int,
+    data: PlanIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require("schedule.edit")),
+):
+    group = await get_accessible_group(group_id, db, current_user)
+    room_ids = {slot.room_id for w in data.weeks for slot in w if slot.room_id}
+    if room_ids:
+        found = set((await db.execute(select(Room.id).where(Room.id.in_(room_ids)))).scalars().all())
+        if room_ids - found:
+            raise HTTPException(status_code=404, detail="Аудитория не найдена")
+
+    past, future = await _group_numbered(db, group_id)
+    word = await lesson_word(db, group.sector)
+
+    if not past and not future:
+        # Новая группа — серия с «Даты первого урока»
+        if not data.start_date:
+            raise HTTPException(status_code=422, detail="Укажите дату первого урока")
+        plan = _plan_dates(data.start_date, data.lesson_count, data.weeks)
+        if len(plan) < data.lesson_count:
+            raise HTTPException(status_code=422, detail="Не удалось подобрать достаточно дат — проверьте дни недели")
+        await ensure_lessons_allowed(db, [(group.teacher_id, begin) for begin, *_ in plan], current_user)
+        lessons_by_order: dict[int, Lesson] = {}
+        for i, (begin, duration, room_id, _wi, _wd) in enumerate(plan, start=data.start_order):
+            lesson = Lesson(
+                group_id=group_id, title=f"{word} {i}", order=i, date=begin, duration_min=duration,
+                source="academy", is_open=False, teacher_id=group.teacher_id, room_id=room_id,
+                created_by=current_user.id,
+            )
+            db.add(lesson)
+            lessons_by_order[i] = lesson
+        group.lesson_duration_min = plan[0][1]
+        if data.fill_source:
+            await _fill_from_source(db, group, lessons_by_order, data.fill_source, data.fill_group_id, current_user)
+        await db.commit()
+        return {"created": len(plan), "updated": 0, "deleted": 0}
+
+    # Группа с уроками — прошедшие не трогаем, будущие перестраиваем с ближайшего
+    needed = data.lesson_count - len(past)
+    if needed < 0:
+        raise HTTPException(status_code=422, detail=f"Уроков не может быть меньше, чем уже прошло: {len(past)}")
+    plan = _plan_dates(_plan_start(future), needed, data.weeks)
+    if len(plan) < needed:
+        raise HTTPException(status_code=422, detail="Не удалось подобрать достаточно дат — проверьте дни недели")
+
+    changes: list[tuple[Optional[int], datetime]] = []
+    for lesson, (begin, duration, room_id, _wi, _wd) in zip(future, plan):
+        if not lesson.date or aware(lesson.date) != begin:
+            changes.append((lesson.teacher_id, begin))
+        lesson.date, lesson.duration_min, lesson.room_id = begin, duration, room_id
+    next_order = max(l.order for l in past + future) + 1
+    added = 0
+    for begin, duration, room_id, _wi, _wd in plan[len(future):]:
+        changes.append((group.teacher_id, begin))
+        db.add(Lesson(
+            group_id=group_id, title=f"{word} {next_order}", order=next_order, date=begin, duration_min=duration,
+            source="academy", is_open=False, teacher_id=group.teacher_id, room_id=room_id,
+            created_by=current_user.id,
+        ))
+        next_order += 1
+        added += 1
+    await ensure_lessons_allowed(db, changes, current_user)
+
+    extra = [l.id for l in future[len(plan):]]
+    if extra:
+        await delete_lessons_homework(db, extra)
+        await db.execute(delete(LessonMark).where(LessonMark.lesson_id.in_(extra)))
+        await db.execute(delete(LessonResource).where(LessonResource.lesson_id.in_(extra)))
+        await db.execute(delete(Lesson).where(Lesson.id.in_(extra)))
+    if plan:
+        group.lesson_duration_min = plan[0][1]
+    await db.commit()
+    return {"created": added, "updated": min(len(future), len(plan)), "deleted": len(extra)}
 
 
 # Открыть / закрыть доступ сразу к нескольким урокам группы (по номерам

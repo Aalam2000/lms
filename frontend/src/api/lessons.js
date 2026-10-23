@@ -36,6 +36,27 @@ export function generateSchedule(payload) {
   return api.post('/lessons/generate', payload).then(res => res.data);
 }
 
+// План расписания группы (окно «Настройка группы» у админа): неделя или две чередующиеся.
+// weeks: [[{weekday, start:'ЧЧ:ММ', end:'ЧЧ:ММ', room_id}], …]
+export function getGroupPlan(groupId) {
+  return api.get(`/lessons/group/${groupId}/plan`).then(res => res.data);
+}
+
+// Аудитории на дни плана: {group_size, slots: [{week, weekday, lesson_count, rooms}]}
+export function previewGroupPlan(payload) {
+  return api.post('/lessons/plan/preview', payload).then(res => res.data);
+}
+
+// Применить план: новой группе — создать уроки, группе с уроками — перестроить будущие
+export function applyGroupPlan(groupId, payload) {
+  return api.put(`/lessons/group/${groupId}/plan`, payload).then(res => res.data);
+}
+
+// Аудитории для новой серии (те же поля, что у generateSchedule): {group_size, days: [{weekday, times, lesson_count, rooms}]}
+export function previewScheduleRooms(payload) {
+  return api.post('/lessons/generate/rooms-preview', payload).then(res => res.data);
+}
+
 // Дозаполнение/обновление материалов уже существующих уроков — и как шаг
 // после генерации, и как отдельная кнопка «Обновить материалы».
 // payload: {source, fill_group_id?, range_from, range_to, mode}

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
 import { ContactIcon } from '../components/ContactIcons';
@@ -15,22 +14,18 @@ import { AccessBlock } from '../components/ParentLinkBlock';
 import { getSectors } from '../api/academy';
 import PushMark from '../components/PushMark';
 import { usePushUsers } from '../hooks/usePushUsers';
-import GroupScheduleModal from '../components/GroupScheduleModal';
-import LessonTeacherModal from '../components/LessonTeacherModal';
-import { getGroupLessons } from '../api/lessons';
+import { GroupAdminModal } from '../components/GroupScheduleModal';
 
 const emptyTeacher = { username: '', password: '', full_name: '', email: '', phone: '', telegram_username: '', whatsapp: '' };
 const emptyAdmin   = { username: '', password: '', full_name: '', email: '', phone: '', telegram_username: '', whatsapp: '' };
 // Куратор: логин и пароль генерирует бэкенд (пароль = логину)
 const emptyCurator = { full_name: '', phone: '', email: '', telegram_username: '', whatsapp: '' };
 const emptyCourse  = { title: '', description: '' };
-const emptyGroup   = { name: '', course_id: '', teacher_id: '', telegram_chat_id: '', whatsapp: '', video_url: '', sector: '' };
 
 const emptyUserEdit = { full_name: '', email: '', phone: '', telegram_username: '', whatsapp: '' };
 const emptyCourseEdit = { title: '', description: '' };
 
 function AdminPage() {
-  const navigate = useNavigate();
   const { user: currentUser } = useAuth();
   const pushUsers = usePushUsers(); // кто разрешил уведомления
   const [tab, setTab] = useState('teachers');
@@ -40,9 +35,8 @@ function AdminPage() {
   const [curators, setCurators] = useState([]);
   const [courses,  setCourses]  = useState([]);
   const [groups,   setGroups]   = useState([]);
-  // Окна по группе из строки таблицы «Группы»: расписание и педагог уроков
-  const [scheduleGroup, setScheduleGroup] = useState(null);
-  const [teacherGroup, setTeacherGroup] = useState(null); // { group, lessons }
+  // «Настройка группы»: { group } — клик по строке, { group: null } — «+ Добавить группу»
+  const [groupModal, setGroupModal] = useState(null);
   // Секторы — справочник с вкладки «Академия»: [{code, name, lesson_word}]
   const [sectors,  setSectors]  = useState([]);
 
@@ -50,7 +44,6 @@ function AdminPage() {
   const [newAdmin,   setNewAdmin]   = useState(emptyAdmin);
   const [newCurator, setNewCurator] = useState(emptyCurator);
   const [newCourse,  setNewCourse]  = useState(emptyCourse);
-  const [newGroup,   setNewGroup]   = useState(emptyGroup);
 
   // Модалка «Добавить»: null | 'teacher' | 'admin' | 'course' | 'group'
   const [openAddModal, setOpenAddModal] = useState(null);
@@ -76,10 +69,6 @@ function AdminPage() {
   const [isSavingCourse, setIsSavingCourse] = useState(false);
   const coursesTableRef = useRef(null);
 
-  const [editingGroupId, setEditingGroupId] = useState(null);
-  const [editingGroupDraft, setEditingGroupDraft] = useState(emptyGroup);
-  const [isSavingGroup, setIsSavingGroup] = useState(false);
-  const groupsTableRef = useRef(null);
 
   const [error, setError] = useState('');
   const [passwordUser, setPasswordUser] = useState(null); // кому админ меняет пароль
@@ -102,8 +91,6 @@ function AdminPage() {
         if (!curatorsTableRef.current?.contains(event.target)) saveEditingCurator();
       } else if (tab === 'courses' && editingCourseId !== null && !isSavingCourse) {
         if (!coursesTableRef.current?.contains(event.target)) saveEditingCourse();
-      } else if (tab === 'groups' && editingGroupId !== null && !isSavingGroup) {
-        if (!groupsTableRef.current?.contains(event.target)) saveEditingGroup();
       }
     };
 
@@ -115,7 +102,6 @@ function AdminPage() {
     editingAdminId, editingAdminDraft, isSavingAdmin,
     editingCuratorId, editingCuratorDraft, isSavingCurator,
     editingCourseId, editingCourseDraft, isSavingCourse,
-    editingGroupId, editingGroupDraft, isSavingGroup,
   ]);
 
   const loadAll = () => {
@@ -139,17 +125,6 @@ function AdminPage() {
     setTimeout(() => setError(''), 4000);
   };
 
-  // Telegram и WhatsApp у группы — необязательные поля, в проверку не входят.
-  const areAllGroupFieldsFilled = (groupData) => {
-    return (
-      groupData.name.trim() !== ''
-      && String(groupData.course_id).trim() !== ''
-      && String(groupData.teacher_id).trim() !== ''
-      && String(groupData.sector || '').trim() !== ''
-    );
-  };
-
-  const isNewGroupValid = areAllGroupFieldsFilled(newGroup);
 
   const closeAddModal = () => {
     setOpenAddModal(null);
@@ -157,7 +132,6 @@ function AdminPage() {
     setNewAdmin(emptyAdmin);
     setNewCurator(emptyCurator);
     setNewCourse(emptyCourse);
-    setNewGroup(emptyGroup);
   };
 
   const createTeacher = async () => {
@@ -199,24 +173,6 @@ function AdminPage() {
     } catch(e) { handleError(e); }
   };
 
-  const createGroup = async () => {
-    if (!isNewGroupValid) {
-      setError('Заполните все поля группы');
-      setTimeout(() => setError(''), 4000);
-      return;
-    }
-
-    try {
-      await adminApi.createGroup({
-        ...newGroup,
-        course_id:  parseInt(newGroup.course_id),
-        teacher_id: parseInt(newGroup.teacher_id),
-        sector: newGroup.sector || null,
-      });
-      closeAddModal();
-      loadGroups();
-    } catch(e) { handleError(e); }
-  };
   // Активную группу можно только отправить в архив; удалить навсегда —
   // только из архива (бэкенд это тоже проверяет).
   const [showArchivedGroups, setShowArchivedGroups] = useState(false);
@@ -340,52 +296,6 @@ function AdminPage() {
     }
   };
 
-  // ── inline-редактирование: группы ──
-  const startEditGroup = (group) => {
-    if (editingGroupId === group.id) return;
-    if (isSavingGroup) return;
-    setEditingGroupId(group.id);
-    setEditingGroupDraft({
-      name: group.name || '',
-      course_id: String(group.course_id || ''),
-      teacher_id: String(group.teacher_id || ''),
-      telegram_chat_id: group.telegram_chat_id || '',
-      whatsapp: group.whatsapp || '',
-      video_url: group.video_url || '',
-      sector: group.sector || '',
-    });
-  };
-
-  const saveEditingGroup = async () => {
-    if (editingGroupId === null || isSavingGroup) return;
-
-    if (!areAllGroupFieldsFilled(editingGroupDraft)) {
-      setError('Заполните все поля группы');
-      setTimeout(() => setError(''), 4000);
-      return;
-    }
-
-    try {
-      setIsSavingGroup(true);
-      const payload = {
-        name: editingGroupDraft.name.trim(),
-        course_id: parseInt(editingGroupDraft.course_id),
-        teacher_id: parseInt(editingGroupDraft.teacher_id),
-        telegram_chat_id: editingGroupDraft.telegram_chat_id.trim(),
-        whatsapp: editingGroupDraft.whatsapp.trim(),
-        video_url: editingGroupDraft.video_url.trim() || null,
-        sector: editingGroupDraft.sector || null,
-      };
-      const saved = await adminApi.updateGroup(editingGroupId, payload);
-      setGroups(prev => prev.map(g => g.id === editingGroupId ? saved : g));
-      setEditingGroupId(null);
-    } catch (e) {
-      handleError(e);
-    } finally {
-      setIsSavingGroup(false);
-    }
-  };
-
   const tabs = [
     { key: 'teachers', label: 'Педагоги' },
     { key: 'admins',   label: 'Админы' },
@@ -425,15 +335,6 @@ function AdminPage() {
   // del: {path, reload, tip} — удаление через общую кнопку с контролем
   // использования (DeleteButton, entity "user")
   const showError = (msg) => { setError(msg); setTimeout(() => setError(''), 4000); };
-
-  // «Педагог уроков»: окну нужны уроки группы
-  const openTeacherModal = async (group) => {
-    try {
-      setTeacherGroup({ group, lessons: await getGroupLessons(group.id) });
-    } catch (err) {
-      showError(err?.response?.data?.detail || 'Не удалось загрузить уроки группы');
-    }
-  };
 
   // Смена роли педагог ⇄ админ. Себе менять нельзя (кнопка неактивна, бэкенд тоже откажет).
   const changeRole = async (u, role) => {
@@ -674,92 +575,39 @@ function AdminPage() {
                 onClick={() => setShowArchivedGroups(v => !v)}
               />
               {!showArchivedGroups && (
-                <Button onClick={() => setOpenAddModal('group')}>{'+ Добавить группу'}</Button>
+                <Button onClick={() => setGroupModal({ group: null })}>{'+ Добавить группу'}</Button>
               )}
             </div>
           </div>
-          <div className="table-scroll" ref={groupsTableRef}>
+          <div className="table-scroll">
             <table className="table">
               <thead><tr>
                 <th>{'Название'}</th>
                 <th>{'Курс'}</th>
                 <th>{'Сектор'}</th>
                 <th>{'Педагог'}</th>
-                <th>{'Telegram'}</th>
-                <th>{'WhatsApp'}</th>
-                <th>{'Видео'}</th>
+                <th></th>
+                <th></th>
+                <th></th>
                 <th></th>
               </tr></thead>
               <tbody>
                 {groups.filter(g => (g.status === 'archived') === showArchivedGroups).length === 0 && (
                   <tr><td colSpan="8" className="table__empty">{showArchivedGroups ? 'Архив пуст' : 'Групп пока нет'}</td></tr>
                 )}
+                {/* Клик по строке — «Настройка группы»; значки связи — только заполненные, по колонке на вид */}
                 {groups.filter(g => (g.status === 'archived') === showArchivedGroups).map(g => (
-                  <tr key={g.id} onClick={() => startEditGroup(g)} className="table__row--clickable">
-                    <td>
-                      {editingGroupId === g.id ? (
-                        <input
-                          className="input input--min160"
-                          value={editingGroupDraft.name}
-                          onChange={e => setEditingGroupDraft({ ...editingGroupDraft, name: e.target.value })}
-                        />
-                      ) : g.name}
-                    </td>
-                    <td>
-                      {/* Курс и сектор задаются при создании группы и не меняются */}
-                      {courseLabelById(g.course_id)}
-                    </td>
-                    <td>
-                      {sectorLabel(g.sector)}
-                    </td>
-                    <td>
-                      {editingGroupId === g.id ? (
-                        <select
-                          className="input input--min160"
-                          value={editingGroupDraft.teacher_id}
-                          onChange={e => setEditingGroupDraft({ ...editingGroupDraft, teacher_id: e.target.value })}
-                          data-tip={'Смена педагога действует с сегодняшнего дня: прошедшие уроки остаются за тем, кто их вёл. Замена на отдельные уроки — кнопка «Педагог уроков» на странице группы'}
-                        >
-                          <option value="">{'— Педагог —'}</option>
-                          {teachersForGroups.map(tc => <option key={tc.id} value={tc.id}>{tc.full_name || tc.username}</option>)}
-                        </select>
-                      ) : teacherLabelById(g.teacher_id)}
-                    </td>
-                    <td>
-                      {editingGroupId === g.id ? (
-                        <input
-                          className="input input--min160"
-                          value={editingGroupDraft.telegram_chat_id}
-                          onChange={e => setEditingGroupDraft({ ...editingGroupDraft, telegram_chat_id: e.target.value })}
-                        />
-                      ) : <ContactIcon type="telegram" value={g.telegram_chat_id} />}
-                    </td>
-                    <td>
-                      {editingGroupId === g.id ? (
-                        <input
-                          className="input input--min160"
-                          value={editingGroupDraft.whatsapp}
-                          onChange={e => setEditingGroupDraft({ ...editingGroupDraft, whatsapp: e.target.value })}
-                        />
-                      ) : <ContactIcon type="whatsapp" value={g.whatsapp} />}
-                    </td>
-                    <td>
-                      {editingGroupId === g.id ? (
-                        <input
-                          className="input input--min160"
-                          placeholder="https://meet.google.com/…"
-                          value={editingGroupDraft.video_url}
-                          onChange={e => setEditingGroupDraft({ ...editingGroupDraft, video_url: e.target.value })}
-                        />
-                      ) : <ContactIcon type="video" value={g.video_url} />}
-                    </td>
-                    <td>
+                  <tr key={g.id} onClick={() => setGroupModal({ group: g })} className="table__row--clickable"
+                    data-tip={'Настройка группы'}>
+                    <td>{g.name}</td>
+                    <td>{courseLabelById(g.course_id)}</td>
+                    <td>{sectorLabel(g.sector)}</td>
+                    <td>{teacherLabelById(g.teacher_id)}</td>
+                    <td className="table__icon-col">{g.telegram_chat_id ? <ContactIcon type="telegram" value={g.telegram_chat_id} /> : null}</td>
+                    <td className="table__icon-col">{g.whatsapp ? <ContactIcon type="whatsapp" value={g.whatsapp} /> : null}</td>
+                    <td className="table__icon-col">{g.video_url ? <ContactIcon type="video" value={g.video_url} /> : null}</td>
+                    <td className="table__icon-col">
                       <div className="icon-row">
-                        <IconButton
-                          icon="calendarView"
-                          tip="Расписание группы"
-                          onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/groups/${g.id}`); }}
-                        />
                         {g.status === 'archived' ? (
                           <>
                             <IconButton
@@ -775,24 +623,12 @@ function AdminPage() {
                             />
                           </>
                         ) : (
-                          <>
-                            <IconButton
-                              icon="schedule"
-                              tip="Расписание: создать, начать с урока N, аудитории по дням"
-                              onClick={(e) => { e.stopPropagation(); setScheduleGroup(g); }}
-                            />
-                            <IconButton
-                              icon="role"
-                              tip="Педагог уроков: замена, передача группы"
-                              onClick={(e) => { e.stopPropagation(); openTeacherModal(g); }}
-                            />
-                            <IconButton
-                              icon="archive"
-                              tip="Отправить в архив"
-                              variant="warn"
-                              onClick={(e) => { e.stopPropagation(); archiveGroup(g); }}
-                            />
-                          </>
+                          <IconButton
+                            icon="archive"
+                            tip="Отправить в архив"
+                            variant="warn"
+                            onClick={(e) => { e.stopPropagation(); archiveGroup(g); }}
+                          />
                         )}
                       </div>
                     </td>
@@ -804,19 +640,14 @@ function AdminPage() {
         </div>
       )}
 
-      {scheduleGroup && (
-        <GroupScheduleModal
-          group={scheduleGroup}
+      {groupModal && (
+        <GroupAdminModal
+          group={groupModal.group}
           groups={groups.filter(g => g.status !== 'archived')}
-          onClose={() => setScheduleGroup(null)}
-        />
-      )}
-      {teacherGroup && (
-        <LessonTeacherModal
-          group={teacherGroup.group}
-          lessons={teacherGroup.lessons}
-          onClose={() => setTeacherGroup(null)}
-          onSaved={() => { setTeacherGroup(null); loadGroups(); }}
+          courses={courses}
+          sectors={sectors}
+          teachers={teachersForGroups}
+          onClose={(changed) => { setGroupModal(null); if (changed) loadGroups(); }}
         />
       )}
 
@@ -901,48 +732,6 @@ function AdminPage() {
         </Modal>
       )}
 
-      {/* Модалка: новая группа */}
-      {openAddModal === 'group' && (
-        <Modal title={'Новая группа'} onClose={closeAddModal} footer={(
-          <>
-            <button className="btn btn--secondary" onClick={closeAddModal}>{'Отмена'}</button>
-            <Button onClick={createGroup} disabled={!isNewGroupValid}>{'Добавить'}</Button>
-          </>
-        )}>
-          <div className="form-stack">
-            <input placeholder={'Название группы'} className="input input--min160"
-              autoComplete="off"
-              value={newGroup.name}
-              onChange={e => setNewGroup({ ...newGroup, name: e.target.value })}
-            />
-            <select className="input input--min160" value={newGroup.course_id}
-              onChange={e => setNewGroup({ ...newGroup, course_id: e.target.value })}>
-              <option value="">{'— Курс —'}</option>
-              {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-            </select>
-            <select className="input input--min160" value={newGroup.sector}
-              onChange={e => setNewGroup({ ...newGroup, sector: e.target.value })}>
-              <option value="">{'— Сектор —'}</option>
-              {sectors.map(s => <option key={s.code} value={s.code}>{s.name}</option>)}
-            </select>
-            <select className="input input--min160" value={newGroup.teacher_id}
-              onChange={e => setNewGroup({ ...newGroup, teacher_id: e.target.value })}>
-              <option value="">{'— Педагог —'}</option>
-              {teachersForGroups.map(tc => <option key={tc.id} value={tc.id}>{tc.full_name || tc.username}</option>)}
-            </select>
-            <input placeholder={'Telegram (юзернейм или ссылка-приглашение)'} className="input input--min160"
-              autoComplete="off"
-              value={newGroup.telegram_chat_id}
-              onChange={e => setNewGroup({ ...newGroup, telegram_chat_id: e.target.value })}
-            />
-            <input placeholder={'WhatsApp'} className="input input--min160"
-              autoComplete="off"
-              value={newGroup.whatsapp}
-              onChange={e => setNewGroup({ ...newGroup, whatsapp: e.target.value })}
-            />
-          </div>
-        </Modal>
-      )}
     </div>
   );
 }
