@@ -3730,11 +3730,19 @@ a.row-icon:hover {
 }
 .group-form__grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px 14px;
 }
 .group-form__grid--3 {
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+/* Поля сжимаются по ширине окна — без горизонтальной прокрутки
+   (выпадающий список иначе растягивается по самому длинному пункту) */
+.group-form .input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 .group-form__wide {
   grid-column: 1 / -1;
@@ -3742,6 +3750,13 @@ a.row-icon:hover {
 .group-form__teacher {
   text-align: left;
   cursor: pointer;
+}
+.group-form__temp .input {
+  width: auto;
+  flex: 1 1 120px;
+}
+.group-form__temp input[type="date"] {
+  flex: 0 0 140px;
 }
 .group-form__temp {
   display: flex;
@@ -3775,9 +3790,9 @@ a.row-icon:hover {
   margin-left: auto;
 }
 .week-plan__day {
-  display: grid;
-  grid-template-columns: 70px 200px 1fr;
-  gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
   align-items: center;
   padding: 5px 10px;
   border-top: 1px solid var(--color-border-light);
@@ -3789,6 +3804,7 @@ a.row-icon:hover {
   color: var(--color-muted);
 }
 .week-plan__name {
+  width: 52px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -3800,14 +3816,18 @@ a.row-icon:hover {
   align-items: center;
   gap: 4px;
 }
-.week-plan__select-time {
-  width: 88px;
+.group-form .week-plan__select-time {
+  width: 76px;
+  padding-left: 4px;
+  padding-right: 4px;
 }
 .week-plan__room {
+  flex: 1 1 200px;
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 4px 6px;
 }
 .week-plan__over {
   color: var(--color-warning);
@@ -3823,9 +3843,6 @@ a.row-icon:hover {
 @media (max-width: 640px) {
   .group-form__grid,
   .group-form__grid--3 {
-    grid-template-columns: 1fr;
-  }
-  .week-plan__day {
     grid-template-columns: 1fr;
   }
 }
