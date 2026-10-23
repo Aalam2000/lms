@@ -13,15 +13,27 @@ import PushMark from '../components/PushMark';
 import { usePushUsers } from '../hooks/usePushUsers';
 import { GroupAdminModal } from '../components/GroupScheduleModal';
 import UserCardModal from '../components/UserCardModal';
+import { useLang } from '../hooks/useLang';
 
 const emptyCourse  = { title: '', description: '' };
 
 const emptyCourseEdit = { title: '', description: '' };
 const ROLE_LABELS = { admin: 'Админ', teacher: 'Педагог', curator: 'Куратор' };
+// Фильтр пользователей: на ПК — слово, на телефоне — цветная кнопка с первой буквой роли
+const ROLE_FILTERS = { admin: 'Админы', teacher: 'Педагоги', curator: 'Кураторы' };
+// Буквы — по языку интерфейса: одиночную букву autoi18n не переводит (как подписи
+// календаря в Calendar.jsx). Язык без своей строки — буквы английского.
+const ROLE_LETTERS_BY_LANG = {
+  ru: { admin: 'А', teacher: 'П', curator: 'К' },
+  az: { admin: 'A', teacher: 'M', curator: 'K' },
+  en: { admin: 'A', teacher: 'T', curator: 'C' },
+};
 
 function AdminPage() {
   const { user: currentUser } = useAuth();
   const pushUsers = usePushUsers(); // кто разрешил уведомления
+  const { lang } = useLang();
+  const ROLE_LETTERS = ROLE_LETTERS_BY_LANG[lang] || ROLE_LETTERS_BY_LANG.en;
   const [tab, setTab] = useState('users');
 
   // Пользователи — админы, педагоги, кураторы одной вкладкой
@@ -180,23 +192,30 @@ function AdminPage() {
       {tab === 'users' && (
         <div>
           <div className="toolbar">
-            <h3 className="toolbar__title">{'Пользователи'}</h3>
-            <div className="icon-row">
-              {[['all', 'Все'], ['admin', 'Админы'], ['teacher', 'Педагоги'], ['curator', 'Кураторы']].map(([key, label]) => (
-                <button key={key} type="button" className={`tab${userFilter === key ? ' tab--active' : ''}`} onClick={() => setUserFilter(key)}>
-                  {label}
+            <div className="role-filter">
+              <button type="button" className={`role-filter__btn${userFilter === 'all' ? ' role-filter__btn--on' : ''}`} onClick={() => setUserFilter('all')}>
+                {'Все'}
+              </button>
+              {Object.keys(ROLE_FILTERS).map(key => (
+                <button key={key} type="button"
+                  className={`role-filter__btn role-filter__btn--${key}${userFilter === key ? ' role-filter__btn--on' : ''}`}
+                  data-tip={ROLE_FILTERS[key]}
+                  onClick={() => setUserFilter(key)}>
+                  <span className="only-desktop">{ROLE_FILTERS[key]}</span>
+                  <span className="only-mobile">{ROLE_LETTERS[key]}</span>
                 </button>
               ))}
-              <Button onClick={() => setUserModal({ user: null })}>{'+ Добавить пользователя'}</Button>
             </div>
+            <Button onClick={() => setUserModal({ user: null })}>
+              <span className="only-desktop">{'+ Пользователь'}</span>
+              <span className="only-mobile role-filter__plus">{'+'}</span>
+            </Button>
           </div>
           <div className="table-scroll">
             <table className="table">
               <thead><tr>
                 <th>{'Имя'}</th>
                 <th>{'Роль'}</th>
-                <th>{'Логин'}</th>
-                <th>{'Телефон'}</th>
                 <th></th>
                 <th></th>
                 <th></th>
@@ -204,7 +223,7 @@ function AdminPage() {
               </tr></thead>
               <tbody>
                 {users.filter(u => userFilter === 'all' || u.role === userFilter).length === 0 && (
-                  <tr><td colSpan="8" className="table__empty">{'Пользователей нет'}</td></tr>
+                  <tr><td colSpan="6" className="table__empty">{'Пользователей нет'}</td></tr>
                 )}
                 {users.filter(u => userFilter === 'all' || u.role === userFilter).map(u => (
                   <tr key={u.id} onClick={() => setUserModal({ user: u })} className="table__row--clickable"
@@ -216,9 +235,12 @@ function AdminPage() {
                       </span>
                       {pushUsers.has(u.id) && <PushMark />}
                     </td>
-                    <td><span className={`badge badge--role badge--${u.role}`}>{ROLE_LABELS[u.role] || u.role}</span></td>
-                    <td>{u.username}</td>
-                    <td>{u.phone}</td>
+                    <td className="table__icon-col">
+                      <span className={`badge badge--role badge--${u.role}`}>
+                        <span className="only-desktop">{ROLE_LABELS[u.role] || u.role}</span>
+                        <span className="only-mobile">{ROLE_LETTERS[u.role] || u.role}</span>
+                      </span>
+                    </td>
                     <td className="table__icon-col">{u.telegram_username ? <ContactIcon type="telegram" value={u.telegram_username} /> : null}</td>
                     <td className="table__icon-col">{u.whatsapp ? <ContactIcon type="whatsapp" value={u.whatsapp} /> : null}</td>
                     <td className="table__icon-col">{u.email ? <ContactIcon type="email" value={u.email} /> : null}</td>

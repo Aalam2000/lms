@@ -3900,3 +3900,66 @@ a.row-icon:hover {
   background: var(--color-role-curator);
   color: var(--color-white);
 }
+
+/* Фильтр «Пользователи» по роли: на ПК — слова, на телефоне — цветные кнопки с буквой */
+.role-filter {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+.role-filter__btn {
+  height: 36px;
+  min-width: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border-light);
+  background: var(--color-white);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+.role-filter__btn--on {
+  border-color: var(--color-primary-border);
+  background: var(--color-primary-border);
+  color: var(--color-white);
+}
+.role-filter__btn--on.role-filter__btn--admin {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+}
+.role-filter__btn--on.role-filter__btn--teacher {
+  background: var(--color-info);
+  border-color: var(--color-info);
+}
+.role-filter__btn--on.role-filter__btn--curator {
+  background: var(--color-role-curator);
+  border-color: var(--color-role-curator);
+}
+.role-filter__plus {
+  font-weight: 800;
+  font-size: 18px;
+}
+@media (max-width: 768px) {
+  /* Буквы ролей — сразу в цвете роли; выбранная — залита */
+  .role-filter__btn {
+    padding: 0;
+    font-weight: 700;
+  }
+  .role-filter__btn--admin {
+    color: var(--color-danger);
+    border-color: var(--color-danger);
+  }
+  .role-filter__btn--teacher {
+    color: var(--color-info);
+    border-color: var(--color-info);
+  }
+  .role-filter__btn--curator {
+    color: var(--color-role-curator);
+    border-color: var(--color-role-curator);
+  }
+  .role-filter__btn--on.role-filter__btn--admin,
+  .role-filter__btn--on.role-filter__btn--teacher,
+  .role-filter__btn--on.role-filter__btn--curator {
+    color: var(--color-white);
+  }
+}
