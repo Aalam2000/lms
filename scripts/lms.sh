@@ -1,27 +1,48 @@
 #!/usr/bin/env bash
-# quiz — управление платформой на прод-сервере. Запуск из любой папки:
-# ссылка /usr/local/bin/quiz → /var/www/quiz/scripts/quiz.sh.
+# lms — управление платформой на прод-сервере. Запуск из любой папки:
+# ссылка /usr/local/bin/lms → /var/www/quiz/scripts/lms.sh.
 # Без аргументов — список команд с пояснениями.
 set -euo pipefail
 
 # Всё тело — в функции, вызываемой последней строкой: bash читает функцию
 # целиком до запуска, поэтому git reset, который подменяет этот же файл
-# посреди «quiz deploy», не сбивает работу скрипта.
+# посреди «lms deploy», не сбивает работу скрипта.
 COMPOSE="docker compose -f docker-compose.prod.yml"
 BACKUP_LOG=/var/backups/logacademy/backup.log
 SITE_URL=http://192.168.0.9/
 
 usage() {
-  echo "Использование: quiz {deploy|status|log|restart|precheck|backup|csp|load}"
+  echo "Использование: lms {deploy|status|log|restart|precheck|backup|csp|load}"
   echo ""
   echo "  deploy [ветка]   — забрать код с GitHub (по умолчанию master), пересобрать и перезапустить"
   echo "  status           — версия кода, контейнеры, база, ответ сайта, последний бэкап"
-  echo "  log [сервис]     — живой лог backend|frontend|nginx, без сервиса — всех (Ctrl+C — выход)"
-  echo "  restart [сервис] — перезапустить контейнеры без пересборки (без сервиса — все)"
+  echo "  log [сервис]     — живой лог: backend | frontend | nginx, без сервиса — всех (Ctrl+C — выход)"
+  echo "  restart [сервис] — перезапустить без пересборки: backend | frontend | nginx, без сервиса — все"
   echo "  precheck         — проверка базы перед выкаткой с миграцией (ничего не меняет)"
   echo "  backup           — сделать бэкап сейчас и показать последние строки журнала бэкапов"
   echo "  csp              — отчёты CSP (что браузеры заблокировали бы)"
   echo "  load [дни]       — отчёт о нагрузке сервера (по умолчанию за сутки, до 28)"
+}
+
+# Автодополнение по Tab: команды (lms d → deploy) и сервисы (lms log b → backend).
+# Подключается файлом /etc/bash_completion.d/lms с одной строкой
+#   eval "$(/usr/local/bin/lms completion)"
+# — список всегда берётся из этого скрипта, отдельно править не нужно.
+COMMANDS="deploy status log restart precheck backup csp load"
+SERVICES="backend frontend nginx"
+
+completion() {
+  cat <<COMPL
+_lms() {
+  local cur="\${COMP_WORDS[COMP_CWORD]}"
+  if [ "\$COMP_CWORD" -eq 1 ]; then
+    COMPREPLY=( \$(compgen -W "$COMMANDS" -- "\$cur") )
+  elif [ "\$COMP_CWORD" -eq 2 ] && { [ "\${COMP_WORDS[1]}" = log ] || [ "\${COMP_WORDS[1]}" = restart ]; }; then
+    COMPREPLY=( \$(compgen -W "$SERVICES" -- "\$cur") )
+  fi
+}
+complete -F _lms lms
+COMPL
 }
 
 version() {
@@ -60,7 +81,7 @@ deploy_failed() {
   exit 1
 }
 
-# quiz deploy [ветка] — выкатка
+# lms deploy [ветка] — выкатка
 deploy() {
   BRANCH="${1:-master}"
   echo "[deploy] branch: $BRANCH"
@@ -148,8 +169,8 @@ deploy() {
 
 main() {
   # Папка проекта — по расположению самого скрипта (scripts/ внутри проекта),
-  # а не текущая папка: quiz запускается откуда угодно (readlink -f раскрывает
-  # ссылку /usr/local/bin/quiz до настоящего файла). PROJECT_DIR=… переопределяет.
+  # а не текущая папка: lms запускается откуда угодно (readlink -f раскрывает
+  # ссылку /usr/local/bin/lms до настоящего файла). PROJECT_DIR=… переопределяет.
   PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)}"
   cd "$PROJECT_DIR"
 
@@ -199,6 +220,10 @@ main() {
 
     load)
       ./scripts/load-report.sh "$@"
+      ;;
+
+    completion)
+      completion
       ;;
 
     ""|-h|--help|help)

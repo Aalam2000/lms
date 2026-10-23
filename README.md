@@ -91,7 +91,7 @@ scripts/            служебные скрипты
 | Попытки входа (для fail2ban) | `logs/nginx-fail2ban/login.log` | logrotate: раз в неделю или при 20 МБ, 4 архива — `deploy/logrotate/logacademy` |
 | Системный журнал | journald | `SystemMaxUse=100M` |
 | auditd | `/var/log/audit` | 5 файлов по 10 МБ, режим `ROTATE` |
-| Кэш сборки Docker | — | `quiz deploy` (`scripts/quiz.sh`) после выкатки удаляет кэш старше 3 дней |
+| Кэш сборки Docker | — | `lms deploy` (`scripts/lms.sh`) после выкатки удаляет кэш старше 3 дней |
 
 Backend пишет в stdout через `logging` (уровень INFO), без `print`.
 
