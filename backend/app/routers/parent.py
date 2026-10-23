@@ -312,6 +312,8 @@ async def parent_task_file(token: str, student_id: int, lesson_id: int, task_id:
         return Response(content=pdf, media_type="application/pdf")
     media_type = material.content_type or "application/octet-stream"
     disposition = "inline" if (media_type == "application/pdf" or (media_type.startswith("image/") and media_type != "image/svg+xml")) else "attachment"
+    if not storage.exists(material.object_key):
+        raise HTTPException(status_code=404, detail="Файл не найден на диске — загрузите его заново")
     return StreamingResponse(
         storage.stream_object(material.object_key), media_type=media_type,
         headers={"Content-Disposition": materials._content_disposition(material.original_filename, disposition)},

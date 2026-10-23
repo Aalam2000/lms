@@ -15,6 +15,7 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import '../styles/calendar.css';
 import { useLang } from '../hooks/useLang';
 import { lessonEnd } from '../utils/lessonTime';
+import Modal from './Modal';
 
 // Названия месяцев и дней в сетке календаря рисует date-fns по локали
 // (culture = язык интерфейса из useLang), а не autoi18n. Первый день недели
@@ -154,6 +155,8 @@ function Calendar({ lessons, onSelectLesson, getEventColor, defaultView = 'month
   const { lang } = useLang();
   const culture = DATE_LOCALES[lang] ? lang : 'ru';
   const isMobile = useIsMobile();
+  // «ещё N» в клетке месяца: окно со скрытыми уроками дня ({ date, events } или null)
+  const [more, setMore] = useState(null);
   const messages = useMemo(() => {
     const base = MESSAGES_BY_LANG[culture] || MESSAGES_BY_LANG.ru;
     return isMobile ? { ...base, ...MOBILE_NAV } : base;
@@ -181,13 +184,29 @@ function Calendar({ lessons, onSelectLesson, getEventColor, defaultView = 'month
   // Подсказка над выходным: фон дня (месяц) и ячейки времени (неделя, день).
   // Слой событий пропускает мышь к фону (calendar.css, .la-calendar--days-off).
   const dayOffTip = (MESSAGES_BY_LANG[culture] || MESSAGES_BY_LANG.ru).dayOff(dayOffTeacher);
+  // «ещё N» — своя кнопка вместо встроенного попапа календаря (флаг popup,
+  // он работает на заброшенной react-overlays). Календарь сам отдаёт
+  // remainingEvents — ровно те уроки, что не поместились в клетку.
   const components = useMemo(() => {
-    if (!isDayOff) return undefined;
+    const showMore = ({ slotDate, count, remainingEvents }) => (
+      <button
+        type="button"
+        className="rbc-button-link rbc-show-more"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setMore({ date: slotDate, events: remainingEvents });
+        }}
+      >
+        {messages.showMore(count)}
+      </button>
+    );
+    if (!isDayOff) return { showMore };
     const wrap = ({ value, children }) => (isDayOff(value)
       ? React.cloneElement(React.Children.only(children), { 'data-tip': dayOffTip })
       : children);
-    return { dateCellWrapper: wrap, timeSlotWrapper: wrap };
-  }, [isDayOff, dayOffTip]);
+    return { showMore, dateCellWrapper: wrap, timeSlotWrapper: wrap };
+  }, [isDayOff, dayOffTip, messages]);
 
   const eventClassName = (lesson) => [
     'la-calendar__event',
@@ -195,6 +214,13 @@ function Calendar({ lessons, onSelectLesson, getEventColor, defaultView = 'month
     isLight && isLight(lesson) && 'la-calendar__event--light',
     isDisabled && isDisabled(lesson) && 'la-calendar__event--disabled',
   ].filter(Boolean).join(' ');
+  // Цвет группы — переменная CSS у каждого урока (и в сетке, и в окне «ещё N»)
+  const eventStyle = (event) => ({ '--la-event-color': getEventColor ? getEventColor(event.resource) : 'var(--color-primary)' });
+
+  const selectLesson = (lesson) => {
+    if (isDisabled && isDisabled(lesson)) return;
+    if (onSelectLesson) onSelectLesson(lesson);
+  };
 
   return (
     <div className={`la-calendar${isDayOff ? ' la-calendar--days-off' : ''}`}>
@@ -206,7 +232,6 @@ function Calendar({ lessons, onSelectLesson, getEventColor, defaultView = 'month
         messages={messages}
         formats={isMobile ? MOBILE_FORMATS : FORMATS}
         culture={culture}
-        popup
         min={min}
         max={max}
         scrollToTime={min}
@@ -216,13 +241,31 @@ function Calendar({ lessons, onSelectLesson, getEventColor, defaultView = 'month
         components={components}
         eventPropGetter={(event) => ({
           className: eventClassName(event.resource),
-          style: { '--la-event-color': getEventColor ? getEventColor(event.resource) : 'var(--color-primary)' },
+          style: eventStyle(event),
         })}
-        onSelectEvent={(event) => {
-          if (isDisabled && isDisabled(event.resource)) return;
-          if (onSelectLesson) onSelectLesson(event.resource);
-        }}
+        onSelectEvent={(event) => selectLesson(event.resource)}
       />
+      {more && (
+        <Modal title={localizer.format(more.date, 'd MMMM, EEEE', culture)} onClose={() => setMore(null)}>
+          <div className="la-calendar__more-list">
+            {more.events.map(event => (
+              <button
+                key={event.id}
+                type="button"
+                className={`rbc-event ${eventClassName(event.resource)}`}
+                style={eventStyle(event)}
+                onClick={() => {
+                  if (isDisabled && isDisabled(event.resource)) return;
+                  setMore(null);
+                  selectLesson(event.resource);
+                }}
+              >
+                {event.title}
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

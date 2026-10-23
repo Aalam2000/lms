@@ -620,6 +620,8 @@ def file_response(object_key: str, filename: str, content_type: Optional[str], i
     в браузере (панель проверки, новая вкладка): картинки и PDF отдаются как
     есть, код/текст — как text/plain (чтобы чужой HTML/JS никогда не
     исполнялся), остальное — обычным скачиванием. inline=False — скачать."""
+    if not storage.exists(object_key):
+        raise HTTPException(status_code=404, detail="Файл не найден на диске — загрузите его заново")
     media_type = content_type or "application/octet-stream"
     disposition = "attachment"
     if inline:

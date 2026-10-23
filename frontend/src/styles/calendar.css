@@ -111,6 +111,23 @@
   color: var(--color-primary);
   font-weight: var(--weight-medium);
 }
+/* Окно «ещё N»: уроки дня, не поместившиеся в клетку месяца — столбиком,
+   вид тот же, что в сетке (классы .rbc-event и .la-calendar__event--*) */
+.la-calendar__more-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.la-calendar__more-list .rbc-event {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  font: inherit;
+  font-size: var(--font-sm);
+  white-space: normal;
+  padding: var(--space-2) var(--space-3);
+}
 
 /* ===== Легенда групп (только агрегированный календарь на /groups) ===== */
 .la-calendar__legend {

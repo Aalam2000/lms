@@ -64,6 +64,8 @@ async def _get_preview_pdf(object_key: str, ext: str) -> bytes:
         cached = await asyncio.to_thread(storage.read_object_or_none, key)
         if cached is not None:
             return cached
+        if not storage.exists(object_key):
+            raise HTTPException(status_code=404, detail="Файл не найден на диске — загрузите его заново")
         pdf_bytes = await asyncio.to_thread(_fetch_and_convert_to_pdf, object_key, ext)
         await asyncio.to_thread(storage.upload_bytes, key, pdf_bytes, "application/pdf")
         return pdf_bytes
@@ -469,6 +471,8 @@ async def material_text(
     material = (await db.execute(select(Material).where(Material.id == material_id))).scalar_one_or_none()
     if not material:
         raise HTTPException(status_code=404, detail="Файл не найден")
+    if not storage.exists(material.object_key):
+        raise HTTPException(status_code=404, detail="Файл не найден на диске — загрузите его заново")
     data = await asyncio.to_thread(lambda: b"".join(storage.stream_object(material.object_key)))
     try:
         text = await asyncio.to_thread(extract_text, material.original_filename, data)
