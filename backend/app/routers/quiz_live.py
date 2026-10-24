@@ -20,9 +20,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..dependencies import require_teacher
+from ..dependencies import get_current_user, require_teacher
 from ..models import GroupMember, Lesson, LessonMark, Quiz, User
-from .lessons import get_lesson_for_teacher_or_admin, _get_active_group_student_ids
+from .lessons import get_lesson_for_teacher_or_admin, get_lesson_for_student, _get_active_group_student_ids
 
 router = APIRouter(prefix="/quiz-live", tags=["quiz-live"])
 
@@ -69,6 +69,14 @@ def _touch(game: dict) -> None:
     game["last_touched"] = time.time()
 
 
+def _running_game(lesson_id: int) -> Optional[dict]:
+    # На урок — одна незавершённая игра: её код ученик получает кнопкой в уроке
+    for game in GAMES.values():
+        if game["lesson_id"] == lesson_id and game["status"] != "finished":
+            return game
+    return None
+
+
 def _check_all_answered(game: dict) -> None:
     if game["all_answered_at"] is not None:
         return
@@ -101,6 +109,15 @@ async def _finish_game(game: dict, db: AsyncSession) -> None:
             score = round(100 * p["correct_count"] / n)
             await _write_exam_score(db, game["lesson_id"], student_id, score, game["teacher_id"])
         await db.commit()
+
+
+async def _close_game(game: dict, db: AsyncSession) -> None:
+    # Педагог закрыл квиз (или запустил в уроке другой): идущая игра
+    # завершается как обычно (экзамен пишет оценки), не начатая — просто закрывается
+    if game["status"] == "active":
+        await _finish_game(game, db)
+    else:
+        game["status"] = "finished"
 
 
 def _time_left(game: dict) -> int:
@@ -231,6 +248,15 @@ async def open_game(
 
     lesson = await get_lesson_for_teacher_or_admin(body.lesson_id, db, current_user)
 
+    # В уроке идёт только один квиз: тот же — возвращаем его (вкладку хоста
+    # открыли заново), другой — прежний закрывается
+    running = _running_game(lesson.id)
+    if running:
+        if running["quiz_id"] == quiz.id:
+            _touch(running)
+            return {"code": running["code"]}
+        await _close_game(running, db)
+
     code = secrets.token_urlsafe(6)
     while code in GAMES:
         code = secrets.token_urlsafe(6)
@@ -326,6 +352,56 @@ async def set_exam(
     return _host_view(game)
 
 
+@router.post("/{code}/close")
+async def close_game(
+    code: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_teacher),
+):
+    game = _get_game(code)
+    if current_user.role != "admin" and game["teacher_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Нет доступа")
+    if game["status"] != "finished":
+        await _close_game(game, db)
+    _touch(game)
+    return _host_view(game)
+
+
+# ---------- Ученик в платформе: кнопка «Войти в квиз» в уроке ----------
+
+@router.get("/lesson/{lesson_id}/active")
+async def get_lesson_active_game(
+    lesson_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Идёт ли сейчас квиз в этом уроке: {code, title} или null
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Нет доступа")
+    lesson = await get_lesson_for_student(lesson_id, db, current_user)
+    game = _running_game(lesson.id)
+    if game:
+        await _maybe_auto_advance(game, db)
+    if not game or game["status"] == "finished":
+        return None
+    if current_user.id not in await _get_active_group_student_ids(lesson, db):
+        return None
+    return {"code": game["code"], "title": game["title"]}
+
+
+@router.post("/{code}/join-me")
+async def join_game_me(
+    code: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Вход ученика под своим логином — без выбора имени из списка
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Войти в квиз может только ученик")
+    game = _get_game(code)
+    return await _join(game, current_user.id, db)
+
+
 # ---------- Ученик (без логина — по коду игры и токену участника) ----------
 
 @router.get("/{code}/roster")
@@ -365,10 +441,14 @@ async def get_roster(code: str, db: AsyncSession = Depends(get_db)):
 @router.post("/{code}/join")
 async def join_game(code: str, body: JoinBody, db: AsyncSession = Depends(get_db)):
     game = _get_game(code)
+    return await _join(game, body.student_id, db)
+
+
+async def _join(game: dict, student_id: int, db: AsyncSession) -> dict:
     if game["status"] == "finished":
         raise HTTPException(status_code=400, detail="Игра уже завершена")
 
-    existing = game["participants"].get(body.student_id)
+    existing = game["participants"].get(student_id)
     if existing:
         _touch(game)
         return {"token": existing["token"], "name": existing["name"]}
@@ -378,23 +458,23 @@ async def join_game(code: str, body: JoinBody, db: AsyncSession = Depends(get_db
     if not lesson:
         raise HTTPException(status_code=404, detail="Урок не найден")
     student_ids = await _get_active_group_student_ids(lesson, db)
-    if body.student_id not in student_ids:
+    if student_id not in student_ids:
         raise HTTPException(status_code=403, detail="Этот ученик не из группы этого урока")
 
-    user_result = await db.execute(select(User).where(User.id == body.student_id))
+    user_result = await db.execute(select(User).where(User.id == student_id))
     student = user_result.scalar_one_or_none()
     if not student:
         raise HTTPException(status_code=404, detail="Ученик не найден")
 
     token = secrets.token_urlsafe(16)
     name = student.full_name or student.username
-    game["participants"][body.student_id] = {
+    game["participants"][student_id] = {
         "name": name,
         "token": token,
         "answers": {},
         "correct_count": 0,
     }
-    game["tokens"][token] = body.student_id
+    game["tokens"][token] = student_id
     _touch(game)
     return {"token": token, "name": name}
 

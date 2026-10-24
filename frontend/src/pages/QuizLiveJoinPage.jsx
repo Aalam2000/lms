@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
-import { getLiveRoster, getLivePlayerState, joinLiveQuiz, answerLiveQuestion } from '../api/quizLive';
+import { getLiveRoster, getLivePlayerState, joinLiveQuiz, joinLiveQuizMe, answerLiveQuestion } from '../api/quizLive';
+import { useAuth } from '../context/AuthContext';
 import { QUIZ_LIVE_OPTION_STYLES } from '../utils/quizLiveColors';
 
 const POLL_MS = 1500;
@@ -23,16 +24,33 @@ function QuizLiveJoinPage() {
   const [error, setError] = useState('');
   const [answering, setAnswering] = useState(false);
   const timerRef = useRef(null);
+  // Ученик, вошедший в платформу (кнопка «Войти в квиз» в уроке), входит
+  // в игру под своим логином; список имён — только для входа без логина (QR)
+  const { user } = useAuth();
+  const isStudent = user?.role === 'student';
+
+  useEffect(() => {
+    if (token || !isStudent) return;
+    let cancelled = false;
+    joinLiveQuizMe(code)
+      .then(({ token: newToken }) => {
+        if (cancelled) return;
+        localStorage.setItem(tokenKey(code), newToken);
+        setToken(newToken);
+      })
+      .catch(err => { if (!cancelled) setError(err?.response?.data?.detail || 'Не удалось войти в квиз'); });
+    return () => { cancelled = true; };
+  }, [code, token, isStudent]);
 
   // Без токена — грузим список ещё не зарегистрированных учеников группы.
   useEffect(() => {
-    if (token) return;
+    if (token || isStudent) return;
     let cancelled = false;
     getLiveRoster(code)
       .then(data => { if (!cancelled) setRoster(data); })
       .catch(err => { if (!cancelled) setError(err?.response?.data?.detail || 'Игра не найдена'); });
     return () => { cancelled = true; };
-  }, [code, token]);
+  }, [code, token, isStudent]);
 
   // С токеном (свежим или из localStorage — «автоматом выбирается он же»
   // при перезагрузке вкладки) — опрашиваем своё состояние.
@@ -90,7 +108,7 @@ function QuizLiveJoinPage() {
   }
 
   if (!token) {
-    if (!roster) return <div className="centered-page">{'Загрузка...'}</div>;
+    if (isStudent || !roster) return <div className="centered-page">{'Загрузка...'}</div>;
     return (
       <div className="centered-page">
         <div className="card">

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
 import { QRCodeSVG } from 'qrcode.react';
-import { getLiveHostState, setLiveExam, startLiveQuiz, nextLiveQuestion } from '../api/quizLive';
+import { getLiveHostState, setLiveExam, startLiveQuiz, nextLiveQuestion, closeLiveQuiz } from '../api/quizLive';
 import { QUIZ_LIVE_OPTION_STYLES } from '../utils/quizLiveColors';
 import { notifyLessonMarksUpdated } from '../utils/lessonMarksChannel';
 
@@ -101,6 +101,19 @@ function QuizLiveHostPage() {
     }
   };
 
+  // Закрыть квиз: у учеников в уроке пропадает кнопка «Войти в квиз».
+  // Идущая игра завершается как обычно (при «Экзамене» оценки уходят в журнал).
+  const handleClose = async () => {
+    setBusy(true);
+    try {
+      setState(await closeLiveQuiz(code));
+    } catch (err) {
+      setError(err?.response?.data?.detail || 'Не удалось закрыть');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (error) {
     return <div className="centered-page"><div className="card"><p className="error-text">{error}</p></div></div>;
   }
@@ -136,7 +149,10 @@ function QuizLiveHostPage() {
                 {state.is_exam ? 'Оценка пойдёт в журнал урока' : 'Оценка не ставится'}
               </p>
             </div>
-            <button className="btn btn--pill btn--lg" onClick={handleStart} disabled={busy}>{'Провести'}</button>
+            <div className="button-row">
+              <button className="btn btn--pill btn--lg" onClick={handleStart} disabled={busy}>{'Провести'}</button>
+              <button className="btn btn--outline btn--pill btn--lg" onClick={handleClose} disabled={busy}>{'Закрыть квиз'}</button>
+            </div>
           </div>
           <div className="quiz-live-participants">
             <h3>{'Участники'}</h3>
@@ -168,7 +184,10 @@ function QuizLiveHostPage() {
                 </div>
               ))}
             </div>
-            <button className="btn btn--pill btn--lg" onClick={handleNext} disabled={busy}>{'Продолжить'}</button>
+            <div className="button-row">
+              <button className="btn btn--pill btn--lg" onClick={handleNext} disabled={busy}>{'Продолжить'}</button>
+              <button className="btn btn--outline btn--pill btn--lg" onClick={handleClose} disabled={busy}>{'Закрыть квиз'}</button>
+            </div>
           </div>
           <div className={`quiz-live-participants${state.all_answered ? ' quiz-live-participants--all' : ''}`}>
             <h3>{'Участники'}</h3>

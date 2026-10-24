@@ -1,4 +1,4 @@
-<!-- autoi18n: source=student.md lang=az sha1=598774176e678eb55b61b02c82fb55c61f23c71a -->
+<!-- autoi18n: source=student.md lang=az sha1=90a0dffa79f8104712113c0cf304568cdb71a642 -->
 # Platformada necə işləmək
 
 ## Ana səhifə — mənim dərslərim
@@ -27,6 +27,8 @@ Dərsi açmaq üçün üzərinə klikləyin.
 Dərs başladıqda, yuxarı sağda **"Dərsi necə bəyəndin?"** sualı və üç smileyk görünür: yaşıl — bəyəndim, sarı — normal, qırmızı — bəyənmədim. Onlardan birinə klikləyin. Qiyməti dəyişmək mümkündür. Müəllim kiminsə hansı smileyk qoyduğunu görmür.
 
 👤 işarəsi olan dərs — şəxsi: onu yalnız siz və müəllimin dəvət etdiyi şəxslər görür.
+
+Müəllim quiz başladanda sekmələrin üstündə **Quizə daxil ol** düyməsi görünür. Onu basın — oyuna öz adınızla daxil olacaqsınız. Quiz bitəndə və ya müəllim onu bağlayanda düymə yox olur.
 
 Aşağıda dörd sekme var: **Materiallar**, **Dərsdə iş**, **Ev tapşırığı** və **Dialoq**. Sekmədəki rəqəm, orada sizi nəyinsə gözlədiyini bildirir; "Dərsdə iş" sekmesində — təqdim etdiyiniz faylların sayı.
 

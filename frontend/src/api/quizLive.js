@@ -23,7 +23,22 @@ export function nextLiveQuestion(code) {
   return api.post(`/quiz-live/${code}/next`).then(res => res.data);
 }
 
+// Закрыть квиз: кнопка «Войти в квиз» у учеников пропадает
+export function closeLiveQuiz(code) {
+  return api.post(`/quiz-live/${code}/close`).then(res => res.data);
+}
+
 // --- Ученик ---
+// Идёт ли в уроке квиз: { code, title } или null — кнопка «Войти в квиз»
+export function getLessonLiveQuiz(lessonId) {
+  return api.get(`/quiz-live/lesson/${lessonId}/active`).then(res => res.data);
+}
+
+// Вход под своим логином (ученик в платформе): { token, name }
+export function joinLiveQuizMe(code) {
+  return api.post(`/quiz-live/${code}/join-me`).then(res => res.data);
+}
+
 export function getLiveRoster(code) {
   return api.get(`/quiz-live/${code}/roster`).then(res => res.data);
 }

@@ -1,4 +1,4 @@
-<!-- autoi18n: source=student.md lang=en sha1=598774176e678eb55b61b02c82fb55c61f23c71a -->
+<!-- autoi18n: source=student.md lang=en sha1=90a0dffa79f8104712113c0cf304568cdb71a642 -->
 # How to work on the platform
 
 ## Home — my lessons
@@ -27,6 +27,8 @@ If you have unsubmitted homework, a colored bar with the lesson name and deadlin
 When the lesson starts, a question **"How do you like the lesson?"** appears at the top right along with three smileys: green — liked it, yellow — okay, red — didn't like it. Click on one of them. The rating can be changed. The teacher does not see who selected which smiley.
 
 A lesson marked 👤 — is personal: only you and those invited by the teacher can see it.
+
+When the teacher starts a quiz, a **Join the quiz** button appears above the tabs. Click it — you will join the game under your own name. When the quiz ends or the teacher closes it, the button disappears.
 
 Below are four tabs: **Materials**, **Work during the lesson**, **Homework** and **Dialogue**. The number on the tab indicates that something is waiting for you there; on the "Work during the lesson" tab — how many files you have submitted.
 

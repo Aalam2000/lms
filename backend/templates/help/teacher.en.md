@@ -1,4 +1,4 @@
-<!-- autoi18n: source=teacher.md lang=en sha1=2909bda8949066aaec70e9d65d1fe760b9e6e2b5 -->
+<!-- autoi18n: source=teacher.md lang=en sha1=8696061a660612f331f0ba00f28e453fbe261f5d -->
 # How to work on the platform
 
 ## My groups
@@ -123,7 +123,8 @@ After the review, the student can no longer add or delete files. The student can
 
 - **Flash** — question-answer; **Live** — real-time voting.
 - Questions can be written by yourself or use the **Assistant**: it will gather a request for any AI on the topic and materials of the lesson, and the AI's answer will fill the quiz.
-- The live quiz is conducted from the quiz page: students connect via the link, you click **Conduct** and lead the questions. If you mark **Exam**, the result will go as a grade in the lesson journal.
+- The live quiz is conducted from the quiz page: students connect via the link, you click **Conduct** and lead the questions. If you mark **Exam**, the result will go as a grade in the lesson journal. Students get a **Join the quiz** button on their lesson page (they can also join by QR code or link).
+- Only one quiz runs in a lesson: starting another one closes the previous one. **Close the quiz** ends the game, and the button disappears for students.
 
 ## Knowledge base
 

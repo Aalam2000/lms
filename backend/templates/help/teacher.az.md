@@ -1,4 +1,4 @@
-<!-- autoi18n: source=teacher.md lang=az sha1=2909bda8949066aaec70e9d65d1fe760b9e6e2b5 -->
+<!-- autoi18n: source=teacher.md lang=az sha1=8696061a660612f331f0ba00f28e453fbe261f5d -->
 # Platformada necə işləmək
 
 ## Mənim qruplarım
@@ -123,7 +123,8 @@ Yoxlamadan sonra tələbə daha fayl əlavə edə və ya silə bilmir. Tələbə
 
 - **Flash** — sual-cavab; **Live** — real vaxtda səsvermə.
 - Sualları özünüz yaza bilərsiniz və ya **Yardımçı**dan istifadə edə bilərsiniz: o, dərs mövzusu və materialları üzrə hər hansı bir AI üçün sorğu toplayacaq, AI-nin cavabı quiz-i dolduracaq.
-- Live-quiz quiz səhifəsindən keçirilir: şagirdlər link vasitəsilə qoşulurlar, siz **Keçirmək** düyməsini basırsınız və sualları irəliləyirsiniz. **İmtahan** seçilərsə, nəticə dərs jurnalında qiymət olaraq gedəcək.
+- Live-quiz quiz səhifəsindən keçirilir: şagirdlər link vasitəsilə qoşulurlar, siz **Keçirmək** düyməsini basırsınız və sualları irəliləyirsiniz. **İmtahan** seçilərsə, nəticə dərs jurnalında qiymət olaraq gedəcək. Şagirdlərin dərs səhifəsində **Quizə daxil ol** düyməsi görünür (QR-kod və ya link ilə də qoşulmaq olar).
+- Dərsdə yalnız bir quiz gedir: başqasını başlatmaq əvvəlkini bağlayır. **Quizi bağla** oyunu bitirir və şagirdlərdə düymə yox olur.
 
 ## Bilik bazası
 

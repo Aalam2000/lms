@@ -19,6 +19,7 @@ import { getMyHomework, getMessages } from '../api/homework';
 import { getMyWork } from '../api/lessonWork';
 import { getLesson, getLessonItems } from '../api/lessons';
 import { openPendingTab, showMaterialInTab } from '../api/materials';
+import { getLessonLiveQuiz } from '../api/quizLive';
 import { useHomeworkRefresh } from '../hooks/useHomeworkRefresh';
 
 function StudentLessonPage() {
@@ -47,6 +48,22 @@ function StudentLessonPage() {
   const [newMessages, setNewMessages] = useState(0);
   const [itemsError, setItemsError] = useState('');
   const [openingKey, setOpeningKey] = useState(null);
+  // Живой квиз, который педагог запустил в этом уроке: { code, title } или null
+  const [liveQuiz, setLiveQuiz] = useState(null);
+
+  // Пока урок открыт — раз в 5 с спрашиваем, не запущен ли квиз: кнопка
+  // «Войти в квиз» появляется при запуске и пропадает, когда квиз закрыт
+  useEffect(() => {
+    let cancelled = false;
+    const check = () => {
+      getLessonLiveQuiz(lessonId)
+        .then(data => { if (!cancelled) setLiveQuiz(data || null); })
+        .catch(() => { if (!cancelled) setLiveQuiz(null); });
+    };
+    check();
+    const timer = setInterval(check, 5000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [lessonId]);
 
   useEffect(() => {
     const load = async () => {
@@ -174,6 +191,18 @@ function StudentLessonPage() {
       </div>
 
       {error && <div className="error-text error-text--muted">{error}</div>}
+
+      {liveQuiz && (
+        <div className="live-quiz-call">
+          <span className="live-quiz-call__text">
+            <span>{'Педагог запустил квиз'}</span>
+            <span className="live-quiz-call__title">{liveQuiz.title}</span>
+          </span>
+          <button type="button" className="btn btn--pill btn--lg" onClick={() => navigate(`/quiz-live/${liveQuiz.code}`)}>
+            {'Войти в квиз'}
+          </button>
+        </div>
+      )}
 
       <div className="lesson-tabs">
         {TABS.map(t => (
