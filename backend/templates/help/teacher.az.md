@@ -1,4 +1,4 @@
-<!-- autoi18n: source=teacher.md lang=az sha1=1b3a58d85f6e1f03fc8434648e52c209828f1bad -->
+<!-- autoi18n: source=teacher.md lang=az sha1=cec3395498c60d1372547460a19dc9e83933be1f -->
 # Platformada necə işləmək
 
 ## Mənim qruplarım
@@ -103,7 +103,7 @@ Bakıda gecə yarısından sonra davamiyyət və dərs üçün qiyməti dəyişm
 
 **AI-nin bütün qrupun yoxlanması (dərsdə iş).** **AI-nin yoxlanması** düyməsi dərs jurnalında pəncərə açır: tapşırıq olan dərs materiallarını işarələyin və **Paketi yüklə** düyməsini basın — ZIP faylı, işarələnmiş materiallar və bütün tələbələrin (hər biri üçün yalnız ad) faylları gələcək. AI arxivini verin, onun cavabını (JSON) pəncərəyə yapışdırın və **Doldur** düyməsini basın: hər bir tələbənin qiyməti və «Yaxşı / Pis» şərhi olacaq. Düzəliş edin və **Qəbul et** düyməsini basın və ya **Hamısını qəbul et** — dərs üçün qiymət jurnalına düşəcək, şərh dialoqa göndəriləcək. Pəncərəni bağlasanız, qəbul edilməmiş eskizlər dərs açıq olduğu müddətcə saxlanılacaq.
 
-Son tarixi hamıya eyni anda və ya ayrı-ayrı tələbələrə dəyişmək mümkündür. Tapşırıqda istənilən sayda fayl ola bilər — «+ Ev tapşırığı» pəncərəsində bir neçə fayl seçmək mümkündür; məhdudiyyət yalnız faylın ölçüsüdür (50 MB-a qədər).
+Son tarixi hamıya eyni anda və ya ayrı-ayrı tələbələrə dəyişmək mümkündür. Tapşırıqda istənilən sayda fayl ola bilər — «+ Ev tapşırığı» pəncərəsində bir neçə fayl seçmək mümkündür; məhdudiyyət yalnız faylın ölçüsüdür (50 MB-a qədər). Elə orada, aşağıda artıq verilmiş fayllar görünür: ✕ faylı ev tapşırığından ayırır (Bilik bazasındakı fayl orada qalır, şagirdlərin cavabları silinmir).
 
 Yoxlama pəncərəsində **⬇ Yüklə** — tələbənin faylı sizin kompüterinizə saxlanılır.
 

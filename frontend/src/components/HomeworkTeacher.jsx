@@ -1,6 +1,7 @@
 // ДЗ со стороны педагога — вкладка «Студенты» урока (claude/homework-plan.md):
 //  - HomeworkAddModal  — окно «+ ДЗ»: «+ Файл», «Из БЗ», «Дедлайн». Без кнопок
-//    «Выдать»/«Отмена» и без вопросов. Клик мимо окна — закрыть.
+//    «Выдать»/«Отмена» и без вопросов. Клик мимо окна — закрыть. Ниже — уже
+//    выданные файлы этого окна (общие или персональные), ✕ — открепить файл.
 //  - HomeworkFlags     — два узких флажка в обычной таблице: «ДЗ» (выдано) и «Ответ».
 //  - HomeworkCheckView — режим «Проверить ДЗ»: таблица перестроена под приём ДЗ
 //    (Имя, Задание, Срок, Ответ, Итог ДЗ, Комментарий).
@@ -24,7 +25,7 @@ import LibraryPickerModal from './LibraryPickerModal';
 import { DialogCell, DialogThread } from './LessonDialog';
 import { formatDeadline } from './DeadlinePicker';
 import {
-  createHomeworkTask, setScopeDeadline, reviewHomework, sendMessage,
+  createHomeworkTask, deleteHomeworkTask, setScopeDeadline, reviewHomework, sendMessage,
   openTaskFile, openAnswerFile, answerFileViewUrl, downloadAnswerFile, getAiSource,
 } from '../api/homework';
 import { LANG_NAMES, copyText } from './QuizHelper';
@@ -34,9 +35,10 @@ import { extractErrorMessage } from '../utils/errors';
 
 // ---------- Окно «+ ДЗ» ----------
 
-export function HomeworkAddModal({ lessonId, student, deadline, sector, courseId, lessonNo, onChanged, onClose }) {
+export function HomeworkAddModal({ lessonId, student, tasks = [], deadline, sector, courseId, lessonNo, onChanged, onClose }) {
   const fileRef = useRef(null);
   const [busy, setBusy] = useState(false);
+  const [removingId, setRemovingId] = useState(null);
   const [error, setError] = useState('');
   const [showLibrary, setShowLibrary] = useState(false);
   const [deadlineValue, setDeadlineValue] = useState(deadline ? new Date(deadline) : null);
@@ -75,6 +77,22 @@ export function HomeworkAddModal({ lessonId, student, deadline, sector, courseId
     }
   };
 
+  // Открепить файл от ДЗ — как ✕ у материалов урока. Файл из Базы знаний
+  // остаётся в ней; персональный файл удаляется, если больше нигде не выдан.
+  // Ответы студентов не трогаем.
+  const handleRemove = async (task) => {
+    setRemovingId(task.id);
+    setError('');
+    try {
+      await deleteHomeworkTask(lessonId, task.id);
+      await onChanged();
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Не удалось открепить'));
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
   const saveDeadline = async () => {
     setError('');
     try {
@@ -110,6 +128,32 @@ export function HomeworkAddModal({ lessonId, student, deadline, sector, courseId
         />
       </div>
       {error && <div className="error-text error-text--muted">{error}</div>}
+      {tasks.length > 0 && (
+        <div className="hw-given">
+          <div className="hw-given__title text-muted">{'Выданные файлы'}</div>
+          {tasks.map(t => (
+            <div key={t.id} className="hw-given__row">
+              <button
+                type="button"
+                className="link"
+                data-tip="Открыть задание"
+                onClick={() => openTaskFile(t).catch(err => setError(extractErrorMessage(err, 'Не удалось открыть файл')))}
+              >
+                {t.title}
+              </button>
+              <button
+                type="button"
+                className="btn btn--sm"
+                data-tip="Открепить файл"
+                onClick={() => handleRemove(t)}
+                disabled={removingId === t.id || busy}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       {showLibrary && (
         <LibraryPickerModal
           lessonId={lessonId}

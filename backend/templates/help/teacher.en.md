@@ -1,4 +1,4 @@
-<!-- autoi18n: source=teacher.md lang=en sha1=1b3a58d85f6e1f03fc8434648e52c209828f1bad -->
+<!-- autoi18n: source=teacher.md lang=en sha1=cec3395498c60d1372547460a19dc9e83933be1f -->
 # How to work on the platform
 
 ## My groups
@@ -103,7 +103,7 @@ After midnight in Baku, attendance and grades for the lesson can no longer be ch
 
 **AI Check for the Entire Group (in-class work).** The **AI Check** button in the lesson journal opens a window: select the lesson materials that were assigned and click **Download Package** — a ZIP file will be sent with the prompt, selected materials, and files of all students (only the name for each). Submit the AI archive, paste its response (JSON) into the window, and click **Fill**: each student will receive a grade and a comment "Good / Bad". Correct it and click **Accept** in the row or **Accept All** — the grade for the lesson will be recorded in the journal, and the comment will go to the dialogue. If the window is closed, unaccepted drafts will be saved while the lesson is open.
 
-The deadline can be changed for everyone at once or for an individual student. There can be any number of files in the assignment — in the "+ Homework" window, you can select several at once; the only limitation is the file size (up to 50 MB).
+The deadline can be changed for everyone at once or for an individual student. There can be any number of files in the assignment — in the "+ Homework" window, you can select several at once; the only limitation is the file size (up to 50 MB). The files already assigned are listed at the bottom of the same window: ✕ detaches a file from the homework (a file from the Knowledge Base stays there, students' answers are not deleted).
 
 In the checking window, there is **⬇ Download** — the student's file is saved to your computer.
 

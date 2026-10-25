@@ -1005,6 +1005,7 @@ function LessonPage() {
                 <HomeworkAddModal
                   lessonId={lessonId}
                   student={null}
+                  tasks={hwBoard.tasks.filter(t => !t.student_id)}
                   deadline={hwBoard.tasks.find(t => !t.student_id && t.deadline)?.deadline || null}
                   sector={lesson.group_sector}
                   courseId={lesson.group_course_id}
@@ -1018,6 +1019,7 @@ function LessonPage() {
                 <HomeworkAddModal
                   lessonId={lessonId}
                   student={hwAddFor}
+                  tasks={hwBoard.tasks.filter(t => t.student_id === hwAddFor.student_id)}
                   deadline={personalOrCommonDeadline(hwBoard, hwAddFor.student_id)}
                   sector={lesson.group_sector}
                   courseId={lesson.group_course_id}
