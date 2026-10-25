@@ -5,6 +5,7 @@ import Avatar from '../components/Avatar';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
 import DaysOffEditor from '../components/DaysOffEditor';
+import { ScratchAccessBlock } from '../components/ParentLinkBlock';
 
 // Исходник фото до обработки — как на сервере (routers/auth.py, PHOTO_MAX_UPLOAD)
 const PHOTO_MAX_MB = 15;
@@ -319,6 +320,17 @@ function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Аккаунт в классе Scratch — выдаёт педагог выгрузкой CSV группы */}
+      {role === 'student' && me && (
+        <>
+          <h3 className="form-section">{'Мой Scratch'}</h3>
+          <ScratchAccessBlock
+            login={me.scratch_login} password={me.scratch_password}
+            emptyText={'Логин и пароль для Scratch выдаст педагог.'}
+          />
+        </>
+      )}
 
       {/* Выходные педагога ставит админ — здесь только просмотр (DaysOffEditor) */}
       {role === 'teacher' && user?.id && (

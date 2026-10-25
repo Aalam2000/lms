@@ -1,5 +1,6 @@
 // Роутер /groups (backend/app/routers/groups.py)
 import api from './auth';
+import { saveBlob } from './homework';
 
 // params.with_guest — ещё и группы, где педагог не основной, но ведёт или вёл уроки (is_main: false)
 export function getMyGroups(params) {
@@ -24,6 +25,12 @@ export function getCourses() {
 
 export function getGroupByInvite(inviteCode) {
   return api.get(`/groups/invite/${inviteCode}`).then(res => res.data);
+}
+
+// CSV для класса Scratch: «логин,пароль» активных учеников; ученикам без аккаунта
+// Scratch логин и пароль создаются и сохраняются (видны в карточке ученика)
+export function downloadGroupScratchCsv(groupId, groupName) {
+  return saveBlob(`/groups/${groupId}/scratch-csv`, `scratch-${groupName}.csv`, 'text/csv');
 }
 
 export function getGroupStudents(groupId, status = 'active') {

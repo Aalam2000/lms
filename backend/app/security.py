@@ -85,6 +85,36 @@ def _latin(word: str) -> str:
     return re.sub(r"[^a-z]", "", word)
 
 
+# ── Аккаунт ученика в классе Scratch (CSV для Scratch на странице группы) ──
+# Логин: «группа_логин» латиницей, «.» → «_», только a-z, 0-9 и «_», не длиннее
+# 20 знаков (ограничение Scratch) — длинное название группы сокращается, логин
+# платформы остаётся целиком. Пароль — простое слово и три цифры: tigr482.
+SCRATCH_LOGIN_MAX = 20
+_SCRATCH_WORDS = (
+    "kot", "tigr", "sova", "panda", "zebra", "ezhik", "kit", "mishka", "zayats",
+    "pingvin", "delfin", "enot", "bars", "kenguru", "zhiraf", "krot", "yozh",
+    "kapibara", "drakon", "raketa", "kometa", "vulkan", "kaktus", "mango",
+)
+
+
+def scratch_slug(text: str) -> str:
+    text = (text or "").replace("İ", "i").lower()
+    text = "".join(_TRANSLIT.get(ch, ch) for ch in text)
+    text = unicodedata.normalize("NFKD", text).replace(".", "_")
+    return re.sub(r"[^a-z0-9_]", "", text).strip("_")
+
+
+def scratch_login(group_name: str, username: str) -> str:
+    login = scratch_slug(username)[:SCRATCH_LOGIN_MAX]
+    room = SCRATCH_LOGIN_MAX - len(login) - 1
+    group = scratch_slug(group_name.replace(" ", ""))[:room].strip("_") if room > 0 else ""
+    return f"{group}_{login}" if group else login
+
+
+def scratch_password() -> str:
+    return random.choice(_SCRATCH_WORDS) + "".join(random.choice("23456789") for _ in range(3))
+
+
 def login_base(full_name: str) -> str:
     """Основа логина без цифр: murad.ali / murad."""
     words = [w for w in (_latin(w) for w in (full_name or "").split()) if w]

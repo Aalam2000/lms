@@ -17,7 +17,7 @@ import { PersonalBadge, ParticipantsPicker } from '../components/PersonalLesson'
 import LessonTeacherModal from '../components/LessonTeacherModal';
 import GroupScheduleModal from '../components/GroupScheduleModal';
 import { useDaysOff } from '../hooks/useDaysOff';
-import { getMyGroups, getCourses } from '../api/groups';
+import { getMyGroups, getCourses, downloadGroupScratchCsv } from '../api/groups';
 import { useHomeworkRefresh } from '../hooks/useHomeworkRefresh';
 import {
   getGroupLessons, createLesson,
@@ -324,6 +324,16 @@ function GroupPage() {
     }
   };
 
+  // CSV для класса Scratch (кнопка в шапке группы): логины и пароли учеников
+  const downloadScratchCsv = async () => {
+    setError('');
+    try {
+      await downloadGroupScratchCsv(group.id, group.name);
+    } catch (err) {
+      setError(err?.response?.data?.detail || 'Не удалось выгрузить CSV');
+    }
+  };
+
   if (loading) return <div className="page">{'Загрузка...'}</div>;
 
   if (!group) {
@@ -369,6 +379,14 @@ function GroupPage() {
             <IconButton icon="settings" tip={'Настройки группы'} onClick={() => setIsSettingsOpen(true)} />
             <IconButton icon="qr" tip={'QR для регистрации'} onClick={() => setIsQRModalOpen(true)} />
             <IconButton icon="students" tip={'Ученики'} label={group.student_count ?? 0} onClick={() => setIsStudentsModalOpen(true)} />
+            <button
+              type="button"
+              className="btn btn--outline"
+              data-tip={'Логины и пароли учеников для класса Scratch'}
+              onClick={downloadScratchCsv}
+            >
+              {'CSV для Scratch'}
+            </button>
             {/* Записались по QR и ждут подтверждения — пока не примете, их нет в журнале */}
             {group.pending_count > 0 && (
               <button

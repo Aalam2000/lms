@@ -76,6 +76,9 @@ async def login(user_data: UserLogin, db: AsyncSession = Depends(get_db)):
 class UserMeOut(UserOut):
     permissions: list[str] = []
     ui_prefs: Optional[dict] = None  # у нового пользователя в базе NULL — отдаём {}
+    # Ученик: аккаунт в классе Scratch — блок «Мой Scratch» в профиле
+    scratch_login: Optional[str] = None
+    scratch_password: Optional[str] = None
 
 
 @router.get("/me", response_model=UserMeOut)

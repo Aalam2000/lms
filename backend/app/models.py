@@ -28,6 +28,11 @@ class User(Base):
     # Выбор пользователя в интерфейсе (вид страниц, фильтры, папка Базы знаний,
     # язык): {"ключ": значение}; пишет PATCH /auth/me/prefs (routers/auth.py)
     ui_prefs = Column(JSONB, nullable=True)
+    # Аккаунт ученика в классе Scratch: логин и понятный ребёнку пароль.
+    # Создаются при выгрузке CSV группы (security.scratch_login / scratch_password),
+    # пароль открытым текстом — он от Scratch, не от платформы
+    scratch_login = Column(String, nullable=True)
+    scratch_password = Column(String, nullable=True)
     # Ученик без группы (добавил куратор): курс, сектор и педагог, к которому его
     # направили — ученик виден этому педагогу в «Студентах», пока тот не запишет
     # его в группу. У остальных ролей пусто.

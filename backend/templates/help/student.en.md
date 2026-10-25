@@ -1,4 +1,4 @@
-<!-- autoi18n: source=student.md lang=en sha1=90a0dffa79f8104712113c0cf304568cdb71a642 -->
+<!-- autoi18n: source=student.md lang=en sha1=faa246ddf73a2f4ad4864ef8e6442c63dc62a889 -->
 # How to work on the platform
 
 ## Home — my lessons
@@ -71,3 +71,5 @@ In the [Performance](/dashboard/performance) section — all your grades for les
 ## Profile
 
 In the [Profile](/dashboard/profile) you can change the password.
+
+There is also the **My Scratch** block: your login and password for scratch.mit.edu, given by your teacher. Each has a **Copy** button.

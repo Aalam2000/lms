@@ -4,6 +4,7 @@
 //   AccessBlock        — адрес платформы, логин и пароль, пока пароль равен логину
 //                        StudentAccessBlock — ученик,
 //                        у куратора — в админке (AdminPage.jsx).
+//   ScratchAccessBlock — аккаунт в классе Scratch (в карточке и в профиле ученика).
 // Кнопки «Скопировать» / «Отправить в WhatsApp» у обоих блоков общие (ShareButtons).
 // Работают педагог (ученикам своих групп) и админ.
 import React, { useEffect, useState } from 'react';
@@ -185,6 +186,35 @@ export function StudentAccessBlock({ studentId, username, phone, passwordIsLogin
       changedText={'сменён учеником'}
       onReset={() => setStudentPassword(studentId, username)}
     />
+  );
+}
+
+// Строка «подпись: значение» со своей кнопкой «Скопировать»
+function CopyRow({ label, value }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    await copyText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <div className="copy-row">
+      <span>{label}{': '}<b className="copy-row__value">{value}</b></span>
+      <button type="button" className="btn btn--sm" onClick={copy}>{copied ? 'Скопировано' : 'Скопировать'}</button>
+    </div>
+  );
+}
+
+// Аккаунт ученика в классе Scratch: сайт, логин и пароль, у каждого — «Скопировать».
+// Создаётся кнопкой «CSV для Scratch» на странице группы (routers/groups.py).
+export function ScratchAccessBlock({ login, password, emptyText }) {
+  if (!login) return <div className="hint-text">{emptyText}</div>;
+  return (
+    <div className="parent-link">
+      <a className="link" href="https://scratch.mit.edu" target="_blank" rel="noopener noreferrer">{'scratch.mit.edu'}</a>
+      <CopyRow label={'Логин'} value={login} />
+      <CopyRow label={'Пароль'} value={password} />
+    </div>
   );
 }
 

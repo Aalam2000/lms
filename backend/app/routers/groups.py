@@ -1,7 +1,7 @@
 from typing import Optional
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
@@ -9,6 +9,7 @@ from ..database import get_db
 from ..models import Group, GroupMember, Lesson, User, Course
 from ..schemas import GroupOut, CourseOut, GroupInviteOut, clean_video_url, DURATION_MIN, DURATION_MAX
 from ..dependencies import has_perm, require, require_teacher, get_current_user
+from ..security import scratch_login, scratch_password, scratch_slug
 from ..homework_status import oldest_lesson_to_review, to_review_by_group
 from ..lesson_work import work_to_review_by_group, work_to_review_for_teacher
 
@@ -371,6 +372,37 @@ async def get_group_students(
             expelled_at=member.expelled_at,
         ))
     return out
+
+
+# CSV для класса Scratch («CSV Upload» в аккаунте педагога): две колонки без
+# заголовка — логин и пароль, по строке на активного ученика группы. Ученику без
+# аккаунта Scratch логин («группа_логин») и пароль создаются и сохраняются — их
+# видно в карточке ученика и в его профиле; повторная выгрузка даёт те же.
+@router.get("/{group_id}/scratch-csv")
+async def get_group_scratch_csv(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_teacher)
+):
+    group = await _get_owned_group(db, group_id, current_user)
+    students = (await db.execute(
+        select(User)
+        .join(GroupMember, GroupMember.student_id == User.id)
+        .where(GroupMember.group_id == group_id, GroupMember.status == "active")
+        .order_by(User.full_name, User.username)
+    )).scalars().all()
+    for student in students:
+        if not student.scratch_login:
+            student.scratch_login = scratch_login(group.name, student.username)
+        if not student.scratch_password:
+            student.scratch_password = scratch_password()
+    await db.commit()
+    csv = "".join(f"{s.scratch_login},{s.scratch_password}\r\n" for s in students)
+    filename = f"scratch-{scratch_slug(group.name.replace(' ', '')) or group.id}.csv"
+    return Response(
+        content=csv.encode("utf-8"), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # Поиск учеников для добавления в группу — по имени/логину, исключая тех,

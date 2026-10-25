@@ -1,4 +1,4 @@
-<!-- autoi18n: source=teacher.md lang=en sha1=8696061a660612f331f0ba00f28e453fbe261f5d -->
+<!-- autoi18n: source=teacher.md lang=en sha1=1b3a58d85f6e1f03fc8434648e52c209828f1bad -->
 # How to work on the platform
 
 ## My groups
@@ -17,6 +17,7 @@ At the top of the group page — icons, the name of each is visible on hover:
 
 - **Group settings** (gear) — name, Telegram, WhatsApp, link to the video conference, and default lesson duration;
 - **QR for registration** — link and QR code, through which students register in the group themselves;
+- **CSV for Scratch** — a file with student logins and passwords for a Scratch class: in your Scratch teacher account open the class → **Students** → **CSV Upload** and choose this file. The login is the group name plus the student's login (`pixels_murad_ali47`), the password is simple (`tigr482`). They are created on the first download and never change; they are shown in the student card (**Scratch** block) and in the student's profile;
 - **Students** (little people with a number) — group composition and phones: enrol a student in the group through search, view their data and parent data, expel (with a reason) or return from the archive. The search shows only students who are not currently studying in any group; a student from another group is transferred by the administrator. A red dash in the "Phone" column means the phone is not filled in.
 
 ### New Students (registration via QR)

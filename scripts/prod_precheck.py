@@ -1,6 +1,6 @@
 """Проверка прод-БД перед выкаткой миграций (ничего не меняет).
 
-Текущая выкатка: 0032_jsonb (JSON-поля → JSONB).
+Текущая выкатка: 0033_scratch_account (аккаунт ученика в классе Scratch).
 Перед следующей выкаткой с миграциями — поправить EXPECTED_* ниже.
 
 Запуск на сервере (работает и на СТАРОМ образе бэкенда):
@@ -11,12 +11,12 @@ import asyncio
 from sqlalchemy import text
 from app.database import engine
 
-EXPECTED_REVISION = "0031_user_ui_prefs"   # последняя уже выкаченная
+EXPECTED_REVISION = "0032_jsonb"   # последняя уже выкаченная
 NEW_TABLES = []
-NEW_COLUMNS = []
+NEW_COLUMNS = [("users", "scratch_login"), ("users", "scratch_password")]
 NEW_INDEXES = []
-# Поля, тип которых меняет миграция: до выкатки ждём json
-TYPE_COLUMNS = [("users", "days_off"), ("users", "ui_prefs"), ("quizzes", "html_translations"), ("quizzes", "questions_data")]
+# Поля, тип которых меняет миграция
+TYPE_COLUMNS = []
 
 
 async def main():

@@ -1,4 +1,4 @@
-<!-- autoi18n: source=student.md lang=az sha1=90a0dffa79f8104712113c0cf304568cdb71a642 -->
+<!-- autoi18n: source=student.md lang=az sha1=faa246ddf73a2f4ad4864ef8e6442c63dc62a889 -->
 # Platformada necə işləmək
 
 ## Ana səhifə — mənim dərslərim
@@ -71,3 +71,5 @@ Bu dərs üzrə müəllimlə yazışma. Mesaj yazın və göndərin. Öz mesajı
 ## Profil
 
 [Profil](/dashboard/profile) bölməsində parolu dəyişmək mümkündür.
+
+Orada **Mənim Scratch** bloku da var: scratch.mit.edu saytı üçün login və şifrə, onları müəllim verir. Hər birinin yanında **Kopyala** düyməsi var.

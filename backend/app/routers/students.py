@@ -473,6 +473,9 @@ class StudentProfileOut(StudentProfile):
     # показать и отправить; сменил ученик — только «Сбросить на логин».
     password_is_login: bool = False
     photo_url: Optional[str] = None  # фото профиля (GET /auth/photo/{id})
+    # Аккаунт в классе Scratch (создаётся выгрузкой CSV группы, routers/groups.py)
+    scratch_login: Optional[str] = None
+    scratch_password: Optional[str] = None
 
 
 # Логин и пароль необязательны: не заданы — логин из ФИО (security.make_login),
@@ -521,6 +524,7 @@ async def _profile_out(db: AsyncSession, student: User) -> StudentProfileOut:
         groups=group_names,
         password_is_login=verify_password(student.username, student.hashed_password),
         photo_url=student.photo_url,
+        scratch_login=student.scratch_login, scratch_password=student.scratch_password,
     )
 
 

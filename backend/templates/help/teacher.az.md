@@ -1,4 +1,4 @@
-<!-- autoi18n: source=teacher.md lang=az sha1=8696061a660612f331f0ba00f28e453fbe261f5d -->
+<!-- autoi18n: source=teacher.md lang=az sha1=1b3a58d85f6e1f03fc8434648e52c209828f1bad -->
 # Platformada necə işləmək
 
 ## Mənim qruplarım
@@ -17,6 +17,7 @@ Qrup səhifəsinin üstündə — ikonlar, hər birinin adı üzərinə gəldikd
 
 - **Qrup parametrləri** (dişli) — ad, Telegram, WhatsApp, videokonfrans linki və dərsin standart müddəti;
 - **Qeydiyyat üçün QR** — şagirdlərin özləri qruplara qeydiyyatdan keçməsi üçün link və QR-kod;
+- **Scratch üçün CSV** — Scratch sinfi üçün şagirdlərin login və şifrələri olan fayl: Scratch müəllim hesabında sinfi açın → **Students** → **CSV Upload** və bu faylı seçin. Login — qrupun adı və şagirdin loginidir (`pixels_murad_ali47`), şifrə sadədir (`tigr482`). Onlar ilk yükləmədə yaradılır və sonra dəyişmir; şagird kartında (**Scratch** bloku) və şagirdin profilində görünür;
 - **Şagirdlər** (şəxslər və say) — qrup tərkibi və telefonlar: şagirdi axtarışla qrupa yazmaq, onun və valideynin məlumatlarına baxmaq, xaric etmək (səbəbini göstərməklə) və ya arxivdən qaytarmaq. Axtarışda yalnız hazırda heç bir qrupda oxumayan şagirdlər görünür; başqa qrupdan olan şagirdi administrator köçürür. "Telefon" sütununda qırmızı xətt — telefon doldurulmayıb.
 
 ### Yeni şagirdlər (QR ilə qeydiyyat)

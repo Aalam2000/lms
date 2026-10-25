@@ -16,7 +16,7 @@ import Avatar from './Avatar';
 import DateTimePicker, { nextHour } from './DateTimePicker';
 import { getStudentProfile, updateStudentProfile, createStudent } from '../api/students';
 import { PHONE_PLACEHOLDER } from '../utils/phone';
-import ParentLinkBlock, { StudentAccessBlock } from './ParentLinkBlock';
+import ParentLinkBlock, { StudentAccessBlock, ScratchAccessBlock } from './ParentLinkBlock';
 import { useAuth } from '../context/AuthContext';
 
 const EMPTY = {
@@ -38,6 +38,7 @@ function StudentCardModal({ studentId, groups = [], defaultGroupId = '', courses
   const [groupNames, setGroupNames] = useState([]);
   const [photoUrl, setPhotoUrl] = useState(null);
   const [passwordIsLogin, setPasswordIsLogin] = useState(false);
+  const [scratch, setScratch] = useState({ login: null, password: null });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -50,6 +51,7 @@ function StudentCardModal({ studentId, groups = [], defaultGroupId = '', courses
         setGroupNames(p.groups || []);
         setPhotoUrl(p.photo_url || null);
         setPasswordIsLogin(!!p.password_is_login);
+        setScratch({ login: p.scratch_login, password: p.scratch_password });
         setDraft({
           ...EMPTY,
           username: p.username,
@@ -154,6 +156,11 @@ function StudentCardModal({ studentId, groups = [], defaultGroupId = '', courses
             <>
               <h4 className="form-section">{'Доступ ученика'}</h4>
               <StudentAccessBlock studentId={studentId} username={draft.username} phone={draft.phone} passwordIsLogin={passwordIsLogin} />
+              <h4 className="form-section">{'Scratch'}</h4>
+              <ScratchAccessBlock
+                login={scratch.login} password={scratch.password}
+                emptyText={'Появится после выгрузки «CSV для Scratch» на странице группы.'}
+              />
             </>
           )}
 
