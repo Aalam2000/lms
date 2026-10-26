@@ -8,7 +8,7 @@ import StudentStars from '../components/StudentStars';
 import StudentHomeworkStrip from '../components/StudentHomeworkStrip';
 import { usePresencePing } from '../hooks/usePresencePing';
 import { useHomeworkRefresh } from '../hooks/useHomeworkRefresh';
-import { getHomeworkToReview, getWorkToReview } from '../api/groups';
+import { getHomeworkToReview, getWorkToReview, getUnreadMessages } from '../api/groups';
 
 function Dashboard() {
   const { user, logout } = useAuth();
@@ -23,16 +23,20 @@ function Dashboard() {
   const [homework, setHomework] = useState({ count: 0, lesson_id: null });
   // «Проверь работы»: работы, сданные на уроках, которые ведёт педагог (api/lessonWork.js)
   const [work, setWork] = useState({ count: 0, lesson_id: null });
+  // «Сообщения»: непрочитанные сообщения учеников в диалогах (app/lesson_dialog.py)
+  const [messages, setMessages] = useState({ count: 0, lesson_id: null });
   useEffect(() => {
     if (!isTeaching) return undefined;
     let alive = true;
     getHomeworkToReview().then(data => { if (alive) setHomework(data); }).catch(() => {});
     getWorkToReview().then(data => { if (alive) setWork(data); }).catch(() => {});
+    getUnreadMessages().then(data => { if (alive) setMessages(data); }).catch(() => {});
     return () => { alive = false; };
   }, [isTeaching, pathname]);
   useHomeworkRefresh(() => {
     getHomeworkToReview().then(setHomework).catch(() => {});
     getWorkToReview().then(setWork).catch(() => {});
+    getUnreadMessages().then(setMessages).catch(() => {});
   }, isTeaching);
 
   const roleBadgeClass = user?.role
@@ -102,6 +106,18 @@ function Dashboard() {
                 <span className="only-desktop">{'Проверь работы'}</span>
                 <span className="only-mobile">{'Работы'}</span>
                 <span className="btn__count">{work.count}</span>
+              </button>
+            )}
+            {isTeaching && messages.count > 0 && messages.lesson_id && (
+              <button
+                type="button"
+                className="btn btn--attention"
+                data-tip="Есть непрочитанные сообщения учеников"
+                onClick={() => navigate(`/dashboard/lessons/${messages.lesson_id}?view=students`)}
+              >
+                <span className="only-desktop">{'Сообщения'}</span>
+                <span className="only-mobile">{'💬'}</span>
+                <span className="btn__count">{messages.count}</span>
               </button>
             )}
             <LanguageSwitcher />

@@ -6,7 +6,8 @@
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
 
-// Уведомление с сервера: { title, body, url }
+// Уведомление с сервера: { title, body, url, tag }. Одинаковый tag — новое
+// уведомление заменяет прежнее (сводка «что ждёт»), renotify — телефон всё равно звенит.
 self.addEventListener('push', (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (e) { data = { body: event.data && event.data.text() }; }
@@ -15,6 +16,7 @@ self.addEventListener('push', (event) => {
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
     data: { url: data.url || '/dashboard' },
+    ...(data.tag ? { tag: data.tag, renotify: true } : {}),
   }));
 });
 

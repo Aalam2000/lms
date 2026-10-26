@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Modal from './Modal';
 import { getMessages, sendMessage, editMessage } from '../api/homework';
 import { extractErrorMessage } from '../utils/errors';
+import { notifyHomeworkChanged } from '../hooks/useHomeworkRefresh';
 
 const fmt = (v) => (v ? new Date(v).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
 
@@ -100,12 +101,15 @@ export function DialogThread({ lessonId, studentId, onChanged, draft, readOnly =
   );
 }
 
-// Ячейка «Комментарий» в строке студента (педагог): последняя реплика, клик — диалог
-export function DialogCell({ lessonId, studentId, studentName, lastMessage, count, onChanged }) {
+// Ячейка «Комментарий» в строке студента (педагог): последняя реплика, клик — диалог.
+// unread — сколько сообщений ученика педагог не прочитал (красное число в начале).
+// Закрыли окно — диалог прочитан: перечитываются строка и флаг «Сообщения» в шапке.
+export function DialogCell({ lessonId, studentId, studentName, lastMessage, count, unread = 0, onChanged }) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <button type="button" className="dialog-cell" onClick={() => setOpen(true)}>
+        {unread > 0 && <span className="dialog-cell__unread" data-tip={'Непрочитанные сообщения'}>{unread}</span>}
         {lastMessage ? (
           <>
             <span className={`dialog-cell__who${lastMessage.from_teacher ? '' : ' dialog-cell__who--student'}`}>
@@ -117,7 +121,7 @@ export function DialogCell({ lessonId, studentId, studentName, lastMessage, coun
         ) : <span className="text-muted">{'Написать…'}</span>}
       </button>
       {open && (
-        <Modal title={`Диалог: ${studentName}`} onClose={() => { setOpen(false); if (onChanged) onChanged(); }} size="wide">
+        <Modal title={`Диалог: ${studentName}`} onClose={() => { setOpen(false); if (onChanged) onChanged(); notifyHomeworkChanged(); }} size="wide">
           <DialogThread lessonId={lessonId} studentId={studentId} />
         </Modal>
       )}

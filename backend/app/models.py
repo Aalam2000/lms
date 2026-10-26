@@ -28,6 +28,7 @@ class User(Base):
     # Выбор пользователя в интерфейсе (вид страниц, фильтры, папка Базы знаний,
     # язык): {"ключ": значение}; пишет PATCH /auth/me/prefs (routers/auth.py)
     ui_prefs = Column(JSONB, nullable=True)
+    push_sent_at = Column(DateTime(timezone=True), nullable=True)  # последнее уведомление (app/notify.py: напоминание не чаще раза в сутки)
     # Аккаунт ученика в классе Scratch: логин и понятный ребёнку пароль.
     # Создаются при выгрузке CSV группы (security.scratch_login / scratch_password),
     # пароль открытым текстом — он от Scratch, не от платформы
@@ -320,6 +321,19 @@ class LessonMessage(Base):
     text = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     edited_at = Column(DateTime(timezone=True), nullable=True)
+
+
+# Докуда человек прочитал диалог (урок, ученик): у каждого участника своя
+# отметка — у ученика, основного педагога группы, замены. Непрочитанное —
+# чужие сообщения диалога с id больше last_read_id. Ставится, когда человек
+# открыл переписку или сам написал в неё (routers/homework.py).
+class LessonMessageRead(Base):
+    __tablename__ = "lesson_message_reads"
+    lesson_id = Column(Integer, ForeignKey("lessons.id", ondelete="CASCADE"), primary_key=True)
+    student_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)  # чей диалог
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)  # кто прочитал
+    last_read_id = Column(Integer, nullable=False)
+    read_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 # Сессии присутствия в системе (claude/presence-plan.md): одна строка на

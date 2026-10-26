@@ -1,6 +1,8 @@
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from . import notify
 from .routers import auth, quizzes, i18n, admin, groups, lessons, materials, links, library, students, quiz_live, help, usages, homework, lesson_work, presence, methodology, csp, academy, parent, push, view
 import logging
 
@@ -16,12 +18,15 @@ class _SkipCspReportAccess(logging.Filter):
 
 logging.getLogger("uvicorn.access").addFilter(_SkipCspReportAccess())
 
-# Фоновый воркер автоперевода — при старте приложения (lifespan вместо
-# устаревшего @app.on_event("startup"), удалённого в новых Starlette).
+# Фоновые задачи при старте приложения (lifespan вместо устаревшего
+# @app.on_event("startup"), удалённого в новых Starlette): автоперевод и
+# ежечасная проверка напоминаний-уведомлений (app/notify.py).
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     i18n.start_translation_worker(interval=1800)
+    reminders = asyncio.create_task(notify.reminder_loop())
     yield
+    reminders.cancel()
 
 
 app = FastAPI(lifespan=lifespan)

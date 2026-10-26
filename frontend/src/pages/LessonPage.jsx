@@ -1148,6 +1148,7 @@ function LessonPage() {
                                 studentName={row.full_name}
                                 lastMessage={hwRow?.last_message}
                                 count={hwRow?.messages_count || 0}
+                                unread={hwRow?.unread_count || 0}
                                 onChanged={loadHomework}
                               />
                               {rowErrors[row.student_id] && (

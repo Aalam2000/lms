@@ -1,6 +1,6 @@
 """Проверка прод-БД перед выкаткой миграций (ничего не меняет).
 
-Текущая выкатка: 0033_scratch_account (аккаунт ученика в классе Scratch).
+Текущая выкатка: 0034_message_reads + 0035_push_sent_at (отметки «прочитано» в диалоге, время последнего уведомления).
 Перед следующей выкаткой с миграциями — поправить EXPECTED_* ниже.
 
 Запуск на сервере (работает и на СТАРОМ образе бэкенда):
@@ -11,10 +11,10 @@ import asyncio
 from sqlalchemy import text
 from app.database import engine
 
-EXPECTED_REVISION = "0032_jsonb"   # последняя уже выкаченная
-NEW_TABLES = []
-NEW_COLUMNS = [("users", "scratch_login"), ("users", "scratch_password")]
-NEW_INDEXES = []
+EXPECTED_REVISION = "0033_scratch_account"   # последняя уже выкаченная
+NEW_TABLES = ["lesson_message_reads"]
+NEW_COLUMNS = [("users", "push_sent_at")]
+NEW_INDEXES = ["ix_lesson_message_reads_user_id"]
 # Поля, тип которых меняет миграция
 TYPE_COLUMNS = []
 

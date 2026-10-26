@@ -1,7 +1,7 @@
 """Согласия на уведомления (Web Push).
 
-Сейчас только сбор: кнопка «На рабочий стол» спрашивает разрешение и присылает
-сюда подписку устройства. Рассылка — отдельная задача (будет здесь же).
+Сбор: кнопка «На рабочий стол» спрашивает разрешение и присылает сюда подписку
+устройства. Рассылка и «куда вести по нажатию» — app/notify.py.
 
 Ключи — VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY в .env. Открытый ключ отдаём
 браузеру, подписка к нему привязана: сменить ключи = потерять все согласия.
@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import notify
 from ..database import get_db
 from ..dependencies import get_current_user, require
 from ..models import PushSubscription, User
@@ -60,6 +61,12 @@ async def subscribe(data: SubscriptionIn, request: Request,
                                 p256dh=data.keys.p256dh, auth=data.keys.auth, user_agent=ua))
     await db.commit()
     return {"ok": True}
+
+
+# Нажали на уведомление (/dashboard/next): урок с самым давним необработанным
+@router.get("/next")
+async def push_next(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    return {"path": await notify.next_path(db, user)}
 
 
 @router.get("/users", response_model=list[int])

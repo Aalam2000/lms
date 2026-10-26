@@ -25,20 +25,23 @@ from datetime import datetime, timezone as dt_timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File as FastAPIFile, Form, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File as FastAPIFile, Form, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import storage
 from ..database import get_db
 from ..dependencies import require_teacher, get_current_user
 from ..models import (
-    Course, Group, GroupMember, HomeworkAnswer, HomeworkAnswerFile, HomeworkTask, Lesson, LessonMessage, Material,
-    Sector, User,
+    Course, Group, GroupMember, HomeworkAnswer, HomeworkAnswerFile, HomeworkTask, Lesson, LessonMessage,
+    LessonMessageRead, Material, Sector, User,
 )
 from ..text_extract import extract_text
+from ..lesson_dialog import from_student, student_unread, unread_by_dialog
+from ..notify import send_summaries
 from ..resources import clean_filename, content_hash, find_duplicate_material, find_materials_by_name, conflict
 from ..personal import is_participant, lesson_students_condition, student_lesson_access
 from ..homework_status import (
@@ -102,6 +105,7 @@ class BoardRow(BaseModel):
     answer: AnswerState
     last_message: Optional[LastMessage] = None
     messages_count: int = 0
+    unread_count: int = 0  # сколько сообщений ученика текущий педагог не прочитал
 
 
 class BoardOut(BaseModel):
@@ -263,7 +267,7 @@ async def _state_for(db: AsyncSession, lesson_id: int, student_id: int) -> Answe
 async def student_open_items(db: AsyncSession, lesson_ids: list[int], student_id: int) -> dict[int, tuple[Optional[str], int]]:
     """Что в уроке не закрыто у студента (для подсветки на его Главной), пачкой:
     урок → (hw_todo: 'pending' — ДЗ надо сдать | 'returned' — вернули на доработку | None,
-             new_messages: реплики педагога после последней реплики студента)."""
+             new_messages: непрочитанные сообщения педагога — app/lesson_dialog.py)."""
     out: dict[int, tuple[Optional[str], int]] = {}
     if not lesson_ids:
         return out
@@ -275,21 +279,11 @@ async def student_open_items(db: AsyncSession, lesson_ids: list[int], student_id
         HomeworkAnswer.lesson_id.in_(lesson_ids), HomeworkAnswer.student_id == student_id,
     ))).scalars().all()}
     files = await _answer_files(db, [a.id for a in answers.values()])
-    msgs_by_lesson: dict[int, list[LessonMessage]] = {}
-    for m in (await db.execute(
-        select(LessonMessage).where(LessonMessage.lesson_id.in_(lesson_ids), LessonMessage.student_id == student_id)
-        .order_by(LessonMessage.created_at, LessonMessage.id)
-    )).scalars().all():
-        msgs_by_lesson.setdefault(m.lesson_id, []).append(m)
+    unread = await student_unread(db, student_id, lesson_ids)
     for lid in lesson_ids:
         answer = answers.get(lid)
         status = _answer_state(tasks_by_lesson.get(lid, []), answer, files.get(answer.id, []) if answer else []).status
-        new = 0
-        for m in reversed(msgs_by_lesson.get(lid, [])):
-            if m.author_id == student_id:
-                break
-            new += 1
-        out[lid] = (status if status in ("pending", "returned") else None, new)
+        out[lid] = (status if status in ("pending", "returned") else None, unread.get(lid, 0))
     return out
 
 
@@ -309,6 +303,7 @@ async def _read_upload(upload: UploadFile) -> bytes:
 # Файл — material_id из «Базы знаний» ИЛИ новый file.
 @router.post("/{lesson_id}/homework", response_model=TaskOut)
 async def create_task(
+    background: BackgroundTasks,
     lesson_id: int,
     student_id: Optional[int] = Form(None),
     deadline: Optional[datetime] = Form(None),
@@ -400,6 +395,8 @@ async def create_task(
     )
     db.add(task)
     await db.commit()
+    # уведомление: персональное — одному ученику, общее — всем активным ученикам урока
+    background.add_task(send_summaries, [student_id] if student_id is not None else [sid for sid, _ in await _active_students(db, lesson)])
     if old_key:
         try:
             storage.delete_object(old_key)
@@ -490,6 +487,7 @@ async def get_board(
         .order_by(LessonMessage.created_at, LessonMessage.id)
     )).scalars().all():
         msgs_by_student.setdefault(m.student_id, []).append(m)
+    unread = await unread_by_dialog(db, current_user.id, LessonMessage.lesson_id == lesson_id, from_student())
 
     rows = []
     to_review = 0
@@ -503,7 +501,7 @@ async def get_board(
         rows.append(BoardRow(
             student_id=sid, full_name=name, task_ids=[t.id for t in mine], answer=state,
             last_message=LastMessage(text=last.text, from_teacher=last.author_id != sid, created_at=last.created_at) if last else None,
-            messages_count=len(thread),
+            messages_count=len(thread), unread_count=unread.get((lesson_id, sid), 0),
         ))
     return BoardOut(tasks=[tasks_out[t.id] for t in tasks], students=rows, to_review=to_review)
 
@@ -555,12 +553,13 @@ async def get_my_homework(
 
 @router.post("/{lesson_id}/homework/my/files", response_model=MyHomeworkOut)
 async def upload_my_files(
+    background: BackgroundTasks,
     lesson_id: int,
     files: list[UploadFile] = FastAPIFile(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    await get_lesson_for_student(lesson_id, db, current_user)
+    lesson = await get_lesson_for_student(lesson_id, db, current_user)
     state = await _state_for(db, lesson_id, current_user.id)
     if state.is_locked:
         raise HTTPException(status_code=403, detail="Ответ уже проверен или срок сдачи истёк — изменить нельзя")
@@ -582,6 +581,8 @@ async def upload_my_files(
     answer.reviewed_by = None
     answer.reviewed_at = None
     await db.commit()
+    # ДЗ проверяет основной педагог группы — уведомление ему
+    background.add_task(send_summaries, [(await db.get(Group, lesson.group_id)).teacher_id])
     return await get_my_homework(lesson_id, db, current_user)
 
 
@@ -797,6 +798,18 @@ async def _thread(db: AsyncSession, lesson_id: int, student_id: int) -> list[Les
     )).scalars().all())
 
 
+async def _mark_read(db: AsyncSession, lesson_id: int, student_id: int, user_id: int, last_id: int) -> None:
+    """Диалог прочитан человеком до сообщения last_id (отметка только растёт)."""
+    stmt = pg_insert(LessonMessageRead).values(
+        lesson_id=lesson_id, student_id=student_id, user_id=user_id, last_read_id=last_id, read_at=_now(),
+    )
+    await db.execute(stmt.on_conflict_do_update(
+        index_elements=[LessonMessageRead.lesson_id, LessonMessageRead.student_id, LessonMessageRead.user_id],
+        set_={"last_read_id": func.greatest(LessonMessageRead.last_read_id, stmt.excluded.last_read_id),
+              "read_at": stmt.excluded.read_at},
+    ))
+
+
 async def _thread_out(db: AsyncSession, thread: list[LessonMessage], student_id: int, user: User) -> list[MessageOut]:
     author_ids = {m.author_id for m in thread}
     names = {}
@@ -821,11 +834,16 @@ async def get_messages(
     current_user: User = Depends(get_current_user),
 ):
     await _thread_access(db, lesson_id, student_id, current_user, write=False)
-    return await _thread_out(db, await _thread(db, lesson_id, student_id), student_id, current_user)
+    thread = await _thread(db, lesson_id, student_id)
+    if thread:  # открыл переписку — прочитал всё, что в ней есть
+        await _mark_read(db, lesson_id, student_id, current_user.id, thread[-1].id)
+        await db.commit()
+    return await _thread_out(db, thread, student_id, current_user)
 
 
 @router.post("/{lesson_id}/messages/{student_id}", response_model=list[MessageOut])
 async def add_message(
+    background: BackgroundTasks,
     lesson_id: int,
     student_id: int,
     data: MessageIn,
@@ -836,8 +854,18 @@ async def add_message(
     text = data.text.strip()
     if not text:
         raise HTTPException(status_code=422, detail="Пустое сообщение")
-    db.add(LessonMessage(lesson_id=lesson_id, student_id=student_id, author_id=current_user.id, text=text, created_at=_now()))
+    msg = LessonMessage(lesson_id=lesson_id, student_id=student_id, author_id=current_user.id, text=text, created_at=_now())
+    db.add(msg)
+    await db.flush()
+    await _mark_read(db, lesson_id, student_id, current_user.id, msg.id)  # написал — значит, видел всё до этого
     await db.commit()
+    # уведомление: написал ученик — основному педагогу группы и ведущему урок; педагог — ученику
+    if current_user.id == student_id:
+        lesson = await db.get(Lesson, lesson_id)
+        recipients = [(await db.get(Group, lesson.group_id)).teacher_id, lesson.teacher_id]
+    else:
+        recipients = [student_id]
+    background.add_task(send_summaries, [uid for uid in recipients if uid != current_user.id])
     return await _thread_out(db, await _thread(db, lesson_id, student_id), student_id, current_user)
 
 

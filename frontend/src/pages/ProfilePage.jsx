@@ -7,6 +7,7 @@ import FormField from '../components/FormField';
 import DaysOffEditor from '../components/DaysOffEditor';
 import { ScratchAccessBlock } from '../components/ParentLinkBlock';
 import { ReviewFolderSettings } from '../components/HomeworkTeacher';
+import { PushSettings } from '../components/InstallButton';
 
 // Исходник фото до обработки — как на сервере (routers/auth.py, PHOTO_MAX_UPLOAD)
 const PHOTO_MAX_MB = 15;
@@ -341,6 +342,9 @@ function ProfilePage() {
           <p className="hint-text">{'Выходные ставит администратор.'}</p>
         </>
       )}
+
+      {/* Уведомления (Web Push) — ученику и педагогу */}
+      {(role === 'student' || role === 'teacher' || role === 'admin') && <PushSettings />}
 
       {/* Куда «В папку ученика» скачивает работы (панель проверки ДЗ и работ на уроке) */}
       {(role === 'teacher' || role === 'admin') && <ReviewFolderSettings />}

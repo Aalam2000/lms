@@ -294,6 +294,7 @@ export function HomeworkCheckView({ lessonId, groupName, board, onChanged, onErr
                     studentName={row.full_name}
                     lastMessage={row.last_message}
                     count={row.messages_count}
+                    unread={row.unread_count}
                     onChanged={onChanged}
                   />
                 </td>

@@ -25,6 +25,7 @@ import QuizLiveJoinPage from './pages/QuizLiveJoinPage';
 import NotFoundPage from './pages/NotFoundPage';
 import HelpPage from './pages/HelpPage';
 import MethodologyPage from './pages/MethodologyPage';
+import NextPage from './pages/NextPage';
 // Просмотр слайдов тянет pdf.js (~1 МБ) — грузим отдельным чанком, только когда он открыт
 const SlideViewerPage = lazy(() => import('./pages/SlideViewerPage'));
 import RoleRoute from './components/RoleRoute';
@@ -92,6 +93,7 @@ function App() {
           <Route path="activity" element={
             <RoleRoute roles={['admin']}><ActivityPage /></RoleRoute>
           } />
+          <Route path="next" element={<NextPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="help" element={<HelpPage />} />
           <Route path="methodology" element={

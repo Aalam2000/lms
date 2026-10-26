@@ -11,6 +11,7 @@ import { IconInstall, IconBell } from './CyberIcons';
 import {
   canPrompt, enablePush, isInstalled, onInstallChange, platform, promptInstall, pushPermission, refreshPush,
 } from '../utils/install';
+import { usePref } from '../hooks/usePref';
 
 function InstallButton({ onDone }) {
   const [, rerender] = useState(0);
@@ -83,6 +84,39 @@ function InstallButton({ onDone }) {
           )}
         </Modal>,
         document.body,
+      )}
+    </>
+  );
+}
+
+// Блок «Уведомления» в профиле. Выключатель — настройка пользователя
+// (ui_prefs «notify.push», по умолчанию включено; сервер при «выключены» не шлёт
+// ничего — backend/app/notify.py). Разрешение браузера — на каждом устройстве
+// своё: здесь видно, разрешено ли на этом, и можно разрешить.
+export function PushSettings() {
+  const [on, setOn] = usePref('notify.push', true);
+  const [, rerender] = useState(0);
+  useEffect(() => onInstallChange(() => rerender(n => n + 1)), []);
+  const perm = pushPermission();
+  return (
+    <>
+      <h3 className="form-section">{'Уведомления'}</h3>
+      <div className="button-row">
+        <button type="button" className={`tab${on ? ' tab--active' : ''}`} onClick={() => setOn(true)}>{'Включены'}</button>
+        <button type="button" className={`tab${!on ? ' tab--active' : ''}`} onClick={() => setOn(false)}>{'Выключены'}</button>
+      </div>
+      {on && (
+        <>
+          <p className="hint-text">{'Новое ДЗ, сообщения, работы учеников — сразу; если не отреагировали — напоминание раз в сутки.'}</p>
+          {perm === 'granted' && <p className="hint-text">{'На этом устройстве уведомления разрешены.'}</p>}
+          {perm === 'denied' && <p className="hint-text">{'На этом устройстве уведомления запрещены в настройках браузера — разрешите их для этого сайта.'}</p>}
+          {perm === 'unsupported' && <p className="hint-text">{'Это устройство не поддерживает уведомления. На iPhone — только в приложении со значка «Домой».'}</p>}
+          {perm === 'default' && (
+            <button type="button" className="btn" onClick={() => { enablePush().catch(() => {}); }}>
+              {'Разрешить на этом устройстве'}
+            </button>
+          )}
+        </>
       )}
     </>
   );

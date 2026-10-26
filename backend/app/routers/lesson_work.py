@@ -13,7 +13,7 @@ import zipfile
 from datetime import datetime, timezone as dt_timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File as FastAPIFile, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File as FastAPIFile, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
@@ -23,6 +23,7 @@ from .. import storage
 from ..database import get_db
 from ..dependencies import require_teacher, get_current_user
 from ..lesson_work import work_status
+from ..notify import send_summaries
 from ..personal import student_lesson_access
 from ..models import Course, Group, Lesson, LessonMark, LessonResource, LessonWorkFile, Material, Sector, User
 from .homework import (
@@ -144,6 +145,7 @@ async def get_my_work(
 
 @router.post("/{lesson_id}/work/my/files", response_model=MyWorkOut)
 async def upload_my_work(
+    background: BackgroundTasks,
     lesson_id: int,
     files: list[UploadFile] = FastAPIFile(...),
     db: AsyncSession = Depends(get_db),
@@ -160,6 +162,7 @@ async def upload_my_work(
             size_bytes=len(data), uploaded_at=_now(),
         ))
     await db.commit()
+    background.add_task(send_summaries, [lesson.teacher_id])  # работу проверяет тот, кто ведёт урок
     return await _my_state(db, lesson, current_user.id)
 
 

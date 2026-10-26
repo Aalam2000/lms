@@ -2058,6 +2058,18 @@ a.row-icon:hover {
 .dialog-cell__who--student {
   color: var(--color-warning);
 }
+/* Непрочитанные сообщения ученика (LessonDialog.jsx, DialogCell) */
+.dialog-cell__unread {
+  display: inline-block;
+  min-width: 18px;
+  margin-right: var(--space-1);
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--color-primary);
+  color: var(--color-white);
+  font-size: 11px;
+  text-align: center;
+}
 .hw-task-card {
   border-top: 1px solid var(--color-border-light);
   padding: var(--space-2) 0;

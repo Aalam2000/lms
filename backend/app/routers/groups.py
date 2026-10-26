@@ -12,6 +12,7 @@ from ..dependencies import has_perm, require, require_teacher, get_current_user
 from ..security import scratch_login, scratch_password, scratch_slug
 from ..homework_status import oldest_lesson_to_review, to_review_by_group
 from ..lesson_work import work_to_review_by_group, work_to_review_for_teacher
+from ..lesson_dialog import teacher_unread
 
 router = APIRouter(prefix="/groups", tags=["groups"])
 
@@ -278,6 +279,17 @@ async def get_work_to_review(
         select(Group.id).where(Group.status == "active")
     )).all()]
     return await work_to_review_for_teacher(db, current_user.id, group_ids)
+
+
+# Флаг «Сообщения» в шапке педагога: непрочитанные сообщения учеников в диалогах
+# уроков, которые он ведёт, и уроков его активных групп; урок, с которого начать
+# (самое давнее непрочитанное). Правило — app/lesson_dialog.py.
+@router.get("/unread-messages")
+async def get_unread_messages(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_teacher),
+):
+    return await teacher_unread(db, current_user.id)
 
 # Данные одной группы (teacher — только свою, admin — любую)
 @router.get("/{group_id}", response_model=GroupOut)

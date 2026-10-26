@@ -11,6 +11,11 @@ export function savePushSubscription(sub) {
   return api.post('/push/subscribe', { endpoint: sub.endpoint, keys: sub.keys });
 }
 
+// Нажали на уведомление: → адрес урока с самым давним необработанным (или '/dashboard')
+export function getNextPath() {
+  return api.get('/push/next').then(res => res.data.path);
+}
+
 // id пользователей, разрешивших уведомления (значок 🔔)
 export function getPushUsers() {
   return api.get('/push/users').then(res => res.data);

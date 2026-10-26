@@ -17,6 +17,11 @@ export function getWorkToReview() {
   return api.get('/groups/work-to-review').then(res => res.data);
 }
 
+// Флаг «Сообщения» в шапке педагога: { count, lesson_id } — непрочитанные сообщения учеников
+export function getUnreadMessages() {
+  return api.get('/groups/unread-messages').then(res => res.data);
+}
+
 // Список курсов для регистрации/создания группы — отдельный эндпоинт
 // /groups/courses, не путать с admin.getCourses() (/admin/courses).
 export function getCourses() {
