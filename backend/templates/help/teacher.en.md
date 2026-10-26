@@ -1,4 +1,4 @@
-<!-- autoi18n: source=teacher.md lang=en sha1=63ab8f18b3692fbc1d1843a03175706a5369d8bc -->
+<!-- autoi18n: source=teacher.md lang=en sha1=57f6e0b2455b563753ccd061d11ec37e54a85f2b -->
 # How to work on the platform
 
 ## My groups
@@ -107,7 +107,7 @@ The deadline can be changed for everyone at once or for an individual student. T
 
 In the checking window, there is **⬇ Download** — the student's file is saved to your computer.
 
-**All the student’s files — into their folder.** Once, in your [profile](/dashboard/profile), in the «Folder for student work» block, enter the path to your work folder (for example, `C:\Work`) and choose the same folder with **Choose the folder in the browser**. Then the review window (for both homework and in-class work) gets two buttons: **⬇ To the student folder** — after you confirm, the student’s `group\student` folder is cleared and all their files are downloaded into it under their own names (of files with the same name, the latest one is kept); **📋 Folder path** — copies the path: press Win+R, Ctrl+V and Enter, and the folder opens in File Explorer. Works in Chrome and Edge; once per session the browser asks for permission to change the folder.
+**All the student’s files — into their folder.** Once, in your [profile](/dashboard/profile), press **Choose folder** and choose your work folder — for example, the one that holds your groups’ folders. Then the review window (for both homework and in-class work) gets the **⬇ To the student folder** button: after you confirm, the `group\student` folder inside the work folder is cleared and all the student’s files are downloaded into it under their own names (of files with the same name, the latest one is kept). The group and student folders are named as in the platform and are created automatically. Works in Chrome and Edge; once per session the browser asks for permission to change the folder.
 
 ### In-Class Work
 

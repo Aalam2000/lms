@@ -33,7 +33,6 @@ import { LANG_NAMES, copyText } from './QuizHelper';
 import { reviewWork, workFileViewUrl, openWorkFile, downloadWorkFile, getWorkFileBlob, getWorkAiSource, downloadWorkAiPack } from '../api/lessonWork';
 import { getLessonItems } from '../api/lessons';
 import { extractErrorMessage } from '../utils/errors';
-import { usePref } from '../hooks/usePref';
 
 // ---------- Окно «+ ДЗ» ----------
 
@@ -924,10 +923,9 @@ function WorkReviewControls({ lessonId, row, onChanged, onError, suggested }) {
 // ---------- Папки учеников на компьютере педагога ----------
 // «⬇ В папку ученика»: все файлы ученика (ДЗ или работа на уроке) — в
 // <рабочая папка>\<группа>\<ученик>; папка ученика сначала очищается, из
-// файлов с одинаковым именем остаётся последний. Путь рабочей папки хранится
-// в профиле (ключ review.folder) — по нему кнопка «Путь к папке» копирует
-// адрес для Проводника (Win+R). Саму папку браузер даёт только «ручкой»
-// (File System Access API, Chrome и Edge): её нельзя хранить на сервере —
+// файлов с одинаковым именем остаётся последний. Рабочую папку педагог
+// выбирает в профиле. Браузер отдаёт её только «ручкой» (File System Access
+// API, Chrome и Edge) — без полного адреса; хранить её на сервере нельзя,
 // она лежит в IndexedDB этого браузера.
 export const folderSupported = typeof window !== 'undefined' && 'showDirectoryPicker' in window;
 const FOLDER_KEY = 'review.folder';
@@ -967,18 +965,11 @@ async function saveFolderHandle(handle) {
 // Имя папки или файла, допустимое в Windows
 const safeName = (s) => String(s || '').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[. ]+$/, '').trim() || '_';
 
-function studentFolderPath(base, group, student) {
-  return [base.replace(/[\\/]+$/, ''), safeName(group), safeName(student)].join('\\');
-}
-
-// Блок в профиле: путь рабочей папки + выбор этой же папки в браузере
+// Блок в профиле: выбор рабочей папки — одной строкой
 export function ReviewFolderSettings() {
-  const [base, setBase] = usePref(FOLDER_KEY, '');
-  const [text, setText] = useState(base);
   const [handle, setHandle] = useState(null);
   const [error, setError] = useState('');
 
-  useEffect(() => { setText(base); }, [base]);
   useEffect(() => { if (folderSupported) loadFolderHandle().then(setHandle); }, []);
 
   const pick = async () => {
@@ -992,50 +983,33 @@ export function ReviewFolderSettings() {
     }
   };
 
-  const last = text.trim().replace(/[\\/]+$/, '').split(/[\\/]/).pop();
-  const mismatch = handle && last && last.toLowerCase() !== handle.name.toLowerCase();
-
   return (
     <>
       <h3 className="form-section">{'Папка для работ учеников'}</h3>
-      <p className="hint-text">{'Сюда кнопка «В папку ученика» в панели проверки скачивает файлы ученика — в папку «группа\\ученик». Укажите путь к папке и выберите эту же папку в браузере.'}</p>
-      <div className="form-row">
-        <label className="form-row__label">{'Путь к папке'}</label>
-        <input
-          className="input"
-          value={text}
-          placeholder={'C:\\Работы'}
-          onChange={e => setText(e.target.value)}
-          onBlur={() => { if (text.trim() !== base) setBase(text.trim()); }}
-        />
-      </div>
       <div className="icon-row">
-        <button type="button" className="btn btn--outline" onClick={pick} disabled={!folderSupported}>
-          {handle ? 'Выбрать другую папку' : 'Выбрать папку в браузере'}
-        </button>
-        {handle && <span className="text-muted">{`Выбрана папка: ${handle.name}`}</span>}
+        {folderSupported ? (
+          <>
+            <button type="button" className="btn btn--outline" onClick={pick}>{'Выбрать папку'}</button>
+            <span className="text-muted">{handle ? `Выбрана папка: ${handle.name}` : 'Папка не выбрана'}</span>
+          </>
+        ) : <span className="text-muted">{'Работает только в Chrome и Edge.'}</span>}
       </div>
-      {!folderSupported && <p className="hint-text">{'Работает только в Chrome и Edge.'}</p>}
-      {mismatch && <div className="error-text error-text--muted">{'Путь и выбранная папка не совпадают — укажите одну и ту же папку.'}</div>}
       {error && <div className="error-text error-text--muted">{error}</div>}
     </>
   );
 }
 
-// Строка в панели проверки: «⬇ В папку ученика» и «📋 Путь к папке»
+// Строка в панели проверки: «⬇ В папку ученика»
 function StudentFolderBar({ lessonId, mode, groupName, studentName, files }) {
-  const [base] = usePref(FOLDER_KEY, '');
   const [handle, setHandle] = useState(null);
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [done, setDone] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => { if (folderSupported) loadFolderHandle().then(setHandle); }, []);
 
   if (!files.length) return null;
-  const path = base ? studentFolderPath(base, groupName, studentName) : '';
 
   const download = async () => {
     setConfirm(false);
@@ -1072,40 +1046,31 @@ function StudentFolderBar({ lessonId, mode, groupName, studentName, files }) {
     }
   };
 
-  const copyPath = async () => {
-    try {
-      await copyText(path);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setError('Не удалось скопировать путь');
-    }
-  };
-
   return (
     <>
       <div className="review-panel__ai-row">
         {!folderSupported && <span className="text-muted">{'Скачивание в папку ученика работает только в Chrome и Edge.'}</span>}
-        {folderSupported && (!base || !handle) && (
+        {folderSupported && !handle && (
           <span className="text-muted">
             {'Папка для работ учеников не выбрана.'}{' '}<Link to="/dashboard/profile">{'Укажите её в профиле'}</Link>
           </span>
         )}
-        {folderSupported && base && handle && (confirm ? (
+        {folderSupported && handle && (confirm ? (
           <>
             <span>{'Очистить папку ученика и скачать заново?'}</span>
             <button type="button" className="btn btn--sm" onClick={download}>{'Да'}</button>
             <button type="button" className="btn btn--sm btn--secondary" onClick={() => setConfirm(false)}>{'Отмена'}</button>
           </>
         ) : (
-          <>
-            <button type="button" className="btn btn--sm btn--outline" disabled={busy} data-tip={path} onClick={() => setConfirm(true)}>
-              {busy ? 'Скачиваем...' : '⬇ В папку ученика'}
-            </button>
-            <button type="button" className="btn btn--sm btn--outline" data-tip="Скопировать путь — Win+R, Ctrl+V, Enter откроет папку в Проводнике" onClick={copyPath}>
-              {copied ? 'Скопировано' : '📋 Путь к папке'}
-            </button>
-          </>
+          <button
+            type="button"
+            className="btn btn--sm btn--outline"
+            disabled={busy}
+            data-tip={`${handle.name}\\${safeName(groupName)}\\${safeName(studentName)}`}
+            onClick={() => setConfirm(true)}
+          >
+            {busy ? 'Скачиваем...' : '⬇ В папку ученика'}
+          </button>
         ))}
       </div>
       {done && <div className="hint-text">{done}</div>}

@@ -1,4 +1,4 @@
-<!-- autoi18n: source=teacher.md lang=az sha1=63ab8f18b3692fbc1d1843a03175706a5369d8bc -->
+<!-- autoi18n: source=teacher.md lang=az sha1=57f6e0b2455b563753ccd061d11ec37e54a85f2b -->
 # Platformada necə işləmək
 
 ## Mənim qruplarım
@@ -107,7 +107,7 @@ Son tarixi hamıya eyni anda və ya ayrı-ayrı tələbələrə dəyişmək müm
 
 Yoxlama pəncərəsində **⬇ Yüklə** — tələbənin faylı sizin kompüterinizə saxlanılır.
 
-**Şagirdin bütün faylları — onun qovluğuna.** Bir dəfə [profildə](/dashboard/profile) «Şagird işləri üçün qovluq» blokunda iş qovluğunun yolunu göstərin (məsələn, `C:\İşlər`) və eyni qovluğu **Qovluğu brauzerdə seç** düyməsi ilə seçin. Bundan sonra yoxlama pəncərəsində (həm ev tapşırığı, həm dərsdə iş üçün) düymələr görünəcək: **⬇ Şagirdin qovluğuna** — təsdiqdən sonra şagirdin `qrup\şagird` qovluğu təmizlənir və onun bütün faylları öz adları ilə ora yüklənir (eyni adlı fayllardan — sonuncusu); **📋 Qovluğun yolu** — yolu kopyalayır: Win+R, Ctrl+V və Enter basın, qovluq Explorer-də açılacaq. Chrome və Edge-də işləyir; brauzer hər seansda bir dəfə qovluqda dəyişikliklərə icazə soruşacaq.
+**Şagirdin bütün faylları — onun qovluğuna.** Bir dəfə [profildə](/dashboard/profile) **Qovluğu seç** düyməsini basın və iş qovluğunu seçin — məsələn, qruplarınızın qovluqlarının olduğu qovluğu. Bundan sonra yoxlama pəncərəsində (həm ev tapşırığı, həm dərsdə iş üçün) **⬇ Şagirdin qovluğuna** düyməsi görünəcək: təsdiqdən sonra iş qovluğunun içindəki `qrup\şagird` qovluğu təmizlənir və şagirdin bütün faylları öz adları ilə ora yüklənir (eyni adlı fayllardan — sonuncusu). Qrup və şagird qovluqları platformadakı kimi adlanır və özləri yaradılır. Chrome və Edge-də işləyir; brauzer hər seansda bir dəfə qovluqda dəyişikliklərə icazə soruşacaq.
 
 ### Dərsdə iş
 
