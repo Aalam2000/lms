@@ -1,4 +1,4 @@
-<!-- autoi18n: source=teacher.md lang=en sha1=af7499b3792d8024f4b41455e064067195d0c574 -->
+<!-- autoi18n: source=teacher.md lang=en sha1=63ab8f18b3692fbc1d1843a03175706a5369d8bc -->
 # How to work on the platform
 
 ## My groups
@@ -106,6 +106,8 @@ After midnight in Baku, attendance and grades for the lesson can no longer be ch
 The deadline can be changed for everyone at once or for an individual student. There can be any number of files in the assignment — in the "+ Homework" window, you can select several at once; the only limitation is the file size (up to 50 MB). The files already assigned are listed at the bottom of the same window: ✕ detaches a file from the homework (a file from the Knowledge Base stays there, students' answers are not deleted).
 
 In the checking window, there is **⬇ Download** — the student's file is saved to your computer.
+
+**All the student’s files — into their folder.** Once, in your [profile](/dashboard/profile), in the «Folder for student work» block, enter the path to your work folder (for example, `C:\Work`) and choose the same folder with **Choose the folder in the browser**. Then the review window (for both homework and in-class work) gets two buttons: **⬇ To the student folder** — after you confirm, the student’s `group\student` folder is cleared and all their files are downloaded into it under their own names (of files with the same name, the latest one is kept); **📋 Folder path** — copies the path: press Win+R, Ctrl+V and Enter, and the folder opens in File Explorer. Works in Chrome and Edge; once per session the browser asks for permission to change the folder.
 
 ### In-Class Work
 

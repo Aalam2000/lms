@@ -1,4 +1,4 @@
-<!-- autoi18n: source=teacher.md lang=az sha1=af7499b3792d8024f4b41455e064067195d0c574 -->
+<!-- autoi18n: source=teacher.md lang=az sha1=63ab8f18b3692fbc1d1843a03175706a5369d8bc -->
 # Platformada necə işləmək
 
 ## Mənim qruplarım
@@ -106,6 +106,8 @@ Bakıda gecə yarısından sonra davamiyyət və dərs üçün qiyməti dəyişm
 Son tarixi hamıya eyni anda və ya ayrı-ayrı tələbələrə dəyişmək mümkündür. Tapşırıqda istənilən sayda fayl ola bilər — «+ Ev tapşırığı» pəncərəsində bir neçə fayl seçmək mümkündür; məhdudiyyət yalnız faylın ölçüsüdür (50 MB-a qədər). Elə orada, aşağıda artıq verilmiş fayllar görünür: ✕ faylı ev tapşırığından ayırır (Bilik bazasındakı fayl orada qalır, şagirdlərin cavabları silinmir).
 
 Yoxlama pəncərəsində **⬇ Yüklə** — tələbənin faylı sizin kompüterinizə saxlanılır.
+
+**Şagirdin bütün faylları — onun qovluğuna.** Bir dəfə [profildə](/dashboard/profile) «Şagird işləri üçün qovluq» blokunda iş qovluğunun yolunu göstərin (məsələn, `C:\İşlər`) və eyni qovluğu **Qovluğu brauzerdə seç** düyməsi ilə seçin. Bundan sonra yoxlama pəncərəsində (həm ev tapşırığı, həm dərsdə iş üçün) düymələr görünəcək: **⬇ Şagirdin qovluğuna** — təsdiqdən sonra şagirdin `qrup\şagird` qovluğu təmizlənir və onun bütün faylları öz adları ilə ora yüklənir (eyni adlı fayllardan — sonuncusu); **📋 Qovluğun yolu** — yolu kopyalayır: Win+R, Ctrl+V və Enter basın, qovluq Explorer-də açılacaq. Chrome və Edge-də işləyir; brauzer hər seansda bir dəfə qovluqda dəyişikliklərə icazə soruşacaq.
 
 ### Dərsdə iş
 

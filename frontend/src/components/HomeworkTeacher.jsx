@@ -19,6 +19,7 @@
 // Оценка одна на всё ДЗ студента; «принято» или оценка = проверено.
 // Файлов в ДЗ сколько угодно — ограничение только размер файла (бэкенд).
 import React, { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router';
 import Modal from './Modal';
 import DateTimePicker from './DateTimePicker';
 import LibraryPickerModal from './LibraryPickerModal';
@@ -26,12 +27,13 @@ import { DialogCell, DialogThread } from './LessonDialog';
 import { formatDeadline } from './DeadlinePicker';
 import {
   createHomeworkTask, deleteHomeworkTask, setScopeDeadline, reviewHomework, sendMessage,
-  openTaskFile, openAnswerFile, answerFileViewUrl, downloadAnswerFile, getAiSource,
+  openTaskFile, openAnswerFile, answerFileViewUrl, downloadAnswerFile, getAnswerFileBlob, getAiSource,
 } from '../api/homework';
 import { LANG_NAMES, copyText } from './QuizHelper';
-import { reviewWork, workFileViewUrl, openWorkFile, downloadWorkFile, getWorkAiSource, downloadWorkAiPack } from '../api/lessonWork';
+import { reviewWork, workFileViewUrl, openWorkFile, downloadWorkFile, getWorkFileBlob, getWorkAiSource, downloadWorkAiPack } from '../api/lessonWork';
 import { getLessonItems } from '../api/lessons';
 import { extractErrorMessage } from '../utils/errors';
+import { usePref } from '../hooks/usePref';
 
 // ---------- Окно «+ ДЗ» ----------
 
@@ -218,7 +220,7 @@ export function HomeworkFlags({ row, onAdd }) {
 
 const STATUS_ORDER = { submitted: 0, returned: 1, pending: 2, expired: 3, accepted: 4, graded: 5, none: 6 };
 
-export function HomeworkCheckView({ lessonId, board, onChanged, onError }) {
+export function HomeworkCheckView({ lessonId, groupName, board, onChanged, onError }) {
   const [panel, setPanel] = useState(null); // { studentId, fileId }
   const [addFor, setAddFor] = useState(null); // строка студента для персонального «+ ДЗ»
   const tasksById = Object.fromEntries(board.tasks.map(t => [t.id, t]));
@@ -316,6 +318,7 @@ export function HomeworkCheckView({ lessonId, board, onChanged, onError }) {
         <ReviewPanel
           key={panel.studentId}
           lessonId={lessonId}
+          groupName={groupName}
           rows={rows}
           queue={rows}
           toReviewCount={toReview.length}
@@ -918,6 +921,199 @@ function WorkReviewControls({ lessonId, row, onChanged, onError, suggested }) {
   );
 }
 
+// ---------- Папки учеников на компьютере педагога ----------
+// «⬇ В папку ученика»: все файлы ученика (ДЗ или работа на уроке) — в
+// <рабочая папка>\<группа>\<ученик>; папка ученика сначала очищается, из
+// файлов с одинаковым именем остаётся последний. Путь рабочей папки хранится
+// в профиле (ключ review.folder) — по нему кнопка «Путь к папке» копирует
+// адрес для Проводника (Win+R). Саму папку браузер даёт только «ручкой»
+// (File System Access API, Chrome и Edge): её нельзя хранить на сервере —
+// она лежит в IndexedDB этого браузера.
+export const folderSupported = typeof window !== 'undefined' && 'showDirectoryPicker' in window;
+const FOLDER_KEY = 'review.folder';
+
+function folderDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('lms', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('handles');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function loadFolderHandle() {
+  try {
+    const db = await folderDb();
+    return await new Promise((resolve, reject) => {
+      const req = db.transaction('handles').objectStore('handles').get(FOLDER_KEY);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function saveFolderHandle(handle) {
+  const db = await folderDb();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction('handles', 'readwrite');
+    tx.objectStore('handles').put(handle, FOLDER_KEY);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// Имя папки или файла, допустимое в Windows
+const safeName = (s) => String(s || '').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[. ]+$/, '').trim() || '_';
+
+function studentFolderPath(base, group, student) {
+  return [base.replace(/[\\/]+$/, ''), safeName(group), safeName(student)].join('\\');
+}
+
+// Блок в профиле: путь рабочей папки + выбор этой же папки в браузере
+export function ReviewFolderSettings() {
+  const [base, setBase] = usePref(FOLDER_KEY, '');
+  const [text, setText] = useState(base);
+  const [handle, setHandle] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => { setText(base); }, [base]);
+  useEffect(() => { if (folderSupported) loadFolderHandle().then(setHandle); }, []);
+
+  const pick = async () => {
+    setError('');
+    try {
+      const h = await window.showDirectoryPicker({ id: 'lms-review', mode: 'readwrite' });
+      await saveFolderHandle(h);
+      setHandle(h);
+    } catch (err) {
+      if (err?.name !== 'AbortError') setError('Не удалось выбрать папку');
+    }
+  };
+
+  const last = text.trim().replace(/[\\/]+$/, '').split(/[\\/]/).pop();
+  const mismatch = handle && last && last.toLowerCase() !== handle.name.toLowerCase();
+
+  return (
+    <>
+      <h3 className="form-section">{'Папка для работ учеников'}</h3>
+      <p className="hint-text">{'Сюда кнопка «В папку ученика» в панели проверки скачивает файлы ученика — в папку «группа\\ученик». Укажите путь к папке и выберите эту же папку в браузере.'}</p>
+      <div className="form-row">
+        <label className="form-row__label">{'Путь к папке'}</label>
+        <input
+          className="input"
+          value={text}
+          placeholder={'C:\\Работы'}
+          onChange={e => setText(e.target.value)}
+          onBlur={() => { if (text.trim() !== base) setBase(text.trim()); }}
+        />
+      </div>
+      <div className="icon-row">
+        <button type="button" className="btn btn--outline" onClick={pick} disabled={!folderSupported}>
+          {handle ? 'Выбрать другую папку' : 'Выбрать папку в браузере'}
+        </button>
+        {handle && <span className="text-muted">{`Выбрана папка: ${handle.name}`}</span>}
+      </div>
+      {!folderSupported && <p className="hint-text">{'Работает только в Chrome и Edge.'}</p>}
+      {mismatch && <div className="error-text error-text--muted">{'Путь и выбранная папка не совпадают — укажите одну и ту же папку.'}</div>}
+      {error && <div className="error-text error-text--muted">{error}</div>}
+    </>
+  );
+}
+
+// Строка в панели проверки: «⬇ В папку ученика» и «📋 Путь к папке»
+function StudentFolderBar({ lessonId, mode, groupName, studentName, files }) {
+  const [base] = usePref(FOLDER_KEY, '');
+  const [handle, setHandle] = useState(null);
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [done, setDone] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => { if (folderSupported) loadFolderHandle().then(setHandle); }, []);
+
+  if (!files.length) return null;
+  const path = base ? studentFolderPath(base, groupName, studentName) : '';
+
+  const download = async () => {
+    setConfirm(false);
+    setError('');
+    setDone('');
+    setBusy(true);
+    try {
+      // Разрешение спрашиваем сразу по клику — после загрузки файлов браузер уже не спросит
+      if ((await handle.queryPermission({ mode: 'readwrite' })) !== 'granted'
+          && (await handle.requestPermission({ mode: 'readwrite' })) !== 'granted') {
+        setError('Нет разрешения на запись в папку');
+        return;
+      }
+      const getBlob = mode === 'work' ? getWorkFileBlob : getAnswerFileBlob;
+      const list = [];
+      for (const f of files) list.push({ name: f.original_filename, blob: await getBlob(lessonId, f) });
+      const group = await handle.getDirectoryHandle(safeName(groupName), { create: true });
+      const dir = await group.getDirectoryHandle(safeName(studentName), { create: true });
+      const old = [];
+      for await (const name of dir.keys()) old.push(name);
+      for (const name of old) await dir.removeEntry(name, { recursive: true });
+      // по порядку загрузки: у файлов с одинаковым именем остаётся последний
+      for (const f of list) {
+        const fh = await dir.getFileHandle(safeName(f.name), { create: true });
+        const w = await fh.createWritable();
+        await w.write(f.blob);
+        await w.close();
+      }
+      setDone(`Скачано в папку ученика: ${new Set(list.map(f => safeName(f.name))).size}`);
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Не удалось скачать в папку'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copyPath = async () => {
+    try {
+      await copyText(path);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError('Не удалось скопировать путь');
+    }
+  };
+
+  return (
+    <>
+      <div className="review-panel__ai-row">
+        {!folderSupported && <span className="text-muted">{'Скачивание в папку ученика работает только в Chrome и Edge.'}</span>}
+        {folderSupported && (!base || !handle) && (
+          <span className="text-muted">
+            {'Папка для работ учеников не выбрана.'}{' '}<Link to="/dashboard/profile">{'Укажите её в профиле'}</Link>
+          </span>
+        )}
+        {folderSupported && base && handle && (confirm ? (
+          <>
+            <span>{'Очистить папку ученика и скачать заново?'}</span>
+            <button type="button" className="btn btn--sm" onClick={download}>{'Да'}</button>
+            <button type="button" className="btn btn--sm btn--secondary" onClick={() => setConfirm(false)}>{'Отмена'}</button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="btn btn--sm btn--outline" disabled={busy} data-tip={path} onClick={() => setConfirm(true)}>
+              {busy ? 'Скачиваем...' : '⬇ В папку ученика'}
+            </button>
+            <button type="button" className="btn btn--sm btn--outline" data-tip="Скопировать путь — Win+R, Ctrl+V, Enter откроет папку в Проводнике" onClick={copyPath}>
+              {copied ? 'Скопировано' : '📋 Путь к папке'}
+            </button>
+          </>
+        ))}
+      </div>
+      {done && <div className="hint-text">{done}</div>}
+      {error && <div className="error-text error-text--muted">{error}</div>}
+    </>
+  );
+}
+
 // ---------- Панель проверки справа ----------
 
 // mode: homework — ответ на ДЗ (row.answer); work — работа на уроке (row.work, оценка за урок).
@@ -943,7 +1139,8 @@ const PANEL_MODES = {
 };
 
 // queue — все студенты группы по порядку таблицы (листаем по кругу, ради диалога тоже); toReviewCount — сколько ждут проверки
-export function ReviewPanel({ lessonId, rows, queue, toReviewCount, studentId, fileId, onNavigate, onChanged, onClose, mode = 'homework' }) {
+// groupName — для папки ученика на компьютере педагога (StudentFolderBar)
+export function ReviewPanel({ lessonId, groupName, rows, queue, toReviewCount, studentId, fileId, onNavigate, onChanged, onClose, mode = 'homework' }) {
   const M = PANEL_MODES[mode];
   const row = rows.find(r => r.student_id === studentId);
   const files = row ? M.files(row) : [];
@@ -1022,6 +1219,8 @@ export function ReviewPanel({ lessonId, rows, queue, toReviewCount, studentId, f
             </button>
           )}
         </div>
+
+        <StudentFolderBar lessonId={lessonId} mode={mode} groupName={groupName} studentName={row.full_name} files={files} />
 
         <div className="review-panel__viewer">
           {error && <div className="error-text error-text--muted">{error}</div>}

@@ -998,7 +998,7 @@ function LessonPage() {
               )}
 
               {hwCheckMode && (
-                <HomeworkCheckView lessonId={lessonId} board={hwBoard} onChanged={loadHomework} onError={setMarksError} />
+                <HomeworkCheckView lessonId={lessonId} groupName={lesson.group_name} board={hwBoard} onChanged={loadHomework} onError={setMarksError} />
               )}
 
               {hwAddOpen && (
@@ -1171,6 +1171,7 @@ function LessonPage() {
                   key={workPanel.studentId}
                   mode="work"
                   lessonId={lessonId}
+                  groupName={lesson.group_name}
                   rows={workBoard.students}
                   queue={workBoard.students}
                   toReviewCount={workBoard.to_review}

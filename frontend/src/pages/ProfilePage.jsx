@@ -6,6 +6,7 @@ import Modal from '../components/Modal';
 import FormField from '../components/FormField';
 import DaysOffEditor from '../components/DaysOffEditor';
 import { ScratchAccessBlock } from '../components/ParentLinkBlock';
+import { ReviewFolderSettings } from '../components/HomeworkTeacher';
 
 // Исходник фото до обработки — как на сервере (routers/auth.py, PHOTO_MAX_UPLOAD)
 const PHOTO_MAX_MB = 15;
@@ -340,6 +341,9 @@ function ProfilePage() {
           <p className="hint-text">{'Выходные ставит администратор.'}</p>
         </>
       )}
+
+      {/* Куда «В папку ученика» скачивает работы (панель проверки ДЗ и работ на уроке) */}
+      {(role === 'teacher' || role === 'admin') && <ReviewFolderSettings />}
 
       {pwdOpen && (
         <Modal

@@ -84,6 +84,11 @@ export async function openWorkFile(lessonId, file) {
   }
 }
 
+// Файл работы как Blob — «В папку ученика» (HomeworkTeacher.jsx)
+export function getWorkFileBlob(lessonId, file) {
+  return api.get(fileUrl(lessonId, file), { responseType: 'blob' }).then(res => res.data);
+}
+
 export function downloadWorkFile(lessonId, file) {
   return saveBlob(fileUrl(lessonId, file), file.original_filename, file.content_type);
 }

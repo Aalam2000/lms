@@ -130,6 +130,11 @@ export function downloadAnswerFile(lessonId, file) {
   return saveBlob(`${hw(lessonId)}/answer-files/${file.id}/download`, file.original_filename, file.content_type);
 }
 
+// Файл ответа как Blob — «В папку ученика» (HomeworkTeacher.jsx)
+export function getAnswerFileBlob(lessonId, file) {
+  return api.get(`${hw(lessonId)}/answer-files/${file.id}/download`, { responseType: 'blob' }).then(res => res.data);
+}
+
 // Файл ответа для просмотра (картинка/PDF как есть, код/текст — текстом):
 // blob-URL для панели проверки или новой вкладки. Не забыть revokeObjectURL.
 export async function answerFileViewUrl(lessonId, file) {
