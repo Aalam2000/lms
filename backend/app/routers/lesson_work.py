@@ -23,6 +23,7 @@ from .. import storage
 from ..database import get_db
 from ..dependencies import require_teacher, get_current_user
 from ..lesson_work import work_status
+from ..personal import student_lesson_access
 from ..models import Course, Group, Lesson, LessonMark, LessonResource, LessonWorkFile, Material, Sector, User
 from .homework import (
     AI_TEXT_LIMIT, AiSourceOut, _active_students, _ai_text, _ensure_active_student, _read_upload,
@@ -55,7 +56,7 @@ class WorkState(BaseModel):
 
 class MyWorkOut(WorkState):
     is_locked: bool = False          # менять файлы нельзя
-    lock_reason: Optional[str] = None  # reviewed | day_over
+    lock_reason: Optional[str] = None  # reviewed | day_over | archived (отчислен — только просмотр)
 
 
 class WorkRow(BaseModel):
@@ -133,8 +134,12 @@ async def get_my_work(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    lesson = await get_lesson_for_student(lesson_id, db, current_user)
-    return await _my_state(db, lesson, current_user.id)
+    lesson = await get_lesson_for_student(lesson_id, db, current_user, write=False)
+    state = await _my_state(db, lesson, current_user.id)
+    if not state.is_locked and await student_lesson_access(db, lesson, current_user.id) == "readonly":
+        # отчислен из группы (архив) — только просмотр
+        state.is_locked, state.lock_reason = True, "archived"
+    return state
 
 
 @router.post("/{lesson_id}/work/my/files", response_model=MyWorkOut)
@@ -432,7 +437,7 @@ async def download_work_file(
     if current_user.role == "student":
         if f.student_id != current_user.id:
             raise HTTPException(status_code=403, detail="Нет доступа к файлу")
-        await get_lesson_for_student(lesson_id, db, current_user)
+        await get_lesson_for_student(lesson_id, db, current_user, write=False)
     else:
         await get_lesson_for_teacher_or_admin(lesson_id, db, current_user, write=False)
     return file_response(f.object_key, f.original_filename, f.content_type, inline)

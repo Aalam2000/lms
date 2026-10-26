@@ -15,7 +15,7 @@
 from typing import Iterable
 
 from fastapi import HTTPException
-from sqlalchemy import delete, or_, select, true
+from sqlalchemy import and_, delete, exists, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import GroupMember, HomeworkAnswer, Lesson, LessonMark, LessonStudent, LessonWorkFile, User
@@ -27,6 +27,46 @@ def visible_to_student(student_id: int):
         Lesson.is_personal.is_(False),
         Lesson.id.in_(select(LessonStudent.lesson_id).where(LessonStudent.student_id == student_id)),
     )
+
+
+def membership_visible():
+    """Условие на GroupMember (вместе с Lesson): ученик видит урок группы, если он
+    в ней активен или отчислен (архив) — тогда только уроки до отчисления и только
+    для просмотра: сдавать, писать и оценивать урок отчисленный не может."""
+    return or_(
+        GroupMember.status == "active",
+        and_(
+            GroupMember.status == "expelled",
+            GroupMember.expelled_at.isnot(None),
+            Lesson.date < GroupMember.expelled_at,
+        ),
+    )
+
+
+def student_lesson_scope(student_id: int):
+    """Условие для запросов по Lesson: уроки групп ученика, которые он может смотреть."""
+    return exists().where(
+        GroupMember.group_id == Lesson.group_id,
+        GroupMember.student_id == student_id,
+        membership_visible(),
+    )
+
+
+async def student_lesson_access(db: AsyncSession, lesson: Lesson, student_id: int):
+    """"active" — ученик группы урока; "readonly" — отчислен, урок до отчисления
+    (только просмотр); None — урок ему недоступен. Персональный — отдельно (is_participant)."""
+    member = (await db.execute(select(GroupMember.status, GroupMember.expelled_at).where(
+        GroupMember.group_id == lesson.group_id, GroupMember.student_id == student_id,
+        GroupMember.status.in_(("active", "expelled")),
+    ))).first()
+    if not member:
+        return None
+    status, expelled_at = member
+    if status == "active":
+        return "active"
+    if expelled_at and lesson.date and lesson.date < expelled_at:
+        return "readonly"
+    return None
 
 
 def lesson_students_condition(lesson: Lesson):

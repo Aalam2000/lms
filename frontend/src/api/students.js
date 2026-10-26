@@ -32,6 +32,11 @@ export function getStudents(params) {
   return api.get('/students', { params }).then(res => res.data);
 }
 
+// Архив: ученики, отчисленные из групп с причиной (педагог — из своих групп)
+export function getArchivedStudents() {
+  return api.get('/students/archive').then(res => res.data);
+}
+
 // Удаление: используемого ученика — только с force (всё связанное удаляется вместе с ним)
 export function deleteStudent(studentId, { force = false } = {}) {
   return api.delete(`/students/${studentId}`, { params: force ? { force: true } : {} }).then(res => res.data);

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { getCourses, getMyGroups } from '../api/groups';
+import { getCourses, getMyGroups, expelGroupMember, restoreGroupMember } from '../api/groups';
 import { getGroups } from '../api/admin';
 import { useAuth } from '../context/AuthContext';
 import { usePref } from '../hooks/usePref';
@@ -13,7 +13,7 @@ import SortTh, { sortRows } from '../components/SortTh';
 import StudentCardModal from '../components/StudentCardModal';
 import Modal from '../components/Modal';
 import DateTimePicker, { nextHour } from '../components/DateTimePicker';
-import { setStudentPassword, getStudents, deleteStudent, createStudentLesson } from '../api/students';
+import { setStudentPassword, getStudents, getArchivedStudents, deleteStudent, createStudentLesson } from '../api/students';
 import Avatar from '../components/Avatar';
 import { extractErrorMessage } from '../utils/errors';
 import PushMark from '../components/PushMark';
@@ -25,6 +25,64 @@ const formatLogin = (value) => {
   const d = new Date(value);
   return `${d.toLocaleDateString('ru-RU')} ${d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
 };
+
+// «В архив» (админ, педагог): отчислить ученика из группы с причиной — история
+// (оценки, посещаемость, ДЗ) остаётся. Педагог выбирает из своих групп, админ —
+// из всех групп ученика; несколько групп — выбор одной или «из всех».
+function ArchiveStudentModal({ student, choices, onClose, onDone }) {
+  const [groupId, setGroupId] = useState(choices.length === 1 ? String(choices[0].id) : '');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    if (!groupId) { setError('Выберите группу'); return; }
+    if (!reason.trim()) { setError('Укажите причину'); return; }
+    setBusy(true);
+    setError('');
+    try {
+      const targets = groupId === 'all' ? choices : choices.filter(g => String(g.id) === groupId);
+      for (const g of targets) {
+        await expelGroupMember(g.id, student.id, reason.trim());
+      }
+      onDone();
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Не удалось отправить в архив'));
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal
+      title={<>{'В архив'}: {student.full_name}</>}
+      onClose={onClose}
+      footer={(
+        <>
+          <button type="button" className="btn btn--secondary" onClick={onClose}>{'Отмена'}</button>
+          <button type="button" className="btn" onClick={save} disabled={busy}>{'В архив'}</button>
+        </>
+      )}
+    >
+      <div className="form-stack">
+        {choices.length > 1 && (
+          <select className="input" value={groupId} onChange={e => setGroupId(e.target.value)}>
+            <option value="">{'Из какой группы'}</option>
+            {choices.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            <option value="all">{'Из всех'}</option>
+          </select>
+        )}
+        <textarea
+          className="input"
+          rows={3}
+          placeholder={'Причина: например, не оплатил или закончил обучение'}
+          value={reason}
+          onChange={e => setReason(e.target.value)}
+          autoFocus
+        />
+        <div className="hint-text">{'Ученик пропадёт из списков и группы. Вся история учёбы сохранится — её видно в архиве.'}</div>
+        {error && <div className="form-field__error">{error}</div>}
+      </div>
+    </Modal>
+  );
+}
 
 // Доп. урок ученику (кнопка «Урок» в строке): нет группы — выбрать её, ученик
 // запишется в неё; несколько групп — выбрать одну. Урок — персональный урок группы.
@@ -82,7 +140,33 @@ function StudentsPage() {
   // Все ученики и фильтр по учителю — право students.all (админ, куратор)
   const isAdmin = can('students.all');
   const canDelete = hasRole('admin');
+  // Админ и педагог: клик по строке — «Данные ученика», кнопок в строке нет.
+  // У куратора строка как была — с кнопками (решение Андрея)
+  const rowButtons = hasRole('curator');
   const [lessonStudent, setLessonStudent] = useState(null); // ученик в окне «Доп. урок»
+  const [archiveStudent, setArchiveStudent] = useState(null); // ученик в окне «В архив»
+  // «Архив» — отчисленные (GET /students/archive); null — ещё не загружен
+  const [showArchive, setShowArchive] = useState(false);
+  const [archived, setArchived] = useState(null);
+  const loadArchived = () => getArchivedStudents()
+    .then(setArchived)
+    .catch(err => { setArchived([]); setError(extractErrorMessage(err, 'Не удалось загрузить архив')); });
+  const toggleArchive = () => {
+    if (!showArchive) { setArchived(null); loadArchived(); }
+    setShowArchive(v => !v);
+  };
+  const restoreFromArchive = async (studentId, groupId) => {
+    setError('');
+    try {
+      await restoreGroupMember(groupId, studentId);
+      loadArchived();
+      loadStudents();
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Не удалось вернуть ученика'));
+    }
+  };
+  // Из каких групп можно отчислить: админ — из всех групп ученика, педагог — из своих
+  const archiveChoices = (s) => (hasRole('admin') ? s.groups : s.groups.filter(g => g.teacher_id === user?.id));
 
   const [students, setStudents] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -211,7 +295,8 @@ function StudentsPage() {
     <div className="page">
       <div className="toolbar toolbar--underline-row">
         <div className="toolbar__filters">
-          {isAdmin && (
+          {showArchive && <h3 className="toolbar__title">{'Архив учеников'}</h3>}
+          {!showArchive && isAdmin && (
             <Dropdown
               value={mine ? '' : teacherId}
               disabled={mine}
@@ -220,26 +305,38 @@ function StudentsPage() {
               options={teacherOptions.map(([id, name]) => ({ value: id, label: name }))}
             />
           )}
+          {!showArchive && (
           <Dropdown
             value={courseId}
             onChange={v => { setCourseId(v); setGroupId(''); }}
             placeholder={'Тема — все'}
             options={courseOptions.map(c => ({ value: c.id, label: c.title }))}
           />
+          )}
+          {!showArchive && (
           <Dropdown
             value={groupId}
             onChange={v => setGroupId(v)}
             placeholder={'Группа — все'}
             options={groupOptions.map(g => ({ value: g.id, label: g.name }))}
           />
+          )}
         </div>
         <div className="toolbar__filters">
-          {canDelete && (
+          {canDelete && !showArchive && (
             <button type="button" className={`tab tab--underline${mine ? ' tab--active' : ''}`} onClick={handleMineToggle}>
               {'Моё'}
             </button>
           )}
-          {can('students.create') && (
+          {!rowButtons && (
+            <IconButton
+              icon="archive"
+              tip={showArchive ? 'Вернуться к ученикам' : 'Архив учеников'}
+              active={showArchive}
+              onClick={toggleArchive}
+            />
+          )}
+          {can('students.create') && !showArchive && (
             <button type="button" className="btn" onClick={() => setIsAddingStudent(true)}>{'+ Ученик'}</button>
           )}
         </div>
@@ -247,6 +344,64 @@ function StudentsPage() {
 
       {error && <div className="error-text error-text--muted">{error}</div>}
 
+      {/* Архив: строка — одно отчисление; клик по имени — карточка учёбы (история сохранена) */}
+      {showArchive && (
+        <div className="table-scroll">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>{'Имя'}</th>
+                <th>{'Группа'}</th>
+                <th>{'Причина'}</th>
+                <th>{'Дата'}</th>
+                <th>{'Телефон'}</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {archived === null ? (
+                <tr><td colSpan="6" className="table__empty">{'Загрузка...'}</td></tr>
+              ) : archived.length === 0 ? (
+                <tr><td colSpan="6" className="table__empty">{'Архив пуст'}</td></tr>
+              ) : archived.flatMap(a => a.entries.map(e => (
+                <tr key={`${a.id}-${e.group_id}`}>
+                  <td>
+                    <span className="person">
+                      <Avatar userId={a.id} photoUrl={a.photo_url} name={a.full_name} size="xs" />
+                      <Link className="link" to={`/dashboard/students/${a.id}/report`}>{a.full_name}</Link>
+                    </span>
+                  </td>
+                  <td>{e.group_name}</td>
+                  <td>{e.reason || '—'}</td>
+                  <td className="nowrap">{e.expelled_at ? new Date(e.expelled_at).toLocaleDateString('ru-RU') : '—'}</td>
+                  <td className="nowrap">{a.phone || '—'}</td>
+                  <td>
+                    <div className="icon-row">
+                      <IconButton icon="restore" tip="Вернуть в группу" onClick={() => restoreFromArchive(a.id, e.group_id)} />
+                      {/* Удалить совсем — только админ и только из архива: ученик и вся его история
+                          (общая кнопка с контролем использования, app/usages.py) */}
+                      {canDelete && (
+                        <DeleteButton
+                          entity="student"
+                          id={a.id}
+                          name={a.full_name}
+                          tip="Удалить совсем — вместе со всей историей"
+                          forceable
+                          onDelete={(opts) => deleteStudent(a.id, { force: !!opts?.force })}
+                          onDeleted={() => setArchived(prev => prev.filter(x => x.id !== a.id))}
+                          onError={setError}
+                        />
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {!showArchive && (
       <div className="table-scroll">
         <table className="table">
           <thead>
@@ -275,7 +430,11 @@ function StudentsPage() {
               <tr><td colSpan={columnCount} className="table__empty">{'Студентов не найдено'}</td></tr>
             ) : (
               sortedStudents.map(s => (
-                <tr key={s.id}>
+                <tr
+                  key={s.id}
+                  className={rowButtons ? undefined : 'table__row--clickable'}
+                  onClick={rowButtons ? undefined : () => setCardStudentId(s.id)}
+                >
                   <td>
                     <span className="person">
                       <Avatar userId={s.id} photoUrl={s.photo_url} name={s.full_name} size="xs" />
@@ -283,6 +442,7 @@ function StudentsPage() {
                       <Link
                         className={`link${s.homework_debt ? ` hw-debt hw-debt--${s.homework_debt}` : ''}`}
                         to={`/dashboard/students/${s.id}/report`}
+                        onClick={e => e.stopPropagation()}
                         data-tip={s.homework_debt === 'overdue' ? 'Не сдал последнее ДЗ — срок прошёл'
                           : s.homework_debt === 'pending' ? 'Ещё не сдал последнее ДЗ' : 'Отчёт по ученику'}
                       >
@@ -313,10 +473,11 @@ function StudentsPage() {
                       <>{s.parent_name}{s.parent_name && s.parent_phone && <br />}{s.parent_phone}</>
                     ) : '—'}
                   </td>
-                  <td>
+                  <td onClick={e => e.stopPropagation()}>
                     <StudentContactIcons telegram={s.telegram_username} whatsapp={s.whatsapp} phone={s.phone} />
                   </td>
-                  <td>
+                  <td onClick={e => e.stopPropagation()}>
+                    {rowButtons && (
                     <div className="icon-row">
                       {/* Ученик забыл пароль — педагог (своим ученикам) или админ задаёт новый */}
                       <IconButton icon="edit" tip="Данные ученика" onClick={() => setCardStudentId(s.id)} />
@@ -324,20 +485,11 @@ function StudentsPage() {
                       {can('lessons.personal') && (
                         <IconButton icon="schedule" tip="Доп. урок" onClick={() => setLessonStudent(s)} />
                       )}
-                      {/* Общая кнопка удаления с контролем использования (app/usages.py) */}
-                      {canDelete && (
-                      <DeleteButton
-                        entity="student"
-                        id={s.id}
-                        name={s.full_name}
-                        tip="Удалить студента"
-                        forceable={canDelete}
-                        onDelete={(opts) => deleteStudent(s.id, { force: !!opts?.force })}
-                        onDeleted={() => setStudents(prev => prev.filter(x => x.id !== s.id))}
-                        onError={setError}
-                      />
-                      )}
                     </div>
+                    )}
+                    {!rowButtons && archiveChoices(s).length > 0 && (
+                      <IconButton icon="archive" tip="В архив" variant="warn" onClick={() => setArchiveStudent(s)} />
+                    )}
                   </td>
                 </tr>
               ))
@@ -345,6 +497,7 @@ function StudentsPage() {
           </tbody>
         </table>
       </div>
+      )}
 
       {cardStudentId && (
         <StudentCardModal
@@ -364,6 +517,14 @@ function StudentsPage() {
           } : {})}
           onClose={() => setIsAddingStudent(false)}
           onSaved={(saved) => { setIsAddingStudent(false); loadStudents(); if (saved?.id) setCardStudentId(saved.id); }}
+        />
+      )}
+      {archiveStudent && (
+        <ArchiveStudentModal
+          student={archiveStudent}
+          choices={archiveChoices(archiveStudent)}
+          onClose={() => setArchiveStudent(null)}
+          onDone={() => { setArchiveStudent(null); loadStudents(); }}
         />
       )}
       {lessonStudent && (

@@ -1,4 +1,4 @@
-<!-- autoi18n: source=teacher.md lang=az sha1=cec3395498c60d1372547460a19dc9e83933be1f -->
+<!-- autoi18n: source=teacher.md lang=az sha1=af7499b3792d8024f4b41455e064067195d0c574 -->
 # Platformada necə işləmək
 
 ## Mənim qruplarım
@@ -153,10 +153,13 @@ Adın altında olan rəngli zolaq — son verilmiş Ev tapşırığı üzrə bor
 
 Yeni şagirdləri administrator və kurator yaradır; istifadəçi adı avtomatik yaradılır (ad, nöqtə, soyadın üç hərfi və rəqəmlər — məsələn, `murad.ali47`), parol əvvəlcə istifadəçi adına bərabərdir.
 
-- **Tələbənin məlumatları** (qələm) — məlumatlara baxmaq; onları administrator və ya kurator dəyişə bilər. Kartda **Şagirdin girişi** bloku var: platformanın ünvanı, istifadəçi adı və parol, **Kopyala** və **WhatsApp-a göndər** düymələri; şagird parolu dəyişib unudubsa — **Girişə sıfırlamaq**. Valideyn üçün link də oradadır.
-- **Parolu Dəyişmək** (açar) — əgər şagird parolu unudubsa.
+- **Tələbənin məlumatları** — şagirdin sətrinə basın (adına yox): məlumatlara baxmaq; onları administrator və ya kurator dəyişə bilər. Kartda **Şagirdin girişi** bloku var: platformanın ünvanı, istifadəçi adı və parol, **Kopyala** və **WhatsApp-a göndər** düymələri; şagird parolu dəyişib unudubsa — **Girişə sıfırlamaq**. Valideyn üçün link də oradadır.
+- **Arxivə** (sətrin sağındakı simge) — şagirdi səbəb göstərərək sizin qrupdan xaric etmək: məsələn, ödəniş etməyib və ya təhsilini bitirib. Şagird sizin bir neçə qrupunuzdadırsa, hansından və ya **Hamısından** seçin. Bütün təhsil tarixçəsi saxlanılır.
+- Şagirdin adına basın — onun üzrə hesabat açılacaq.
 
-- **Əlavə dərs** (artı ilə təqvim) — bu şagird üçün fərdi dərs: tarix və vaxt. Əgər şagird hələ qrupa daxil olmayıbsa (onu kurator göndərib — “Qrup” sütununda “qrupsuz” işarəsi), qrup seçin — şagird ora yazılacaq.
+Yuxarı sağdakı arxiv simgesi **Şagirdlərin arxivi**ni açır — sizin qruplardan xaric edilənlər: qrup, səbəb və tarix. Ad şagirdin bütün təhsili ilə hesabatını açır; **Qrupa qaytar** — şagird yenidən qrupdadır. Arxivdəki şagird platformaya daxil olub bu qrupun xaric edildiyi günə qədərki dərslərinə baxa bilər — materiallar, öz cavabları və dialoq — amma heç nə təqdim etmir və yazmır.
+
+Şagirdə əlavə dərs qrup səhifəsində qoyulur: **+ Dərs** → **Fərdi dərs**. Qrupsuz şagirdi (onu kurator göndərib — “Qrup” sütununda “qrupsuz” işarəsi) əvvəlcə qrupa yazın: qrup səhifəsi, **Şagirdlər** simgesi → axtarış.
 
 Kuratorun sizə yönləndirdiyi şagirdlər bu siyahıda dərhal görünür, hətta qrupsuz. Şagirdin gəlməsindən əvvəl qrupa verilmiş Ev tapşırıqları onun borcu sayılmır; əgər o, onları təqdim edərsə — qiymət hesaba alınacaq.
 
@@ -166,7 +169,7 @@ Kuratorun sizə yönləndirdiyi şagirdlər bu siyahıda dərhal görünür, hə
 
 ### Valideyn üçün link
 
-Valideyn uşağın akademik göstəricilərini şəxsi link vasitəsilə görə bilər və ya platformaya öz giriş adı ilə daxil ola bilər. Şagirdin məlumatlarını açın (qələm): "Valideyn" bölməsində linkin olduğu blok var. Linklə birlikdə valideynin girişi yaradılır: giriş adı — `p.` və uşağın giriş adı, şifrə əvvəlcə giriş adı ilə eynidir. **Kopyala** və **WhatsApp-a göndər** düymələri valideynə dərhal linki, ünvanı, giriş adını və şifrəni göndərir. Əvvəl yaradılmış linklər üçün **Valideyn üçün giriş yarat** düyməsini basın.
+Valideyn uşağın akademik göstəricilərini şəxsi link vasitəsilə görə bilər və ya platformaya öz giriş adı ilə daxil ola bilər. Şagirdin məlumatlarını açın (sətrə klik): "Valideyn" bölməsində linkin olduğu blok var. Linklə birlikdə valideynin girişi yaradılır: giriş adı — `p.` və uşağın giriş adı, şifrə əvvəlcə giriş adı ilə eynidir. **Kopyala** və **WhatsApp-a göndər** düymələri valideynə dərhal linki, ünvanı, giriş adını və şifrəni göndərir. Əvvəl yaradılmış linklər üçün **Valideyn üçün giriş yarat** düyməsini basın.
 
 - **Valideyn üçün link yarat** — düymə valideynin telefon məlumatları doldurulduqda və kart saxlandıqda görünür.
 - **Kopyala** — link clipboard-a düşəcək, istənilən mesajlaşma tətbiqinə yapışdırıla bilər.

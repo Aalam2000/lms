@@ -1,4 +1,4 @@
-<!-- autoi18n: source=teacher.md lang=en sha1=cec3395498c60d1372547460a19dc9e83933be1f -->
+<!-- autoi18n: source=teacher.md lang=en sha1=af7499b3792d8024f4b41455e064067195d0c574 -->
 # How to work on the platform
 
 ## My groups
@@ -153,10 +153,13 @@ In the "Absences" column — only unresolved absences without a Valid reason. A 
 
 New students are added by the administrator and the curator; the login is created automatically (first name, dot, three letters of the last name, and numbers — for example, `murad.ali47`), the password initially equals the login.
 
-- **Student details** (pencil) — view the data; the administrator or the curator can change it. The card has the **Student access** block: platform address, login and password, **Copy** and **Send via WhatsApp** buttons; if the student has changed the password and forgotten it — **Reset to login**. The parent's link is there too.
-- **Change Password** (key) — if the student has forgotten the password.
+- **Student details** — click the student's row (not the name): view the data; the administrator or the curator can change it. The card has the **Student access** block: platform address, login and password, **Copy** and **Send via WhatsApp** buttons; if the student has changed the password and forgotten it — **Reset to login**. The parent's link is there too.
+- **To archive** (icon on the right of the row) — expel the student from your group with a reason: for example, did not pay or finished the course. If the student is in several of your groups, choose which one, or **From all**. The whole study history is kept.
+- Click the student's name — the report on them opens.
 
-- **Additional Lesson** (calendar with a plus) — personal lesson for this student: date and time. If the student is not yet in the group (sent by the curator — in the "Group" column marked "without group"), select a group — the student will be enrolled in it.
+The archive icon at the top right opens the **Student archive** — students expelled from your groups: group, reason and date. The name opens the student report with all their studies; **Return to the group** — the student is back in the group. A student in the archive can log in and view the lessons of this group up to the day of expulsion — materials, their answers and the dialogue — but cannot submit or write anything.
+
+An extra lesson for a student is added on the group page: **+ Lesson** → **Personal lesson**. A student without a group (sent by the curator — marked "without group" in the "Group" column) is first enrolled in the group: group page, the **Students** icon → search.
 
 Students referred to you by the curator are visible in this list immediately, even without a group. Homework assigned to the group before the student's arrival is not considered their debt; if they submit it — the grade will be counted.
 
@@ -166,7 +169,7 @@ Students evaluate each lesson with an emoji (green, yellow, red). You cannot see
 
 ### Link for Parent
 
-The parent can view the child's performance via a personal link or log into the platform using their login. Open the student's data (pencil): in the "Parent" section, there is a block with the link. Along with the link, a parent login is created: login — `p.` and the child's login, password initially equals the login. The **Copy** and **Send via WhatsApp** buttons immediately send the parent the link, address, login, and password. For links created earlier, click **Create Parent Login**.
+The parent can view the child's performance via a personal link or log into the platform using their login. Open the student's data (click on the row): in the "Parent" section, there is a block with the link. Along with the link, a parent login is created: login — `p.` and the child's login, password initially equals the login. The **Copy** and **Send via WhatsApp** buttons immediately send the parent the link, address, login, and password. For links created earlier, click **Create Parent Login**.
 
 - **Create Link for Parent** — the button appears when the parent's phone number is filled in and the card is saved.
 - **Copy** — the link will go to the clipboard and can be pasted into any messenger.

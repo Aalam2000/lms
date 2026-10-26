@@ -297,7 +297,7 @@ async def parent_messages(token: str, student_id: int, lesson_id: int, db: Async
 async def parent_task_file(token: str, student_id: int, lesson_id: int, task_id: int, db: AsyncSession = Depends(get_db)):
     """Файл задания — открыть на телефоне: docx/xlsx/pptx — как PDF, картинки и PDF — как есть."""
     child = await _child(db, token, student_id)
-    await lessons.get_lesson_for_student(lesson_id, db, child)
+    await lessons.get_lesson_for_student(lesson_id, db, child, write=False)
     task = (await db.execute(select(HomeworkTask).where(
         HomeworkTask.id == task_id, HomeworkTask.lesson_id == lesson_id,
     ))).scalar_one_or_none()

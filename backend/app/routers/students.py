@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -251,6 +251,70 @@ async def new_students_count(
     return {"count": len(await _new_ids(db, ids))}
 
 
+# Архив «Студентов»: ученики, отчисленные из групп с причиной (кнопка «В архив»).
+# Педагог — отчисленные из его групп, у кого в его группах не осталось активного
+# членства; students.all — у кого не осталось ни одной активной группы. История
+# не удаляется: по клику — отчёт по ученику (видны и группы, откуда отчислен).
+class ArchivedEntryOut(BaseModel):
+    group_id: int
+    group_name: str
+    reason: Optional[str] = None
+    expelled_at: Optional[datetime] = None
+
+
+class ArchivedStudentOut(BaseModel):
+    id: int
+    full_name: str
+    photo_url: Optional[str] = None
+    phone: Optional[str] = None
+    entries: list[ArchivedEntryOut] = []
+
+
+@router.get("/archive", response_model=list[ArchivedStudentOut])
+async def list_archived_students(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require("students.view")),
+):
+    groups_by_id = await _scope_group_ids(db, current_user)
+    if not groups_by_id:
+        return []
+    expelled = (await db.execute(
+        select(GroupMember.student_id, GroupMember.group_id, GroupMember.expel_reason, GroupMember.expelled_at)
+        .where(GroupMember.group_id.in_(list(groups_by_id)), GroupMember.status == "expelled")
+    )).all()
+    if not expelled:
+        return []
+    student_ids = {row[0] for row in expelled}
+    active_query = select(GroupMember.student_id).where(
+        GroupMember.student_id.in_(student_ids), GroupMember.status == "active",
+    )
+    if not has_perm(current_user, "students.all"):
+        active_query = active_query.where(GroupMember.group_id.in_(list(groups_by_id)))
+    still_active = {row[0] for row in (await db.execute(active_query)).all()}
+    archived_ids = student_ids - still_active
+    if not archived_ids:
+        return []
+    users = {u.id: u for u in (await db.execute(
+        select(User).where(User.id.in_(archived_ids), User.role == "student")
+    )).scalars().all()}
+    out: dict[int, ArchivedStudentOut] = {}
+    for sid, gid, reason, expelled_at in expelled:
+        user = users.get(sid)
+        if not user:
+            continue
+        item = out.setdefault(sid, ArchivedStudentOut(
+            id=sid, full_name=user.full_name or user.username, photo_url=user.photo_url, phone=user.phone,
+        ))
+        item.entries.append(ArchivedEntryOut(
+            group_id=gid, group_name=groups_by_id[gid]["name"], reason=reason, expelled_at=expelled_at,
+        ))
+    def last_expelled(item: ArchivedStudentOut):
+        return max((e.expelled_at for e in item.entries if e.expelled_at), default=datetime.min.replace(tzinfo=timezone.utc))
+    for item in out.values():
+        item.entries.sort(key=lambda e: e.expelled_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    return sorted(out.values(), key=last_expelled, reverse=True)
+
+
 @router.get("", response_model=list[StudentStatsOut])
 async def list_students(
     course_id: Optional[int] = Query(None),
@@ -393,9 +457,11 @@ async def get_student_report(
         raise HTTPException(status_code=404, detail="Студент не найден")
 
     groups_by_id = await _scope_group_ids(db, current_user)
+    # И группы, откуда отчислен (архив): отчёт считает уроки только до дня
+    # отчисления (student_report.in_membership)
     member_group_ids = {row[0] for row in (await db.execute(
         select(GroupMember.group_id)
-        .where(GroupMember.student_id == student_id, GroupMember.status == "active")
+        .where(GroupMember.student_id == student_id, GroupMember.status.in_(("active", "expelled")))
     )).all()}
     groups = [groups_by_id[gid] for gid in member_group_ids if gid in groups_by_id]
 

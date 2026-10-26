@@ -40,7 +40,7 @@ from ..models import (
 )
 from ..text_extract import extract_text
 from ..resources import clean_filename, content_hash, find_duplicate_material, find_materials_by_name, conflict
-from ..personal import is_participant, lesson_students_condition
+from ..personal import is_participant, lesson_students_condition, student_lesson_access
 from ..homework_status import (
     answer_status, effective_deadline as _effective_deadline, expired as _expired, task_is_for as _task_is_for,
 )
@@ -544,13 +544,13 @@ async def get_my_homework(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    await get_lesson_for_student(lesson_id, db, current_user)
+    lesson = await get_lesson_for_student(lesson_id, db, current_user, write=False)
     tasks = [t for t in await _lesson_tasks(db, lesson_id) if _task_is_for(t, current_user.id)]
     tasks_out = await _task_out(db, tasks)
-    return MyHomeworkOut(
-        tasks=[tasks_out[t.id] for t in tasks],
-        answer=await _state_for(db, lesson_id, current_user.id),
-    )
+    answer = await _state_for(db, lesson_id, current_user.id)
+    if await student_lesson_access(db, lesson, current_user.id) == "readonly":
+        answer.is_locked = True  # отчислен из группы (архив) — только просмотр
+    return MyHomeworkOut(tasks=[tasks_out[t.id] for t in tasks], answer=answer)
 
 
 @router.post("/{lesson_id}/homework/my/files", response_model=MyHomeworkOut)
@@ -657,7 +657,7 @@ async def download_answer_file(
     if current_user.role == "student":
         if owner_id != current_user.id:
             raise HTTPException(status_code=403, detail="Нет доступа к файлу")
-        await get_lesson_for_student(lesson_id, db, current_user)
+        await get_lesson_for_student(lesson_id, db, current_user, write=False)
     else:
         await get_lesson_for_teacher_or_admin(lesson_id, db, current_user, write=False)
     return file_response(f.object_key, f.original_filename, f.content_type, inline)
@@ -784,7 +784,7 @@ async def _thread_access(db: AsyncSession, lesson_id: int, student_id: int, user
     if user.role == "student":
         if student_id != user.id:
             raise HTTPException(status_code=403, detail="Нет доступа")
-        await get_lesson_for_student(lesson_id, db, user)
+        await get_lesson_for_student(lesson_id, db, user, write=write)
     else:
         lesson = await get_lesson_for_teacher_or_admin(lesson_id, db, user, write=write)
         await _ensure_active_student(db, lesson, student_id)

@@ -16,7 +16,7 @@ from .. import storage
 from ..database import get_db
 from ..dependencies import require_admin, require_teacher, get_current_user
 from ..models import Material, User, Lesson, LessonResource, GroupMember, HomeworkTask, Course
-from ..personal import visible_to_student
+from ..personal import membership_visible, visible_to_student
 from ..resources import clean_filename, content_hash, find_duplicate_material, find_materials_by_name, conflict
 from .academy import sector_exists
 from ..usages import ensure_not_used
@@ -75,7 +75,8 @@ async def _verify_student_material_access(
     db: AsyncSession, material_id: int, current_user: User
 ) -> None:
     """Студент может скачать/просмотреть файл, только если он реально
-    привязан к открытому уроку в группе, где студент активный участник —
+    привязан к открытому уроку в группе, где студент активный участник (или
+    отчислен — тогда урок до дня отчисления, personal.membership_visible) —
     иначе через прямой URL можно было бы утащить любой файл из общей
     базы знаний."""
     result = await db.execute(
@@ -87,7 +88,7 @@ async def _verify_student_material_access(
             LessonResource.resource_id == material_id,
             Lesson.is_open == True,
             GroupMember.student_id == current_user.id,
-            GroupMember.status == "active",
+            membership_visible(),
             visible_to_student(current_user.id),  # персональный урок — только участникам
         )
     )
@@ -102,7 +103,7 @@ async def _verify_student_material_access(
             HomeworkTask.material_id == material_id,
             Lesson.is_open == True,
             GroupMember.student_id == current_user.id,
-            GroupMember.status == "active",
+            membership_visible(),
             visible_to_student(current_user.id),
             or_(HomeworkTask.student_id.is_(None), HomeworkTask.student_id == current_user.id),
         )

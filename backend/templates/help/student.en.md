@@ -1,4 +1,4 @@
-<!-- autoi18n: source=student.md lang=en sha1=faa246ddf73a2f4ad4864ef8e6442c63dc62a889 -->
+<!-- autoi18n: source=student.md lang=en sha1=96ed9da908b3b337261a22cbf90b5a9689244c21 -->
 # How to work on the platform
 
 ## Home — my lessons
@@ -63,6 +63,8 @@ Answer status:
 ### Dialogue
 
 Correspondence with the teacher regarding this lesson. Write a message and send it. You can edit your message — the **Edit** button.
+
+If you have been expelled from a group, the lessons of this group up to the day of expulsion remain available for viewing: materials, your answers and the dialogue are visible, but you cannot submit or write anything.
 
 ## Performance
 

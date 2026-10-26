@@ -1,4 +1,4 @@
-<!-- autoi18n: source=admin.md lang=az sha1=a5410694d26efe39a568162f14c8d8b4f9961cf9 -->
+<!-- autoi18n: source=admin.md lang=az sha1=a9b63010ab69aa2d890eafbdb0039c5525a11064 -->
 # Platformada necə işləmək olar
 
 Administrator müəllimlərin gördüyü hər şeyi görür — amma bütün qruplar və bütün müəllimlər üzrə — və əlavə olaraq istifadəçiləri, kursları və qrupları idarə edir.
@@ -113,7 +113,7 @@ Fərdi dərs davamiyyətləri bağlayır: o bitdikdə və şagird orada “Gəld
 
 ### Tələbənin məlumatlarını necə dəyişmək olar
 
-Tələbə sırasındakı **qələm** ikonuna basın. Pəncərədə ad, telefon, email, Telegram, WhatsApp, valideynin adı və telefonu dəyişdirilə bilər. İstifadəçi adı dəyişdirilə bilməz.
+Şagirdin sətrinə basın (adına yox). Pəncərədə ad, telefon, email, Telegram, WhatsApp, valideynin adı və telefonu dəyişdirilə bilər. İstifadəçi adı dəyişdirilə bilməz.
 
 ### Telefonlar üçün qaydalar
 
@@ -125,7 +125,7 @@ Tələbə sırasındakı **qələm** ikonuna basın. Pəncərədə ad, telefon, 
 
 ### Valideyn üçün link
 
-Valideyn uşağının akademik göstəricilərini şəxsi link vasitəsilə görə bilər və ya öz istifadəçi adı ilə daxil ola bilər. Tələbənin məlumatlarını açın (qələm); müəllim bunu yalnız öz qruplarındakı tələbələr üçün edə bilər: "Valideyn" bölməsində linkin olduğu blok var. Linklə birlikdə valideynin girişi yaradılır: istifadəçi adı — `p.` və uşağın istifadəçi adı, şifrə əvvəlcə istifadəçi adına bərabərdir; düymələr valideynə dərhal link, ünvan, istifadəçi adı və şifrəni təqdim edir. Köhnə linklər üçün — **Valideyn üçün giriş yaradın**.
+Valideyn uşağının akademik göstəricilərini şəxsi link vasitəsilə görə bilər və ya öz istifadəçi adı ilə daxil ola bilər. Tələbənin məlumatlarını açın (sətrə klik); müəllim bunu yalnız öz qruplarındakı tələbələr üçün edə bilər: "Valideyn" bölməsində linkin olduğu blok var. Linklə birlikdə valideynin girişi yaradılır: istifadəçi adı — `p.` və uşağın istifadəçi adı, şifrə əvvəlcə istifadəçi adına bərabərdir; düymələr valideynə dərhal link, ünvan, istifadəçi adı və şifrəni təqdim edir. Köhnə linklər üçün — **Valideyn üçün giriş yaradın**.
 
 - **Valideyn üçün link yaradın** — düymə valideynin telefonu doldurulduqda və kart saxlandıqda görünür.
 - **Kopyala** — link clipboard-a düşəcək, istənilən mesajlaşma tətbiqinə yapışdırıla bilər.
@@ -138,9 +138,19 @@ Link vasitəsilə valideyn yalnız akademik göstəriciləri görür: dərslər,
 
 ### Digər əməliyyatlar
 
-- **Şifrəni dəyişmək** (açar) — əgər şagird şifrəsini unutmuşdursa. Yeni şifrə sistemi ekranda göstərəcək, onu şagirdə bildirmək lazımdır.
-- **Silmək** (tullantı) — sistem şagirdlə bağlı olanları göstərəcək və təsdiq tələb edəcək.
-- Şagirdi başqa qrupa köçürmək və ya xaric etmək — qrup səhifəsində, **Şagirdlər** simgesi: şagirdi yeni qrupa yazın və köhnə qrupdan xaric edin. Şagird eyni vaxtda iki qrupda da oxuya bilər.
+- Şagird şifrəni unudub — onun məlumatlarını açın (sətrə klik) və **Şagirdin girişi** blokunda **Girişə sıfırlamaq** düyməsini basın.
+- **Arxivə** (sətrin sağındakı simge) — şagirdi səbəb göstərərək xaric etmək: məsələn, ödəniş etməyib və ya təhsilini bitirib. Şagirdin bir neçə qrupu varsa, hansından xaric etməyi və ya **Hamısından** seçin. Bütün təhsil tarixçəsi saxlanılır.
+- Əlavə dərs qrup səhifəsində qoyulur: **+ Dərs** → **Fərdi dərs**.
+- Şagirdi başqa qrupa köçürmək — qrup səhifəsində, **Şagirdlər** simgesi: şagirdi yeni qrupa yazın və köhnə qrupdan arxivə göndərin. Şagird eyni vaxtda iki qrupda da oxuya bilər.
+
+### Şagirdlərin arxivi
+
+Yuxarı sağdakı arxiv simgesi **Şagirdlərin arxivi**ni açır — heç bir qrupu qalmamış şagirdlər: qrup, səbəb və xaric edilmə tarixi. Ada basın — şagirdin bütün təhsili ilə hesabatı açılacaq (dərslər — xaric edildiyi günə qədər).
+
+- **Qrupa qaytar** — şagird yenidən qrupdadır.
+
+Arxivdəki şagird platformaya daxil olub bu qrupun xaric edildiyi günə qədərki dərslərinə baxa bilər — materiallar, öz cavabları və dialoq — amma heç nə təqdim etmir və yazmır.
+- **Tamamilə sil** (səbət) — yalnız arxivdə: sistem şagirdlə bağlı olanları göstərəcək və təsdiqdən sonra onu bütün tarixçə ilə — qiymətlər, davamiyyət, ev tapşırıqları və dialoqlarla birlikdə siləcək.
 
 Şagirdləri administrator və kurator yaradır və onların məlumatlarını dəyişir. Müəllim şagird kartını yalnız oxumaq üçün görür, amma giriş verir: şagirdin login və şifrəsi, valideynin linki və girişi. Müəllim və kurator qrupa yalnız hazırda heç bir qrupda oxumayan şagirdləri yazır; başqa qrupdan olan şagirdi yalnız administrator yazır.
 

@@ -9,7 +9,8 @@ import { extractErrorMessage } from '../utils/errors';
 const fmt = (v) => (v ? new Date(v).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
 
 // draft — { text } снаружи (ответ ИИ): кладётся в поле сообщения, не отправляется
-export function DialogThread({ lessonId, studentId, onChanged, draft }) {
+// readOnly — только чтение переписки (ученик отчислен из группы, урок из архива)
+export function DialogThread({ lessonId, studentId, onChanged, draft, readOnly = false }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
@@ -64,7 +65,7 @@ export function DialogThread({ lessonId, studentId, onChanged, draft }) {
               {m.author_name} · {fmt(m.created_at)}{m.edited_at ? ' · изменено' : ''}
             </div>
             <div className="dialog__text">{m.text}</div>
-            {m.can_edit && editingId !== m.id && (
+            {m.can_edit && !readOnly && editingId !== m.id && (
               <button type="button" className="link dialog__edit" onClick={() => { setEditingId(m.id); setText(m.text); }}>
                 {'Изменить'}
               </button>
@@ -74,6 +75,8 @@ export function DialogThread({ lessonId, studentId, onChanged, draft }) {
         <div ref={endRef} />
       </div>
       {error && <div className="error-text error-text--muted">{error}</div>}
+      {!readOnly && (
+      <>
       <textarea
         className="input input--textarea"
         value={text}
@@ -91,6 +94,8 @@ export function DialogThread({ lessonId, studentId, onChanged, draft }) {
           </button>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-<!-- autoi18n: source=student.md lang=az sha1=faa246ddf73a2f4ad4864ef8e6442c63dc62a889 -->
+<!-- autoi18n: source=student.md lang=az sha1=96ed9da908b3b337261a22cbf90b5a9689244c21 -->
 # Platformada necə işləmək
 
 ## Ana səhifə — mənim dərslərim
@@ -63,6 +63,8 @@ Cavabın statusu:
 ### Dialoq
 
 Bu dərs üzrə müəllimlə yazışma. Mesaj yazın və göndərin. Öz mesajınızı düzəldə bilərsiniz — **Dəyişdir** düyməsi.
+
+Əgər sizi qrupdan xaric ediblərsə, bu qrupun xaric edildiyiniz günə qədərki dərsləri baxmaq üçün qalır: materiallar, cavablarınız və dialoq görünür, amma heç nə təqdim etmək və ya yazmaq olmur.
 
 ## Uğur
 

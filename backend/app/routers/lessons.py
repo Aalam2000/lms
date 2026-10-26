@@ -20,7 +20,7 @@ from ..days_off import (
 )
 from ..personal import (
     is_participant, lesson_student_ids, lesson_students_condition, participant_names,
-    set_participants, visible_to_student,
+    set_participants, student_lesson_access, student_lesson_scope, visible_to_student,
 )
 from ..database import get_db
 from .. import storage
@@ -68,6 +68,8 @@ class LessonOut(BaseModel):
     id: int
     group_id: int
     title: str
+    # Ученику: отчислен из группы (архив) — урок только для просмотра
+    read_only: bool = False
     order: int
     date: Optional[datetime]
     duration_min: int = 120  # конец урока = date + duration_min (считает фронт)
@@ -408,8 +410,11 @@ async def _apply_positions_to_lessons(
 async def get_lesson_for_student(
     lesson_id: int,
     db: AsyncSession,
-    current_user: User
+    current_user: User,
+    write: bool = True,
 ) -> Lesson:
+    """Урок для ученика. write=False — только просмотр: его получает и отчисленный
+    ученик (архив) для уроков до дня отчисления (personal.student_lesson_access)."""
     result = await db.execute(select(Lesson).where(Lesson.id == lesson_id))
     lesson = result.scalar_one_or_none()
     if not lesson:
@@ -418,15 +423,11 @@ async def get_lesson_for_student(
     if not lesson.is_open:
         raise HTTPException(status_code=403, detail="Урок ещё не открыт")
 
-    member = await db.execute(
-        select(GroupMember).where(
-            GroupMember.group_id == lesson.group_id,
-            GroupMember.student_id == current_user.id,
-            GroupMember.status == "active",
-        )
-    )
-    if not member.scalar_one_or_none():
+    access = await student_lesson_access(db, lesson, current_user.id)
+    if access is None:
         raise HTTPException(status_code=403, detail="Нет доступа")
+    if write and access == "readonly":
+        raise HTTPException(status_code=403, detail="Вы отчислены из этой группы — урок доступен только для просмотра")
     # Персональный урок — только участникам
     if not await is_participant(db, lesson, current_user.id):
         raise HTTPException(status_code=403, detail="Нет доступа")
@@ -1373,20 +1374,11 @@ async def get_student_lessons(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Находим группы студента
-    members_result = await db.execute(
-        select(GroupMember).where(
-            GroupMember.student_id == current_user.id,
-            GroupMember.status == "active"
-        )
-    )
-    group_ids = [m.group_id for m in members_result.scalars().all()]
-    if not group_ids:
-        return []
+    # Уроки групп студента: активных и, только для просмотра, отчисленных — до дня отчисления
     result = await db.execute(
         select(Lesson)
         .where(
-            Lesson.group_id.in_(group_ids),
+            student_lesson_scope(current_user.id),
             visible_to_student(current_user.id),  # персональные — только свои
             *([] if include_closed else [Lesson.is_open == True]),
         )
@@ -1412,10 +1404,11 @@ async def get_student_marks(
     if current_user.role != "student":
         raise HTTPException(status_code=403, detail="Только для студента")
 
+    # Группы, где ученик активен или откуда отчислен (уроки — до дня отчисления)
     members_result = await db.execute(
         select(GroupMember).where(
             GroupMember.student_id == current_user.id,
-            GroupMember.status == "active",
+            GroupMember.status.in_(("active", "expelled")),
         )
     )
     group_ids = [m.group_id for m in members_result.scalars().all()]
@@ -1428,7 +1421,8 @@ async def get_student_marks(
             LessonMark,
             (LessonMark.lesson_id == Lesson.id) & (LessonMark.student_id == current_user.id),
         )
-        .where(Lesson.group_id.in_(group_ids), Lesson.is_open == True, visible_to_student(current_user.id))
+        .where(Lesson.group_id.in_(group_ids), student_lesson_scope(current_user.id),
+               Lesson.is_open == True, visible_to_student(current_user.id))
         .order_by(Lesson.date.desc())
     )
 
@@ -1551,7 +1545,7 @@ async def get_student_grades(
 
     group_ids = [r[0] for r in (await db.execute(
         select(GroupMember.group_id).where(
-            GroupMember.student_id == current_user.id, GroupMember.status == "active",
+            GroupMember.student_id == current_user.id, GroupMember.status.in_(("active", "expelled")),
         )
     )).all()]
     lesson_items: list[GradeItemOut] = []
@@ -1561,7 +1555,8 @@ async def get_student_grades(
         for lesson, mark in (await db.execute(
             select(Lesson, LessonMark)
             .join(LessonMark, (LessonMark.lesson_id == Lesson.id) & (LessonMark.student_id == current_user.id))
-            .where(Lesson.group_id.in_(group_ids), Lesson.is_open == True, visible_to_student(current_user.id))
+            .where(Lesson.group_id.in_(group_ids), student_lesson_scope(current_user.id),
+                   Lesson.is_open == True, visible_to_student(current_user.id))
             .order_by(Lesson.date.desc())
         )).all():
             if mark.score is not None:
@@ -1785,11 +1780,12 @@ async def get_my_lesson_feedback(
 ):
     if current_user.role != "student":
         raise HTTPException(status_code=403, detail="Только для студента")
-    lesson = await get_lesson_for_student(lesson_id, db, current_user)
+    lesson = await get_lesson_for_student(lesson_id, db, current_user, write=False)
     rating = (await db.execute(select(LessonFeedback.rating).where(
         LessonFeedback.lesson_id == lesson_id, LessonFeedback.student_id == current_user.id,
     ))).scalar_one_or_none()
-    return LessonFeedbackOut(rating=rating, can_rate=_lesson_started(lesson))
+    readonly = await student_lesson_access(db, lesson, current_user.id) == "readonly"
+    return LessonFeedbackOut(rating=rating, can_rate=_lesson_started(lesson) and not readonly)
 
 
 @router.put("/{lesson_id}/feedback/me", response_model=LessonFeedbackOut)
@@ -1876,7 +1872,7 @@ async def get_lesson_items(
     current_user: User = Depends(get_current_user)
 ):
     if current_user.role == "student":
-        await get_lesson_for_student(lesson_id, db, current_user)
+        await get_lesson_for_student(lesson_id, db, current_user, write=False)
     else:
         await get_lesson_for_teacher_or_admin(lesson_id, db, current_user, write=False)
 
@@ -2135,11 +2131,14 @@ async def get_lesson(
     current_user: User = Depends(get_current_user)
 ):
     if current_user.role == "student":
-        lesson = await get_lesson_for_student(lesson_id, db, current_user)
+        lesson = await get_lesson_for_student(lesson_id, db, current_user, write=False)
     else:
         lesson = await get_lesson_for_teacher_or_admin(lesson_id, db, current_user, write=False)
     out = LessonOut.model_validate(lesson)
     out.is_locked = lesson_locked_for(lesson, current_user)
+    if current_user.role == "student":
+        # Отчислен из группы (архив): урок только для просмотра
+        out.read_only = await student_lesson_access(db, lesson, current_user.id) == "readonly"
     group_row = (await db.execute(
         select(Group.name, Group.video_url, Group.telegram_chat_id, Group.whatsapp, Group.sector, Group.course_id)
         .where(Group.id == lesson.group_id)

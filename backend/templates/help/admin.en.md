@@ -1,4 +1,4 @@
-<!-- autoi18n: source=admin.md lang=en sha1=a5410694d26efe39a568162f14c8d8b4f9961cf9 -->
+<!-- autoi18n: source=admin.md lang=en sha1=a9b63010ab69aa2d890eafbdb0039c5525a11064 -->
 # How to Work on the Platform
 
 The administrator sees everything that the teacher sees — but for all groups and all teachers — and additionally manages users, courses, and groups.
@@ -113,7 +113,7 @@ A personal lesson closes absences: when it is over and the student is marked as 
 
 ### How to change student data
 
-Click the **pencil** icon in the student's row. In the window, you can change the name, phone, email, Telegram, WhatsApp, parent's name, and parent's phone. The login cannot be changed.
+Click the student's row (not the name). In the window, you can change the name, phone, email, Telegram, WhatsApp, parent's name, and parent's phone. The login cannot be changed.
 
 ### Rules for phones
 
@@ -125,7 +125,7 @@ Click the **pencil** icon in the student's row. In the window, you can change th
 
 ### Link for the parent
 
-The parent can view the child's performance via a personal link or log in with their own login. Open the student's data (pencil); the teacher can only do this for students in their groups: in the "Parent" section, there is a block with the link. Along with the link, a parent login is created: the login is `p.` followed by the child's login, and the password initially equals the login; the buttons immediately provide the parent with the link, address, login, and password. For old links — **Create parent login**.
+The parent can view the child's performance via a personal link or log in with their own login. Open the student's data (click on the row); the teacher can only do this for students in their groups: in the "Parent" section, there is a block with the link. Along with the link, a parent login is created: the login is `p.` followed by the child's login, and the password initially equals the login; the buttons immediately provide the parent with the link, address, login, and password. For old links — **Create parent login**.
 
 - **Create link for parent** — the button appears when the parent's phone is filled in and the card is saved.
 - **Copy** — the link will go to the clipboard and can be pasted into any messenger.
@@ -138,9 +138,19 @@ Through the link, the parent sees only the performance: grades for lessons, Home
 
 ### Other Actions
 
-- **Change Password** (key) — if the student forgot the password. The new password will be displayed on the screen, and it needs to be communicated to the student.
-- **Delete** (trash can) — the system will show what is associated with the student and ask for confirmation.
-- Transfer the student to another group or expel — on the group page, the **Students** icon: enrol the student in the new group and expel them from the old one. A student may also study in two groups at once.
+- The student forgot the password — open their data (click on the row) and in the **Student access** block click **Reset to login**.
+- **To archive** (icon on the right of the row) — expel the student with a reason: for example, did not pay or finished the course. If the student has several groups, choose which one to expel from, or **From all**. The whole study history is kept.
+- An extra lesson is added on the group page: **+ Lesson** → **Personal lesson**.
+- Transfer the student to another group — on the group page, the **Students** icon: enrol the student in the new group and send them to the archive from the old one. A student may also study in two groups at once.
+
+### Student Archive
+
+The archive icon at the top right opens the **Student archive** — students who have no group left: group, reason and date of expulsion. Click the name — the student report opens with all their studies (lessons up to the day of expulsion).
+
+- **Return to the group** — the student is back in the group.
+
+A student in the archive can log in and view the lessons of this group up to the day of expulsion — materials, their answers and the dialogue — but cannot submit or write anything.
+- **Delete completely** (trash can) — only in the archive: the system will show what is associated with the student and, after confirmation, delete them together with the whole history — grades, attendance, homework and dialogues.
 
 Students are added and their data changed by the administrator and the curator. The teacher sees the student card read-only but gives access: the student's login and password, the parent's link and login. The teacher and the curator enrol in a group only students who are not currently studying in any group; a student from another group is enrolled only by the administrator.
 

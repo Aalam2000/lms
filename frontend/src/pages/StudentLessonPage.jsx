@@ -191,8 +191,11 @@ function StudentLessonPage() {
       </div>
 
       {error && <div className="error-text error-text--muted">{error}</div>}
+      {lesson.read_only && (
+        <div className="hint-text">{'Вы отчислены из этой группы — урок открыт только для просмотра'}</div>
+      )}
 
-      {liveQuiz && (
+      {liveQuiz && !lesson.read_only && (
         <div className="live-quiz-call">
           <span className="live-quiz-call__text">
             <span>{'Педагог запустил квиз'}</span>
@@ -269,7 +272,7 @@ function StudentLessonPage() {
         )}
 
         {tab === 'dialog' && user && (
-          <DialogThread lessonId={lessonId} studentId={user.id} onChanged={refreshMessagesCount} />
+          <DialogThread lessonId={lessonId} studentId={user.id} onChanged={refreshMessagesCount} readOnly={lesson.read_only} />
         )}
       </div>
     </div>
