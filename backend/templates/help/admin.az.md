@@ -1,4 +1,4 @@
-<!-- autoi18n: source=admin.md lang=az sha1=a9b63010ab69aa2d890eafbdb0039c5525a11064 -->
+<!-- autoi18n: source=admin.md lang=az sha1=23d1484ee680c85d37d31d621c33a605d220fda9 -->
 # Platformada necə işləmək olar
 
 Administrator müəllimlərin gördüyü hər şeyi görür — amma bütün qruplar və bütün müəllimlər üzrə — və əlavə olaraq istifadəçiləri, kursları və qrupları idarə edir.
@@ -192,7 +192,7 @@ Dərs üçün qiymətlər və ulduzlar hesabata daxil deyil: onları müəllim �
 
 [Ziyarətlər](/dashboard/activity) bölməsində:
 
-- **Bu gün sistemdə** — bu gün kimlər daxil olub; «indiki» — son dəqiqələrdə aktivdir.
+- **İndi sistemdə** — yalnız hazırda onlayn olanlar və hansı vaxtdan. Vərəqi bağladı — dərhal itir, kiçiltdi və ya bağlantı itdi — 1–2 dəqiqəyə. Bu gün kimin daxil olduğu — aşağıdakı hesabatda, «Bu gün» dövrü.
 - Müəllimlər, şagirdlər və administratorlar üzrə dövr üçün hesabat (bu gün, 7 və ya 30 gün): neçə gün daxil olub, sistemdə vaxt, son aktivlik — yekun və ya günlər üzrə.
 
 ## Profil

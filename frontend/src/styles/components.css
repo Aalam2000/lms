@@ -2718,14 +2718,11 @@ a.row-icon:hover {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--color-muted);           /* серый — сегодня был, сейчас нет */
+  background: var(--color-muted);
   flex-shrink: 0;
 }
 .activity-online__dot--online {
-  background: var(--color-role-student);    /* зелёный — активен за последние 10 мин */
-}
-.activity-online__user--away {
-  color: var(--color-muted);
+  background: var(--color-role-student);    /* зелёный — сейчас в системе */
 }
 .activity-online__since {
   color: var(--color-muted);

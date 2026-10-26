@@ -5,8 +5,11 @@
   hooks/usePresencePing.js). Свёрнутая / скрытая вкладка пульс не шлёт.
 - Пульс продлевает последнюю сессию, если с прошлого прошло не больше
   SESSION_GAP; иначе начинается новая сессия.
-- «Сегодня в системе» — все, у кого сегодня (по Баку) была сессия; зелёный
-  флажок «сейчас здесь» — последний пульс не старше ONLINE_WINDOW.
+- «Сейчас в системе» — только те, у кого последний пульс не старше
+  ONLINE_WINDOW и кто не закрыл вкладку: при закрытии фронт шлёт «ушёл»
+  (POST /presence/bye) — человек пропадает сразу, до следующего пульса.
+  «Ушёл» хранится в памяти процесса (backend в один воркер); после
+  перезапуска действует только окно ONLINE_WINDOW.
 - Время сессии = last_seen - started + PING_INTERVAL (последняя минута
   после последнего пульса тоже была проведена в системе).
 """
@@ -27,7 +30,11 @@ router = APIRouter(prefix="/presence", tags=["presence"])
 
 PING_INTERVAL = timedelta(seconds=60)
 SESSION_GAP = timedelta(minutes=5)
-ONLINE_WINDOW = timedelta(minutes=10)  # решение Андрея: «сейчас здесь» = активен за 10 мин
+# Решение Андрея: «сейчас в системе» — только кто онлайн сейчас: пульс раз в минуту,
+# окно — 2 минуты (одна пропущенная минута в запасе)
+ONLINE_WINDOW = timedelta(minutes=2)
+# Кто закрыл вкладку («ушёл», POST /presence/bye): user_id → время. Снимается пульсом.
+LEFT_AT: dict[int, datetime] = {}
 # Несколько вкладок одного пользователя шлют пульсы независимо — чаще раза
 # в THROTTLE базу не трогаем.
 THROTTLE = timedelta(seconds=20)
@@ -74,48 +81,48 @@ MAX_REPORT_DAYS = 366
 
 @router.post("/ping", status_code=204)
 async def ping(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    LEFT_AT.pop(current_user.id, None)  # снова на месте (вторая вкладка, перезагрузка)
     await record_ping(db, current_user.id)
     return Response(status_code=204)
 
 
-class TodayUserOut(BaseModel):
+# Закрыл вкладку — «ушёл» сразу (фронт: fetch keepalive при pagehide)
+@router.post("/bye", status_code=204)
+async def bye(current_user: User = Depends(get_current_user)):
+    LEFT_AT[current_user.id] = now_utc()
+    return Response(status_code=204)
+
+
+class OnlineUserOut(BaseModel):
     user_id: int
     full_name: str
     role: str
-    first_seen: datetime   # первый вход сегодня
+    since: datetime        # начало текущей сессии
     last_seen: datetime
-    minutes: int           # время в системе сегодня
-    is_online: bool        # последний пульс не старше ONLINE_WINDOW (зелёный флажок)
 
 
-# «Сегодня в системе»: все, кто заходил сегодня (день по Баку), с флажком
-# «сейчас здесь». Сначала те, кто сейчас в системе, потом по последней активности.
-@router.get("/today", response_model=list[TodayUserOut])
-async def today(db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)):
+# «Сейчас в системе»: последний пульс не старше ONLINE_WINDOW и вкладку не закрыл
+@router.get("/online", response_model=list[OnlineUserOut])
+async def online(db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)):
     now = now_utc()
-    day_start = datetime.combine(baku_day(now), time.min, tzinfo=BAKU_TZ)
     rows = (await db.execute(
         select(UserSession, User)
         .join(User, User.id == UserSession.user_id)
-        .where(UserSession.last_seen_at >= day_start)
+        .where(UserSession.last_seen_at >= now - ONLINE_WINDOW)
     )).all()
-    out: dict[int, TodayUserOut] = {}
+    out: dict[int, OnlineUserOut] = {}
     for s, u in rows:
-        started = max(aware(s.started_at), day_start)  # сессия с прошлого дня — считаем с полуночи
-        minutes = round(session_minutes(started, aware(s.last_seen_at)))
+        last_seen = aware(s.last_seen_at)
+        left = LEFT_AT.get(u.id)
+        if left and left >= last_seen:
+            continue
         item = out.get(u.id)
-        if item is None:
-            out[u.id] = TodayUserOut(
+        if item is None or last_seen > item.last_seen:
+            out[u.id] = OnlineUserOut(
                 user_id=u.id, full_name=u.full_name or u.username, role=u.role,
-                first_seen=started, last_seen=aware(s.last_seen_at), minutes=minutes, is_online=False,
+                since=aware(s.started_at), last_seen=last_seen,
             )
-        else:
-            item.first_seen = min(item.first_seen, started)
-            item.last_seen = max(item.last_seen, aware(s.last_seen_at))
-            item.minutes += minutes
-    for item in out.values():
-        item.is_online = item.last_seen >= now - ONLINE_WINDOW
-    return sorted(out.values(), key=lambda i: (not i.is_online, -i.last_seen.timestamp()))
+    return sorted(out.values(), key=lambda i: i.full_name.lower())
 
 
 class DayRowOut(BaseModel):

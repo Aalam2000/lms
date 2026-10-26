@@ -1,4 +1,4 @@
-<!-- autoi18n: source=admin.md lang=en sha1=a9b63010ab69aa2d890eafbdb0039c5525a11064 -->
+<!-- autoi18n: source=admin.md lang=en sha1=23d1484ee680c85d37d31d621c33a605d220fda9 -->
 # How to Work on the Platform
 
 The administrator sees everything that the teacher sees — but for all groups and all teachers — and additionally manages users, courses, and groups.
@@ -192,7 +192,7 @@ In the [Classrooms](/dashboard/rooms) section — a directory of the academy's c
 
 In the [Attendance](/dashboard/activity) section:
 
-- **Today in the system** — who logged in today; "now" — active in the last minutes.
+- **Now in the system** — only those who are online right now, and since what time. Closed the tab — disappears at once; minimised it or lost the connection — within 1–2 minutes. Who logged in today — in the report below, period "Today".
 - Report for the period (today, 7 or 30 days) for teachers, students, and administrators: how many days logged in, time in the system, last activity — in total or by days.
 
 ## Profile

@@ -1,15 +1,15 @@
-// «Посещения» (только админ, claude/presence-plan.md): кто сегодня был в
-// системе (зелёный флажок — активен за последние 10 мин) и отчёт — кто когда заходил и сколько времени провёл. Данные —
+// «Посещения» (только админ, claude/presence-plan.md): кто сейчас в системе
+// (пульс за последние 2 мин, вкладку не закрыл) и отчёт — кто когда заходил и сколько времени провёл. Данные —
 // из пульса открытых вкладок (hooks/usePresencePing.js), правила — на
 // бэкенде (app/routers/presence.py).
 import React, { useEffect, useMemo, useState } from 'react';
 import Dropdown from '../components/Dropdown';
-import { getTodayUsers, getPresenceReport } from '../api/presence';
+import { getOnlineUsers, getPresenceReport } from '../api/presence';
 import { getMyGroups } from '../api/groups';
 import { extractErrorMessage } from '../utils/errors';
 import { formatDuration } from '../utils/lessonTime';
 
-const TODAY_REFRESH_MS = 30 * 1000;
+const ONLINE_REFRESH_MS = 30 * 1000;
 const ROLE_OPTIONS = [
   { value: 'teacher', label: 'Педагоги' },
   { value: 'student', label: 'Студенты' },
@@ -38,7 +38,7 @@ function RoleBadge({ role }) {
 }
 
 function ActivityPage() {
-  const [todayUsers, setTodayUsers] = useState([]);
+  const [onlineUsers, setOnlineUsers] = useState([]);
   const [groups, setGroups] = useState([]);
   const [dateFrom, setDateFrom] = useState(daysAgo(6));
   const [dateTo, setDateTo] = useState(daysAgo(0));
@@ -49,11 +49,11 @@ function ActivityPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // «Сегодня в системе» — обновляется сам, пока страница открыта
+  // «Сейчас в системе» — обновляется сам, пока страница открыта
   useEffect(() => {
-    const load = () => getTodayUsers().then(setTodayUsers).catch(() => {});
+    const load = () => getOnlineUsers().then(setOnlineUsers).catch(() => {});
     load();
-    const timer = setInterval(load, TODAY_REFRESH_MS);
+    const timer = setInterval(load, ONLINE_REFRESH_MS);
     return () => clearInterval(timer);
   }, []);
 
@@ -87,27 +87,21 @@ function ActivityPage() {
         <h1 className="page-title">{'Посещения'}</h1>
       </div>
 
-      {/* Сегодня в системе: зелёный — активен за последние 10 мин, серый — уже ушёл */}
+      {/* Сейчас в системе: только кто онлайн — пульс за последние 2 мин и вкладку не закрыл.
+          Кто был сегодня — в отчёте ниже, период «Сегодня» */}
       <section className="activity-online">
         <div className="activity-online__title">
-          {'Сегодня в системе'}: <b>{todayUsers.length}</b>
-          {' · '}{'сейчас'}: <b>{todayUsers.filter(u => u.is_online).length}</b>
+          {'Сейчас в системе'}: <b>{onlineUsers.length}</b>
         </div>
-        {todayUsers.length === 0 ? (
-          <div className="activity-online__empty">{'Сегодня никто не заходил'}</div>
+        {onlineUsers.length === 0 ? (
+          <div className="activity-online__empty">{'Сейчас никого нет'}</div>
         ) : (
           <div className="activity-online__list">
-            {todayUsers.map(u => (
-              <span
-                key={u.user_id}
-                className={`activity-online__user${u.is_online ? '' : ' activity-online__user--away'}`}
-                title={`${formatTime(u.first_seen)}–${formatTime(u.last_seen)} · ${formatDuration(u.minutes)}`}
-              >
-                <span className={`activity-online__dot${u.is_online ? ' activity-online__dot--online' : ''}`} />
+            {onlineUsers.map(u => (
+              <span key={u.user_id} className="activity-online__user">
+                <span className="activity-online__dot activity-online__dot--online" />
                 {u.full_name} <RoleBadge role={u.role} />
-                <span className="activity-online__since">
-                  {u.is_online ? `с ${formatTime(u.first_seen)}` : `был до ${formatTime(u.last_seen)}`}
-                </span>
+                <span className="activity-online__since">{`с ${formatTime(u.since)}`}</span>
               </span>
             ))}
           </div>
