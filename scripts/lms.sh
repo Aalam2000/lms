@@ -12,7 +12,7 @@ BACKUP_LOG=/var/backups/logacademy/backup.log
 SITE_URL=http://192.168.0.9/
 
 usage() {
-  echo "Использование: lms {deploy|status|log|restart|precheck|backup|csp|load}"
+  echo "Использование: lms {deploy|status|log|restart|precheck|backup|csp|load|renumber}"
   echo ""
   echo "  deploy [ветка]   — забрать код с GitHub (по умолчанию master), пересобрать и перезапустить"
   echo "  status           — версия кода, контейнеры, база, ответ сайта, последний бэкап"
@@ -22,13 +22,14 @@ usage() {
   echo "  backup           — сделать бэкап сейчас и показать последние строки журнала бэкапов"
   echo "  csp              — отчёты CSP (что браузеры заблокировали бы)"
   echo "  load [дни]       — отчёт о нагрузке сервера (по умолчанию за сутки, до 28)"
+  echo "  renumber [apply] — разовая перенумерация уроков N.M → K: отчёт в tmp/, apply — применить"
 }
 
 # Автодополнение по Tab: команды (lms d → deploy) и сервисы (lms log b → backend).
 # Подключается файлом /etc/bash_completion.d/lms с одной строкой
 #   eval "$(/usr/local/bin/lms completion)"
 # — список всегда берётся из этого скрипта, отдельно править не нужно.
-COMMANDS="deploy status log restart precheck backup csp load"
+COMMANDS="deploy status log restart precheck backup csp load renumber"
 SERVICES="backend frontend nginx"
 
 completion() {
@@ -220,6 +221,16 @@ main() {
 
     load)
       ./scripts/load-report.sh "$@"
+      ;;
+
+    renumber)
+      # разовая перенумерация уроков (app/lesson_renumber.py) — удалить вместе с модулем
+      mkdir -p tmp
+      local out arg=""
+      out="tmp/renumber_$(TZ=Asia/Baku date +%Y-%m-%d_%H%M%S).txt"
+      [ "${1:-}" = apply ] && arg="--apply"
+      $COMPOSE exec -T backend python -m app.lesson_renumber $arg | tee "$out"
+      echo "Отчёт: $PWD/$out"
       ;;
 
     completion)
