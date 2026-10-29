@@ -249,10 +249,14 @@ async def open_game(
     lesson = await get_lesson_for_teacher_or_admin(body.lesson_id, db, current_user)
 
     # В уроке идёт только один квиз: тот же — возвращаем его (вкладку хоста
-    # открыли заново), другой — прежний закрывается
+    # открыли заново), другой — прежний закрывается. Ведущий идущей игры — тот,
+    # кто нажал «Запустить» (доступ к уроку проверен выше): игра, начатая под
+    # другим входом (админ, другой педагог, закрытый браузер), иначе держала бы
+    # урок — страница ведущего получала бы 403. Ученики и ответы остаются.
     running = _running_game(lesson.id)
     if running:
         if running["quiz_id"] == quiz.id:
+            running["teacher_id"] = current_user.id
             _touch(running)
             return {"code": running["code"]}
         await _close_game(running, db)
